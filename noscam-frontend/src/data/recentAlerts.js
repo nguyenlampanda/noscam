@@ -1,0 +1,33 @@
+export const recentAlerts = [
+  {
+    id: 1,
+    type: 'Tài khoản ngân hàng',
+    value: '1234567821',
+    bank: 'Ngân hàng ABC',
+    description: 'Được cộng đồng báo cáo liên quan đến giao dịch mua bán.',
+    reports: 12,
+    time: '18 phút trước',
+    risk: 'Rủi ro cao',
+    riskLevel: 'high',
+  },
+  {
+    id: 2,
+    type: 'Số điện thoại',
+    value: '0909123846',
+    description: 'Có nhiều báo cáo liên quan đến nội dung liên hệ đáng ngờ.',
+    reports: 8,
+    time: '42 phút trước',
+    risk: 'Rủi ro cao',
+    riskLevel: 'high',
+  },
+  {
+    id: 3,
+    type: 'Website',
+    value: 'shop-example.vn',
+    description: 'Tên miền được người dùng gửi báo cáo để kiểm tra.',
+    reports: 5,
+    time: '1 giờ trước',
+    risk: 'Rủi ro trung bình',
+    riskLevel: 'medium',
+  },
+]

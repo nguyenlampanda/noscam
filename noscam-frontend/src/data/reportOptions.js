@@ -1,0 +1,30 @@
+export const scamTypes = [
+  'Mua bán hàng hóa',
+  'Chuyển khoản',
+  'Mạo danh',
+  'Đầu tư / tài chính',
+  'Tuyển dụng',
+  'Phòng trọ / đặt cọc',
+  'Vay tiền',
+  'Chiếm đoạt tài khoản',
+  'Website giả mạo',
+  'Khác',
+]
+
+export const banks = [
+  'Vietcombank',
+  'VietinBank',
+  'BIDV',
+  'Agribank',
+  'MB Bank',
+  'Techcombank',
+  'ACB',
+  'VPBank',
+  'TPBank',
+  'Sacombank',
+  'VIB',
+  'SHB',
+  'OCB',
+  'MSB',
+  'Khác',
+]
