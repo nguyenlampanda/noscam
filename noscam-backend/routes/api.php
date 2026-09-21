@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AdminAuthController;
+use App\Http\Controllers\Api\AdminDashboardController;
 use App\Http\Controllers\Api\AdminEvidenceController;
 use App\Http\Controllers\Api\AdminReportController;
 use App\Http\Controllers\Api\AlertController;
@@ -9,9 +10,20 @@ use App\Http\Controllers\Api\ReportModerationController;
 use App\Http\Controllers\Api\SearchController;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/search', [SearchController::class, 'index']);
-Route::get('/alerts', [AlertController::class, 'index']);
-Route::post('/reports', [ReportController::class, 'store']);
+Route::get(
+    '/search',
+    [SearchController::class, 'index']
+);
+
+Route::get(
+    '/alerts',
+    [AlertController::class, 'index']
+);
+
+Route::post(
+    '/reports',
+    [ReportController::class, 'store']
+);
 
 Route::post(
     '/admin/login',
@@ -27,6 +39,11 @@ Route::prefix('admin')
         Route::post(
             '/logout',
             [AdminAuthController::class, 'logout']
+        );
+
+        Route::get(
+            '/dashboard',
+            [AdminDashboardController::class, 'index']
         );
 
         Route::get(

@@ -9,12 +9,26 @@ use Illuminate\Http\Request;
 
 class AdminReportController extends Controller
 {
-    public function index(
-        Request $request
-    ): JsonResponse {
+    public function index(Request $request): JsonResponse
+    {
         $status = $request->query(
             'status',
             'pending'
+        );
+
+        $search = trim(
+            (string) $request->query(
+                'search',
+                ''
+            )
+        );
+
+        $page = max(
+            1,
+            (int) $request->query(
+                'page',
+                1
+            )
         );
 
         if (
@@ -34,14 +48,71 @@ class AdminReportController extends Controller
             ], 422);
         }
 
-        $reports = Report::query()
-            ->where('status', $status)
+        $query = Report::query()
+            ->where(
+                'status',
+                $status
+            )
             ->with([
                 'evidences:id,report_id,original_name,mime_type,file_size',
             ])
-            ->withCount('evidences')
+            ->withCount(
+                'evidences'
+            );
+
+        if ($search !== '') {
+            $query->where(
+                function ($query) use (
+                    $search
+                ) {
+                    $query
+                        ->where(
+                            'phone',
+                            'like',
+                            "%{$search}%"
+                        )
+                        ->orWhere(
+                            'bank_account',
+                            'like',
+                            "%{$search}%"
+                        )
+                        ->orWhere(
+                            'bank',
+                            'like',
+                            "%{$search}%"
+                        )
+                        ->orWhere(
+                            'social',
+                            'like',
+                            "%{$search}%"
+                        )
+                        ->orWhere(
+                            'website',
+                            'like',
+                            "%{$search}%"
+                        )
+                        ->orWhere(
+                            'description',
+                            'like',
+                            "%{$search}%"
+                        );
+
+                    if (ctype_digit($search)) {
+                        $query->orWhere(
+                            'id',
+                            (int) $search
+                        );
+                    }
+                }
+            );
+        }
+
+        $reports = $query
             ->latest()
-            ->paginate(20);
+            ->paginate(
+                perPage: 10,
+                page: $page
+            );
 
         return response()->json([
             'data' => $reports,

@@ -10,6 +10,7 @@ class EntityRelation extends Model
     protected $fillable = [
         'entity_id',
         'related_entity_id',
+        'report_id',
         'relation_type',
     ];
 
@@ -26,6 +27,13 @@ class EntityRelation extends Model
         return $this->belongsTo(
             Entity::class,
             'related_entity_id'
+        );
+    }
+
+    public function report(): BelongsTo
+    {
+        return $this->belongsTo(
+            Report::class
         );
     }
 }

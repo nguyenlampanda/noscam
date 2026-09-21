@@ -1,70 +1,187 @@
 import {
   useEffect,
+  useRef,
   useState,
 } from 'react'
 
-import adminService from '../../services/adminService'
+import adminService
+  from '../../services/adminService'
 
-function EvidenceGallery({ evidences = [] }) {
+const INITIAL_LIMIT = 6
+
+function EvidenceGallery({
+  evidences = [],
+}) {
+  const [expanded, setExpanded] =
+    useState(false)
+
   if (!evidences.length) {
     return (
-      <div className="text-sm text-slate-400">
+      <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-5 text-sm text-slate-500">
         Không có bằng chứng đính kèm.
       </div>
     )
   }
 
+  const visibleEvidences =
+    expanded
+      ? evidences
+      : evidences.slice(
+          0,
+          INITIAL_LIMIT,
+        )
+
+  const remaining =
+    evidences.length -
+    INITIAL_LIMIT
+
   return (
     <div>
-      <div className="mb-3 flex items-center justify-between">
-        <div className="text-sm font-semibold text-slate-700">
-          Bằng chứng
+      <div className="mb-4 flex items-center justify-between gap-4">
+        <div>
+          <div className="text-sm font-semibold text-slate-900">
+            Bằng chứng
+          </div>
+
+          <div className="mt-1 text-xs text-slate-400">
+            {evidences.length} file
+          </div>
         </div>
 
-        <div className="text-xs text-slate-400">
-          {evidences.length} file
-        </div>
+        {evidences.length >
+          INITIAL_LIMIT && (
+          <button
+            type="button"
+            onClick={() =>
+              setExpanded(
+                (current) =>
+                  !current,
+              )
+            }
+            className="text-sm font-semibold text-blue-600 hover:text-blue-700"
+          >
+            {expanded
+              ? 'Thu gọn'
+              : `Xem thêm ${remaining} file`}
+          </button>
+        )}
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-        {evidences.map((evidence) => (
-          <EvidenceItem
-            key={evidence.id}
-            evidence={evidence}
-          />
-        ))}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+        {visibleEvidences.map(
+          (evidence) => (
+            <EvidenceItem
+              key={evidence.id}
+              evidence={evidence}
+            />
+          ),
+        )}
       </div>
     </div>
   )
 }
 
-function EvidenceItem({ evidence }) {
-  const [url, setUrl] = useState('')
+function EvidenceItem({
+  evidence,
+}) {
+  const containerRef =
+    useRef(null)
+
+  const [shouldLoad, setShouldLoad] =
+    useState(false)
+
+  const [url, setUrl] =
+    useState('')
+
   const [loading, setLoading] =
-    useState(true)
+    useState(false)
+
   const [error, setError] =
     useState(false)
 
+  const [opening, setOpening] =
+    useState(false)
+
   const isImage =
-    evidence.mime_type?.startsWith('image/')
+    evidence.mime_type?.startsWith(
+      'image/',
+    )
 
   useEffect(() => {
-    let objectUrl = ''
-    let active = true
+    if (!isImage) {
+      return
+    }
 
-    async function loadEvidence() {
+    const element =
+      containerRef.current
+
+    if (!element) {
+      return
+    }
+
+    if (
+      typeof IntersectionObserver ===
+      'undefined'
+    ) {
+      setShouldLoad(true)
+      return
+    }
+
+    const observer =
+      new IntersectionObserver(
+        (entries) => {
+          const entry =
+            entries[0]
+
+          if (
+            entry?.isIntersecting
+          ) {
+            setShouldLoad(true)
+            observer.disconnect()
+          }
+        },
+        {
+          rootMargin: '250px',
+        },
+      )
+
+    observer.observe(element)
+
+    return () => {
+      observer.disconnect()
+    }
+  }, [isImage])
+
+  useEffect(() => {
+    if (
+      !isImage ||
+      !shouldLoad
+    ) {
+      return
+    }
+
+    let active = true
+    let objectUrl = ''
+
+    async function loadImage() {
+      setLoading(true)
+      setError(false)
+
       try {
         const blob =
-          await adminService.getEvidence(
-            evidence.id,
-          )
+          await adminService
+            .getEvidence(
+              evidence.id,
+            )
 
         if (!active) {
           return
         }
 
         objectUrl =
-          URL.createObjectURL(blob)
+          URL.createObjectURL(
+            blob,
+          )
 
         setUrl(objectUrl)
       } catch {
@@ -78,89 +195,224 @@ function EvidenceItem({ evidence }) {
       }
     }
 
-    loadEvidence()
+    loadImage()
 
     return () => {
       active = false
 
       if (objectUrl) {
-        URL.revokeObjectURL(objectUrl)
+        URL.revokeObjectURL(
+          objectUrl,
+        )
       }
     }
-  }, [evidence.id])
+  }, [
+    evidence.id,
+    isImage,
+    shouldLoad,
+  ])
 
-  if (loading) {
-    return (
-      <div className="flex aspect-square items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-xs text-slate-400">
-        Đang tải...
-      </div>
-    )
-  }
+  async function openFile() {
+    if (opening) {
+      return
+    }
 
-  if (error || !url) {
-    return (
-      <div className="flex aspect-square items-center justify-center rounded-xl border border-red-100 bg-red-50 p-3 text-center text-xs text-red-500">
-        Không tải được file
-      </div>
-    )
-  }
+    if (isImage && url) {
+      window.open(
+        url,
+        '_blank',
+        'noopener,noreferrer',
+      )
 
-  if (isImage) {
-    return (
-      <button
-        type="button"
-        onClick={() =>
-          window.open(
-            url,
-            '_blank',
-            'noopener,noreferrer',
+      return
+    }
+
+    setOpening(true)
+    setError(false)
+
+    try {
+      const blob =
+        await adminService
+          .getEvidence(
+            evidence.id,
           )
-        }
-        className="group overflow-hidden rounded-xl border border-slate-200 bg-slate-100 text-left"
-      >
-        <div className="aspect-square overflow-hidden">
-          <img
-            src={url}
-            alt={
-              evidence.original_name ||
-              'Evidence'
-            }
-            className="h-full w-full object-cover transition duration-200 group-hover:scale-105"
-          />
-        </div>
 
-        <div className="truncate bg-white px-3 py-2 text-xs text-slate-600">
-          {evidence.original_name}
-        </div>
-      </button>
-    )
+      const objectUrl =
+        URL.createObjectURL(
+          blob,
+        )
+
+      window.open(
+        objectUrl,
+        '_blank',
+        'noopener,noreferrer',
+      )
+
+      setTimeout(() => {
+        URL.revokeObjectURL(
+          objectUrl,
+        )
+      }, 60000)
+    } catch {
+      setError(true)
+    } finally {
+      setOpening(false)
+    }
   }
 
   return (
-    <button
-      type="button"
-      onClick={() =>
-        window.open(
-          url,
-          '_blank',
-          'noopener,noreferrer',
-        )
-      }
-      className="flex aspect-square flex-col items-center justify-center rounded-xl border border-slate-200 bg-slate-50 p-4 text-center transition hover:bg-slate-100"
+    <div
+      ref={containerRef}
+      className="overflow-hidden rounded-xl border border-slate-200 bg-white"
     >
-      <div className="text-3xl">
-        📄
-      </div>
+      {isImage ? (
+        <button
+          type="button"
+          onClick={openFile}
+          className="block w-full text-left"
+        >
+          <div className="flex aspect-square items-center justify-center overflow-hidden bg-slate-100">
+            {loading && (
+              <span className="text-xs text-slate-400">
+                Đang tải...
+              </span>
+            )}
 
-      <div className="mt-3 line-clamp-2 text-xs font-medium text-slate-700">
-        {evidence.original_name}
+            {!loading &&
+              error && (
+                <span className="px-3 text-center text-xs text-red-500">
+                  Không tải được ảnh
+                </span>
+              )}
+
+            {!loading &&
+              !error &&
+              url && (
+                <img
+                  src={url}
+                  alt={
+                    evidence.original_name ||
+                    'Evidence'
+                  }
+                  className="h-full w-full object-cover transition duration-200 hover:scale-105"
+                />
+              )}
+
+            {!loading &&
+              !error &&
+              !url && (
+                <span className="text-xs text-slate-400">
+                  Hình ảnh
+                </span>
+              )}
+          </div>
+
+          <FileInfo
+            evidence={evidence}
+          />
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={openFile}
+          disabled={opening}
+          className="block w-full text-left disabled:opacity-60"
+        >
+          <div className="flex aspect-square flex-col items-center justify-center bg-slate-50 p-4">
+            <div className="text-3xl">
+              {getFileIcon(
+                evidence.mime_type,
+              )}
+            </div>
+
+            <div className="mt-3 text-center text-xs font-semibold text-slate-600">
+              {opening
+                ? 'Đang mở...'
+                : 'Bấm để xem'}
+            </div>
+
+            {error && (
+              <div className="mt-2 text-center text-xs text-red-500">
+                Không tải được file
+              </div>
+            )}
+          </div>
+
+          <FileInfo
+            evidence={evidence}
+          />
+        </button>
+      )}
+    </div>
+  )
+}
+
+function FileInfo({
+  evidence,
+}) {
+  return (
+    <div className="p-3">
+      <div
+        title={
+          evidence.original_name
+        }
+        className="truncate text-xs font-semibold text-slate-700"
+      >
+        {evidence.original_name ||
+          `Evidence #${evidence.id}`}
       </div>
 
       <div className="mt-1 text-[11px] text-slate-400">
-        {evidence.mime_type}
+        {formatFileSize(
+          evidence.file_size,
+        )}
       </div>
-    </button>
+    </div>
   )
+}
+
+function getFileIcon(
+  mimeType = '',
+) {
+  if (
+    mimeType.includes('pdf')
+  ) {
+    return 'PDF'
+  }
+
+  if (
+    mimeType.includes('video')
+  ) {
+    return '▶'
+  }
+
+  return 'FILE'
+}
+
+function formatFileSize(bytes) {
+  const size = Number(bytes)
+
+  if (
+    !Number.isFinite(size) ||
+    size <= 0
+  ) {
+    return 'File đính kèm'
+  }
+
+  if (size < 1024) {
+    return `${size} B`
+  }
+
+  if (size < 1024 * 1024) {
+    return `${(
+      size / 1024
+    ).toFixed(1)} KB`
+  }
+
+  return `${(
+    size /
+    (1024 * 1024)
+  ).toFixed(1)} MB`
 }
 
 export default EvidenceGallery

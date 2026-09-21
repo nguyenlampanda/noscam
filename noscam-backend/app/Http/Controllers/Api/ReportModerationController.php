@@ -37,46 +37,35 @@ class ReportModerationController extends Controller
 
         $newStatus = $validated['status'];
 
+        if ($report->status === $newStatus) {
+            return response()->json([
+                'message' =>
+                    $newStatus === 'approved'
+                        ? 'Báo cáo đã ở trạng thái đã duyệt.'
+                        : 'Báo cáo đã ở trạng thái từ chối.',
+
+                'data' => [
+                    'id' => $report->id,
+                    'status' => $report->status,
+                    'updated_at' => $report->updated_at,
+                ],
+            ]);
+        }
+
         $report = DB::transaction(
-            function () use ($report, $newStatus) {
-                if ($report->status === $newStatus) {
-                    return $report->refresh();
-                }
-
+            function () use (
+                $report,
+                $newStatus
+            ) {
                 if ($newStatus === 'approved') {
-                    $report->update([
-                        'status' => 'approved',
-                    ]);
-
-                    $entities = $this->publishReport($report);
-
-                    foreach ($entities as $entity) {
-                        $this->riskService->update($entity);
-                    }
-
-                    return $report->refresh();
+                    return $this->approve(
+                        $report
+                    );
                 }
 
-                /*
-                 * Khi rejected:
-                 * Giữ lại pivot/entity để bảo toàn lịch sử moderation.
-                 *
-                 * RiskService chỉ tính report có status approved,
-                 * nên report rejected sẽ tự động không còn ảnh hưởng score.
-                 */
-                $entities = $report
-                    ->entities()
-                    ->get();
-
-                $report->update([
-                    'status' => 'rejected',
-                ]);
-
-                foreach ($entities as $entity) {
-                    $this->riskService->update($entity);
-                }
-
-                return $report->refresh();
+                return $this->reject(
+                    $report
+                );
             }
         );
 
@@ -94,41 +83,127 @@ class ReportModerationController extends Controller
         ]);
     }
 
-    private function publishReport(
+    private function approve(
+        Report $report
+    ): Report {
+        $report->update([
+            'status' => 'approved',
+        ]);
+
+        $entities =
+            $this->publishEntities(
+                $report
+            );
+
+        $this->createRelations(
+            $report,
+            $entities
+        );
+
+        foreach ($entities as $entity) {
+            $this->riskService->update(
+                $entity
+            );
+        }
+
+        return $report->refresh();
+    }
+
+    private function reject(
+        Report $report
+    ): Report {
+        $entities = $report
+            ->entities()
+            ->get();
+
+        $report->update([
+            'status' => 'rejected',
+        ]);
+
+        EntityRelation::query()
+            ->where(
+                'report_id',
+                $report->id
+            )
+            ->delete();
+
+        foreach ($entities as $entity) {
+            $this->riskService->update(
+                $entity
+            );
+        }
+
+        return $report->refresh();
+    }
+
+    private function publishEntities(
         Report $report
     ): Collection {
         $entityData = [
-            'phone' => $report->phone,
-            'bank_account' => $report->bank_account,
-            'social' => $report->social,
-            'website' => $report->website,
+            'phone' =>
+                $report->phone,
+
+            'bank_account' =>
+                $report->bank_account,
+
+            'social' =>
+                $report->social,
+
+            'website' =>
+                $report->website,
         ];
 
         $entities = collect();
 
-        foreach ($entityData as $type => $value) {
+        foreach (
+            $entityData as $type => $value
+        ) {
             if (! filled($value)) {
                 continue;
             }
 
-            $normalizedValue = $this->normalizeValue(
-                $type,
-                $value
-            );
+            $normalizedValue =
+                $this->normalizeValue(
+                    $type,
+                    $value
+                );
 
-            $entity = Entity::firstOrCreate(
-                [
-                    'type' => $type,
-                    'normalized_value' => $normalizedValue,
-                ],
-                [
-                    'value' => trim($value),
-                    'report_count' => 0,
-                    'risk_score' => 0,
-                    'risk_level' => 'safe',
+            if ($normalizedValue === '') {
+                continue;
+            }
+
+            $entity =
+                Entity::firstOrCreate(
+                    [
+                        'type' =>
+                            $type,
+
+                        'normalized_value' =>
+                            $normalizedValue,
+                    ],
+                    [
+                        'value' =>
+                            trim($value),
+
+                        'report_count' =>
+                            0,
+
+                        'risk_score' =>
+                            0,
+
+                        'risk_level' =>
+                            'safe',
+
+                        'is_active' =>
+                            true,
+                    ]
+                );
+
+            if (! $entity->is_active) {
+                $entity->update([
                     'is_active' => true,
-                ]
-            );
+                ]);
+            }
 
             $entities->push($entity);
         }
@@ -137,21 +212,67 @@ class ReportModerationController extends Controller
             ->unique('id')
             ->values();
 
-        $entityIds = $entities
-            ->pluck('id')
-            ->all();
-
-        if (! empty($entityIds)) {
+        if ($entities->isNotEmpty()) {
             $report
                 ->entities()
-                ->syncWithoutDetaching($entityIds);
+                ->syncWithoutDetaching(
+                    $entities
+                        ->pluck('id')
+                        ->all()
+                );
         }
 
-        $this->createEntityRelations(
-            $entities->all()
-        );
-
         return $entities;
+    }
+
+    private function createRelations(
+        Report $report,
+        Collection $entities
+    ): void {
+        $items = $entities
+            ->values()
+            ->all();
+
+        $count = count($items);
+
+        for ($i = 0; $i < $count; $i++) {
+            for (
+                $j = $i + 1;
+                $j < $count;
+                $j++
+            ) {
+                $first = $items[$i];
+                $second = $items[$j];
+
+                EntityRelation::firstOrCreate([
+                    'entity_id' =>
+                        $first->id,
+
+                    'related_entity_id' =>
+                        $second->id,
+
+                    'report_id' =>
+                        $report->id,
+
+                    'relation_type' =>
+                        'reported_together',
+                ]);
+
+                EntityRelation::firstOrCreate([
+                    'entity_id' =>
+                        $second->id,
+
+                    'related_entity_id' =>
+                        $first->id,
+
+                    'report_id' =>
+                        $report->id,
+
+                    'relation_type' =>
+                        'reported_together',
+                ]);
+            }
+        }
     }
 
     private function normalizeValue(
@@ -161,16 +282,26 @@ class ReportModerationController extends Controller
         $value = trim($value);
 
         return match ($type) {
-            'phone',
+            'phone' =>
+                $this->normalizePhone(
+                    $value
+                ),
+
             'bank_account' =>
-                preg_replace('/\D+/', '', $value),
+                preg_replace(
+                    '/\D+/',
+                    '',
+                    $value
+                ) ?? '',
 
             'website' =>
-                $this->normalizeWebsite($value),
+                $this->normalizeWebsite(
+                    $value
+                ),
 
             'social' =>
-                strtolower(
-                    rtrim($value, '/')
+                $this->normalizeSocial(
+                    $value
                 ),
 
             default =>
@@ -179,67 +310,92 @@ class ReportModerationController extends Controller
                         '/\s+/',
                         '',
                         $value
-                    )
+                    ) ?? ''
                 ),
         };
+    }
+
+    private function normalizePhone(
+        string $value
+    ): string {
+        $value = trim($value);
+
+        $hasVietnamCountryCode =
+            preg_match(
+                '/^\s*(?:\+84|84)[\s.\-()]*/',
+                $value
+            ) === 1;
+
+        $digits =
+            preg_replace(
+                '/\D+/',
+                '',
+                $value
+            ) ?? '';
+
+        if ($digits === '') {
+            return '';
+        }
+
+        if (
+            $hasVietnamCountryCode &&
+            str_starts_with(
+                $digits,
+                '84'
+            )
+        ) {
+            return '0' .
+                substr(
+                    $digits,
+                    2
+                );
+        }
+
+        return $digits;
     }
 
     private function normalizeWebsite(
         string $value
     ): string {
-        $value = strtolower(trim($value));
-
-        $value = preg_replace(
-            '#^https?://#',
-            '',
-            $value
+        $value = strtolower(
+            trim($value)
         );
 
-        $value = preg_replace(
-            '#^www\.#',
-            '',
-            $value
-        );
+        $value =
+            preg_replace(
+                '#^https?://#',
+                '',
+                $value
+            ) ?? '';
 
-        return rtrim($value, '/');
+        $value =
+            preg_replace(
+                '#^www\.#',
+                '',
+                $value
+            ) ?? '';
+
+        $value =
+            preg_replace(
+                '#[?#].*$#',
+                '',
+                $value
+            ) ?? '';
+
+        return rtrim(
+            $value,
+            '/'
+        );
     }
 
-    private function createEntityRelations(
-        array $entities
-    ): void {
-        $count = count($entities);
-
-        for ($i = 0; $i < $count; $i++) {
-            for (
-                $j = $i + 1;
-                $j < $count;
-                $j++
-            ) {
-                $first = $entities[$i];
-                $second = $entities[$j];
-
-                EntityRelation::firstOrCreate([
-                    'entity_id' =>
-                        $first->id,
-
-                    'related_entity_id' =>
-                        $second->id,
-
-                    'relation_type' =>
-                        'reported_together',
-                ]);
-
-                EntityRelation::firstOrCreate([
-                    'entity_id' =>
-                        $second->id,
-
-                    'related_entity_id' =>
-                        $first->id,
-
-                    'relation_type' =>
-                        'reported_together',
-                ]);
-            }
-        }
+    private function normalizeSocial(
+        string $value
+    ): string {
+        return strtolower(
+            rtrim(
+                trim($value),
+                '/'
+            )
+        );
     }
 }

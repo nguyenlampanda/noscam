@@ -1,17 +1,25 @@
 import apiClient from './apiClient'
 
-const TOKEN_KEY = 'noscam_admin_token'
+const TOKEN_KEY =
+  'noscam_admin_token'
 
 export function getAdminToken() {
-  return localStorage.getItem(TOKEN_KEY)
+  return localStorage.getItem(
+    TOKEN_KEY,
+  )
 }
 
 export function setAdminToken(token) {
-  localStorage.setItem(TOKEN_KEY, token)
+  localStorage.setItem(
+    TOKEN_KEY,
+    token,
+  )
 }
 
 export function removeAdminToken() {
-  localStorage.removeItem(TOKEN_KEY)
+  localStorage.removeItem(
+    TOKEN_KEY,
+  )
 }
 
 function authOptions() {
@@ -19,22 +27,25 @@ function authOptions() {
 
   return {
     headers: {
-      Authorization: `Bearer ${token}`,
+      Authorization:
+        `Bearer ${token}`,
     },
   }
 }
 
 export const adminService = {
   async login(email, password) {
-    const response = await apiClient.post(
-      '/admin/login',
-      {
-        email,
-        password,
-      },
-    )
+    const response =
+      await apiClient.post(
+        '/admin/login',
+        {
+          email,
+          password,
+        },
+      )
 
-    const token = response?.data?.token
+    const token =
+      response?.data?.token
 
     if (!token) {
       throw new Error(
@@ -59,9 +70,40 @@ export const adminService = {
     }
   },
 
-  async getReports(status = 'pending') {
+  async getDashboard() {
     return apiClient.get(
-      `/admin/reports?status=${encodeURIComponent(status)}`,
+      '/admin/dashboard',
+      authOptions(),
+    )
+  },
+
+  async getReports(
+    status = 'pending',
+    search = '',
+    page = 1,
+  ) {
+    const params =
+      new URLSearchParams()
+
+    params.set(
+      'status',
+      status,
+    )
+
+    params.set(
+      'page',
+      String(page),
+    )
+
+    if (search.trim()) {
+      params.set(
+        'search',
+        search.trim(),
+      )
+    }
+
+    return apiClient.get(
+      `/admin/reports?${params.toString()}`,
       authOptions(),
     )
   },
@@ -73,7 +115,10 @@ export const adminService = {
     )
   },
 
-  async updateReportStatus(id, status) {
+  async updateReportStatus(
+    id,
+    status,
+  ) {
     return apiClient.patch(
       `/admin/reports/${id}/status`,
       { status },
@@ -82,24 +127,30 @@ export const adminService = {
   },
 
   async getEvidence(id) {
-    const token = getAdminToken()
+    const token =
+      getAdminToken()
 
-    const response = await fetch(
-      `http://127.0.0.1:8000/api/admin/evidences/${id}`,
-      {
-        headers: {
-          Accept: '*/*',
-          Authorization: `Bearer ${token}`,
+    const response =
+      await fetch(
+        `http://127.0.0.1:8000/api/admin/evidences/${id}`,
+        {
+          headers: {
+            Accept: '*/*',
+
+            Authorization:
+              `Bearer ${token}`,
+          },
         },
-      },
-    )
-
-    if (!response.ok) {
-      const error = new Error(
-        'Không thể tải evidence.',
       )
 
-      error.status = response.status
+    if (!response.ok) {
+      const error =
+        new Error(
+          'Không thể tải evidence.',
+        )
+
+      error.status =
+        response.status
 
       throw error
     }
