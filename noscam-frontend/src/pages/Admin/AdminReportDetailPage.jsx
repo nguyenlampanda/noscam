@@ -3,6 +3,7 @@ import {
   useState,
 } from 'react'
 
+import ModerationHistory from '../../components/admin/ModerationHistory'
 import {
   Link,
   useNavigate,
@@ -71,7 +72,7 @@ function AdminReportDetailPage() {
 
         setError(
           err.message ||
-            'Không thể tải báo cáo.',
+          'Không thể tải báo cáo.',
         )
       } finally {
         if (active) {
@@ -139,7 +140,7 @@ function AdminReportDetailPage() {
 
       setError(
         err.message ||
-          'Không thể cập nhật báo cáo.',
+        'Không thể cập nhật báo cáo.',
       )
     } finally {
       setProcessing(false)
@@ -196,10 +197,10 @@ function AdminReportDetailPage() {
             <div className="mt-2 text-sm text-slate-500">
               {report.created_at
                 ? new Date(
-                    report.created_at,
-                  ).toLocaleString(
-                    'vi-VN',
-                  )
+                  report.created_at,
+                ).toLocaleString(
+                  'vi-VN',
+                )
                 : ''}
             </div>
           </div>
@@ -207,46 +208,46 @@ function AdminReportDetailPage() {
           <div className="flex flex-wrap gap-3">
             {report.status !==
               'rejected' && (
-              <button
-                type="button"
-                disabled={
-                  processing
-                }
-                onClick={() =>
-                  moderate(
-                    'rejected',
-                  )
-                }
-                className="rounded-xl border border-red-200 bg-red-50 px-5 py-2.5 text-sm font-semibold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {processing
-                  ? 'Đang xử lý...'
-                  : 'Từ chối'}
-              </button>
-            )}
+                <button
+                  type="button"
+                  disabled={
+                    processing
+                  }
+                  onClick={() =>
+                    moderate(
+                      'rejected',
+                    )
+                  }
+                  className="rounded-xl border border-red-200 bg-red-50 px-5 py-2.5 text-sm font-semibold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {processing
+                    ? 'Đang xử lý...'
+                    : 'Từ chối'}
+                </button>
+              )}
 
             {report.status !==
               'approved' && (
-              <button
-                type="button"
-                disabled={
-                  processing
-                }
-                onClick={() =>
-                  moderate(
-                    'approved',
-                  )
-                }
-                className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {processing
-                  ? 'Đang xử lý...'
-                  : report.status ===
+                <button
+                  type="button"
+                  disabled={
+                    processing
+                  }
+                  onClick={() =>
+                    moderate(
+                      'approved',
+                    )
+                  }
+                  className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {processing
+                    ? 'Đang xử lý...'
+                    : report.status ===
                       'rejected'
-                    ? 'Duyệt lại'
-                    : 'Duyệt'}
-              </button>
-            )}
+                      ? 'Duyệt lại'
+                      : 'Duyệt'}
+                </button>
+              )}
           </div>
         </div>
 
@@ -319,41 +320,47 @@ function AdminReportDetailPage() {
 
         {report.entities?.length >
           0 && (
-          <div className="mt-8">
-            <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-400">
-              Dữ liệu đã liên kết
+            <div className="mt-8">
+              <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                Dữ liệu đã liên kết
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                {report.entities.map(
+                  (entity) => (
+                    <div
+                      key={
+                        entity.id
+                      }
+                      className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700"
+                    >
+                      <span className="font-semibold">
+                        {formatEntityType(
+                          entity.type,
+                        )}
+                      </span>
+
+                      <span className="mx-2 text-slate-300">
+                        |
+                      </span>
+
+                      <span>
+                        {entity.value}
+                      </span>
+                    </div>
+                  ),
+                )}
+              </div>
             </div>
-
-            <div className="flex flex-wrap gap-2">
-              {report.entities.map(
-                (entity) => (
-                  <div
-                    key={
-                      entity.id
-                    }
-                    className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700"
-                  >
-                    <span className="font-semibold">
-                      {formatEntityType(
-                        entity.type,
-                      )}
-                    </span>
-
-                    <span className="mx-2 text-slate-300">
-                      |
-                    </span>
-
-                    <span>
-                      {entity.value}
-                    </span>
-                  </div>
-                ),
-              )}
-            </div>
-          </div>
-        )}
+          )}
 
         <div className="mt-8 border-t border-slate-100 pt-7">
+          <ModerationHistory
+            logs={
+              report.moderation_logs ??
+              []
+            }
+          />
           <EvidenceGallery
             evidences={
               report.evidences ??
@@ -418,10 +425,9 @@ function StatusBadge({
 
   return (
     <span
-      className={`rounded-full px-3 py-1 text-xs font-semibold ${
-        styles[status] ??
+      className={`rounded-full px-3 py-1 text-xs font-semibold ${styles[status] ??
         'bg-slate-100 text-slate-600'
-      }`}
+        }`}
     >
       {labels[status] ??
         status}

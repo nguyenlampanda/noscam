@@ -24,8 +24,11 @@ class Report extends Model
     protected function casts(): array
     {
         return [
-            'loss_amount' => 'decimal:2',
-            'occurred_at' => 'date',
+            'loss_amount' =>
+                'decimal:2',
+
+            'occurred_at' =>
+                'date',
         ];
     }
 
@@ -39,6 +42,15 @@ class Report extends Model
 
     public function evidences(): HasMany
     {
-        return $this->hasMany(Evidence::class);
+        return $this->hasMany(
+            Evidence::class
+        );
+    }
+
+    public function moderationLogs(): HasMany
+    {
+        return $this->hasMany(
+            ReportModerationLog::class
+        );
     }
 }

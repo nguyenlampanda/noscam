@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Entity;
 use App\Models\EntityRelation;
 use App\Models\Report;
+use App\Models\ReportModerationLog;
 use App\Services\RiskService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -24,31 +25,40 @@ class ReportModerationController extends Controller
         Request $request,
         Report $report
     ): JsonResponse {
-        $validated = $request->validate([
-            'status' => [
-                'required',
-                'string',
-                Rule::in([
-                    'approved',
-                    'rejected',
-                ]),
-            ],
-        ]);
+        $validated =
+            $request->validate([
+                'status' => [
+                    'required',
+                    'string',
+                    Rule::in([
+                        'approved',
+                        'rejected',
+                    ]),
+                ],
+            ]);
 
-        $newStatus = $validated['status'];
+        $newStatus =
+            $validated['status'];
 
         $result = DB::transaction(
             function () use (
+                $request,
                 $report,
                 $newStatus
             ) {
-                $lockedReport = Report::query()
-                    ->whereKey($report->id)
-                    ->lockForUpdate()
-                    ->firstOrFail();
+                $lockedReport =
+                    Report::query()
+                        ->whereKey(
+                            $report->id
+                        )
+                        ->lockForUpdate()
+                        ->firstOrFail();
+
+                $oldStatus =
+                    $lockedReport->status;
 
                 if (
-                    $lockedReport->status ===
+                    $oldStatus ===
                     $newStatus
                 ) {
                     return [
@@ -75,6 +85,20 @@ class ReportModerationController extends Controller
                         );
                 }
 
+                ReportModerationLog::create([
+                    'report_id' =>
+                        $lockedReport->id,
+
+                    'user_id' =>
+                        $request->user()?->id,
+
+                    'from_status' =>
+                        $oldStatus,
+
+                    'to_status' =>
+                        $newStatus,
+                ]);
+
                 return [
                     'report' =>
                         $updatedReport,
@@ -92,7 +116,8 @@ class ReportModerationController extends Controller
         if ($result['unchanged']) {
             return response()->json([
                 'message' =>
-                    $newStatus === 'approved'
+                    $newStatus ===
+                    'approved'
                         ? 'Báo cáo đã ở trạng thái đã duyệt.'
                         : 'Báo cáo đã ở trạng thái từ chối.',
 
@@ -156,9 +181,10 @@ class ReportModerationController extends Controller
     private function reject(
         Report $report
     ): Report {
-        $entities = $report
-            ->entities()
-            ->get();
+        $entities =
+            $report
+                ->entities()
+                ->get();
 
         $report->update([
             'status' => 'rejected',
@@ -198,7 +224,8 @@ class ReportModerationController extends Controller
         $entities = collect();
 
         foreach (
-            $entityData as $type => $value
+            $entityData
+            as $type => $value
         ) {
             if (! filled($value)) {
                 continue;
@@ -210,7 +237,9 @@ class ReportModerationController extends Controller
                     $value
                 );
 
-            if ($normalizedValue === '') {
+            if (
+                $normalizedValue === ''
+            ) {
                 continue;
             }
 
@@ -351,9 +380,8 @@ class ReportModerationController extends Controller
         string $type,
         string $value
     ): string {
-        $value = trim(
-            $value
-        );
+        $value =
+            trim($value);
 
         return match ($type) {
             'phone' =>
@@ -392,9 +420,8 @@ class ReportModerationController extends Controller
     private function normalizePhone(
         string $value
     ): string {
-        $value = trim(
-            $value
-        );
+        $value =
+            trim($value);
 
         $hasVietnamCountryCode =
             preg_match(
@@ -420,7 +447,7 @@ class ReportModerationController extends Controller
                 '84'
             )
         ) {
-            return '0' .
+            return '0'.
                 substr(
                     $digits,
                     2

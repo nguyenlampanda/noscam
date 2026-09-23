@@ -9,27 +9,31 @@ use Illuminate\Http\Request;
 
 class AdminReportController extends Controller
 {
-    public function index(Request $request): JsonResponse
-    {
-        $status = $request->query(
-            'status',
-            'pending'
-        );
+    public function index(
+        Request $request
+    ): JsonResponse {
+        $status =
+            $request->query(
+                'status',
+                'pending'
+            );
 
-        $search = trim(
-            (string) $request->query(
-                'search',
-                ''
-            )
-        );
+        $search =
+            trim(
+                (string) $request->query(
+                    'search',
+                    ''
+                )
+            );
 
-        $page = max(
-            1,
-            (int) $request->query(
-                'page',
-                1
-            )
-        );
+        $page =
+            max(
+                1,
+                (int) $request->query(
+                    'page',
+                    1
+                )
+            );
 
         if (
             ! in_array(
@@ -48,17 +52,18 @@ class AdminReportController extends Controller
             ], 422);
         }
 
-        $query = Report::query()
-            ->where(
-                'status',
-                $status
-            )
-            ->with([
-                'evidences:id,report_id,original_name,mime_type,file_size',
-            ])
-            ->withCount(
-                'evidences'
-            );
+        $query =
+            Report::query()
+                ->where(
+                    'status',
+                    $status
+                )
+                ->with([
+                    'evidences:id,report_id,original_name,mime_type,file_size',
+                ])
+                ->withCount(
+                    'evidences'
+                );
 
         if ($search !== '') {
             $query->where(
@@ -97,7 +102,11 @@ class AdminReportController extends Controller
                             "%{$search}%"
                         );
 
-                    if (ctype_digit($search)) {
+                    if (
+                        ctype_digit(
+                            $search
+                        )
+                    ) {
                         $query->orWhere(
                             'id',
                             (int) $search
@@ -107,15 +116,17 @@ class AdminReportController extends Controller
             );
         }
 
-        $reports = $query
-            ->latest()
-            ->paginate(
-                perPage: 10,
-                page: $page
-            );
+        $reports =
+            $query
+                ->latest()
+                ->paginate(
+                    perPage: 10,
+                    page: $page
+                );
 
         return response()->json([
-            'data' => $reports,
+            'data' =>
+                $reports,
         ]);
     }
 
@@ -125,10 +136,20 @@ class AdminReportController extends Controller
         $report->load([
             'evidences',
             'entities',
+
+            'moderationLogs' =>
+                function ($query) {
+                    $query
+                        ->with([
+                            'user:id,name,email,role',
+                        ])
+                        ->latest();
+                },
         ]);
 
         return response()->json([
-            'data' => $report,
+            'data' =>
+                $report,
         ]);
     }
 }
