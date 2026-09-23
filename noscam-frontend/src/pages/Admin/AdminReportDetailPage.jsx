@@ -2,6 +2,7 @@ import {
   useEffect,
   useState,
 } from 'react'
+
 import {
   Link,
   useNavigate,
@@ -9,6 +10,9 @@ import {
 } from 'react-router-dom'
 
 import EvidenceGallery from '../../components/admin/EvidenceGallery'
+import {
+  removeAdminToken,
+} from '../../services/adminService'
 import adminService from '../../services/adminService'
 
 function AdminReportDetailPage() {
@@ -28,19 +32,39 @@ function AdminReportDetailPage() {
     useState('')
 
   useEffect(() => {
+    let active = true
+
     async function load() {
       try {
         const response =
-          await adminService.getReport(id)
+          await adminService.getReport(
+            id,
+          )
+
+        if (!active) {
+          return
+        }
 
         setReport(
           response?.data ?? null,
         )
       } catch (err) {
-        if (err.status === 401) {
-          navigate('/admin/login', {
-            replace: true,
-          })
+        if (!active) {
+          return
+        }
+
+        if (
+          err.status === 401 ||
+          err.status === 403
+        ) {
+          removeAdminToken()
+
+          navigate(
+            '/admin/login',
+            {
+              replace: true,
+            },
+          )
 
           return
         }
@@ -50,20 +74,33 @@ function AdminReportDetailPage() {
             'Không thể tải báo cáo.',
         )
       } finally {
-        setLoading(false)
+        if (active) {
+          setLoading(false)
+        }
       }
     }
 
     load()
+
+    return () => {
+      active = false
+    }
   }, [id, navigate])
 
-  async function moderate(status) {
+  async function moderate(
+    status,
+  ) {
     const message =
       status === 'approved'
-        ? 'Bạn chắc chắn muốn duyệt báo cáo này?'
+        ? report?.status ===
+          'rejected'
+          ? 'Bạn chắc chắn muốn duyệt lại báo cáo này?'
+          : 'Bạn chắc chắn muốn duyệt báo cáo này?'
         : 'Bạn chắc chắn muốn từ chối báo cáo này?'
 
-    if (!window.confirm(message)) {
+    if (
+      !window.confirm(message)
+    ) {
       return
     }
 
@@ -71,13 +108,35 @@ function AdminReportDetailPage() {
     setError('')
 
     try {
-      await adminService.updateReportStatus(
-        id,
-        status,
-      )
+      await adminService
+        .updateReportStatus(
+          id,
+          status,
+        )
 
-      navigate('/admin/reports')
+      navigate(
+        '/admin/reports',
+        {
+          replace: true,
+        },
+      )
     } catch (err) {
+      if (
+        err.status === 401 ||
+        err.status === 403
+      ) {
+        removeAdminToken()
+
+        navigate(
+          '/admin/login',
+          {
+            replace: true,
+          },
+        )
+
+        return
+      }
+
       setError(
         err.message ||
           'Không thể cập nhật báo cáo.',
@@ -128,7 +187,9 @@ function AdminReportDetailPage() {
               </h1>
 
               <StatusBadge
-                status={report.status}
+                status={
+                  report.status
+                }
               />
             </div>
 
@@ -143,33 +204,50 @@ function AdminReportDetailPage() {
             </div>
           </div>
 
-          {report.status === 'pending' && (
-            <div className="flex gap-3">
+          <div className="flex flex-wrap gap-3">
+            {report.status !==
+              'rejected' && (
               <button
                 type="button"
-                disabled={processing}
-                onClick={() =>
-                  moderate('rejected')
+                disabled={
+                  processing
                 }
-                className="rounded-xl border border-red-200 bg-red-50 px-5 py-2.5 text-sm font-semibold text-red-700 transition hover:bg-red-100 disabled:opacity-50"
-              >
-                Từ chối
-              </button>
-
-              <button
-                type="button"
-                disabled={processing}
                 onClick={() =>
-                  moderate('approved')
+                  moderate(
+                    'rejected',
+                  )
                 }
-                className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50"
+                className="rounded-xl border border-red-200 bg-red-50 px-5 py-2.5 text-sm font-semibold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {processing
                   ? 'Đang xử lý...'
-                  : 'Duyệt'}
+                  : 'Từ chối'}
               </button>
-            </div>
-          )}
+            )}
+
+            {report.status !==
+              'approved' && (
+              <button
+                type="button"
+                disabled={
+                  processing
+                }
+                onClick={() =>
+                  moderate(
+                    'approved',
+                  )
+                }
+                className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {processing
+                  ? 'Đang xử lý...'
+                  : report.status ===
+                      'rejected'
+                    ? 'Duyệt lại'
+                    : 'Duyệt'}
+              </button>
+            )}
+          </div>
         </div>
 
         {error && (
@@ -181,7 +259,9 @@ function AdminReportDetailPage() {
         <div className="mt-8 grid gap-x-10 gap-y-5 md:grid-cols-2 lg:grid-cols-3">
           <Info
             label="Loại báo cáo"
-            value={report.scam_type}
+            value={
+              report.scam_type
+            }
           />
 
           <Info
@@ -213,20 +293,16 @@ function AdminReportDetailPage() {
 
           <Info
             label="Số tiền thiệt hại"
-            value={
-              formatMoney(
-                report.loss_amount,
-              )
-            }
+            value={formatMoney(
+              report.loss_amount,
+            )}
           />
 
           <Info
             label="Ngày xảy ra"
-            value={
-              formatDate(
-                report.occurred_at,
-              )
-            }
+            value={formatDate(
+              report.occurred_at,
+            )}
           />
         </div>
 
@@ -241,10 +317,47 @@ function AdminReportDetailPage() {
           </div>
         </div>
 
+        {report.entities?.length >
+          0 && (
+          <div className="mt-8">
+            <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-400">
+              Dữ liệu đã liên kết
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              {report.entities.map(
+                (entity) => (
+                  <div
+                    key={
+                      entity.id
+                    }
+                    className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700"
+                  >
+                    <span className="font-semibold">
+                      {formatEntityType(
+                        entity.type,
+                      )}
+                    </span>
+
+                    <span className="mx-2 text-slate-300">
+                      |
+                    </span>
+
+                    <span>
+                      {entity.value}
+                    </span>
+                  </div>
+                ),
+              )}
+            </div>
+          </div>
+        )}
+
         <div className="mt-8 border-t border-slate-100 pt-7">
           <EvidenceGallery
             evidences={
-              report.evidences ?? []
+              report.evidences ??
+              []
             }
           />
         </div>
@@ -253,7 +366,10 @@ function AdminReportDetailPage() {
   )
 }
 
-function Info({ label, value }) {
+function Info({
+  label,
+  value,
+}) {
   if (
     value === null ||
     value === undefined ||
@@ -275,20 +391,29 @@ function Info({ label, value }) {
   )
 }
 
-function StatusBadge({ status }) {
+function StatusBadge({
+  status,
+}) {
   const styles = {
     pending:
       'bg-amber-50 text-amber-700',
+
     approved:
       'bg-emerald-50 text-emerald-700',
+
     rejected:
       'bg-red-50 text-red-700',
   }
 
   const labels = {
-    pending: 'Chờ duyệt',
-    approved: 'Đã duyệt',
-    rejected: 'Đã từ chối',
+    pending:
+      'Chờ duyệt',
+
+    approved:
+      'Đã duyệt',
+
+    rejected:
+      'Đã từ chối',
   }
 
   return (
@@ -298,7 +423,8 @@ function StatusBadge({ status }) {
         'bg-slate-100 text-slate-600'
       }`}
     >
-      {labels[status] ?? status}
+      {labels[status] ??
+        status}
     </span>
   )
 }
@@ -312,9 +438,12 @@ function formatMoney(value) {
     return null
   }
 
-  const number = Number(value)
+  const number =
+    Number(value)
 
-  if (Number.isNaN(number)) {
+  if (
+    Number.isNaN(number)
+  ) {
     return value
   }
 
@@ -328,15 +457,41 @@ function formatDate(value) {
     return null
   }
 
-  const date = new Date(value)
+  const date =
+    new Date(value)
 
-  if (Number.isNaN(date.getTime())) {
+  if (
+    Number.isNaN(
+      date.getTime(),
+    )
+  ) {
     return value
   }
 
   return date.toLocaleDateString(
     'vi-VN',
   )
+}
+
+function formatEntityType(
+  type,
+) {
+  const labels = {
+    phone:
+      'Số điện thoại',
+
+    bank_account:
+      'Tài khoản',
+
+    social:
+      'Mạng xã hội',
+
+    website:
+      'Website',
+  }
+
+  return labels[type] ??
+    type
 }
 
 function Page({ children }) {

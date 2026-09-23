@@ -1,6 +1,7 @@
-const API_BASE_URL =
+export const API_BASE_URL = (
   import.meta.env.VITE_API_BASE_URL ||
   'http://127.0.0.1:8000/api'
+).replace(/\/+$/, '')
 
 async function request(
   endpoint,
@@ -11,18 +12,24 @@ async function request(
     signal,
   } = {},
 ) {
-  const url = `${API_BASE_URL}${endpoint}`
+  const url =
+    `${API_BASE_URL}${endpoint}`
 
   const isFormData =
-    typeof FormData !== 'undefined' &&
+    typeof FormData !==
+      'undefined' &&
     body instanceof FormData
 
   const config = {
     method,
+
     headers: {
-      Accept: 'application/json',
+      Accept:
+        'application/json',
+
       ...headers,
     },
+
     signal,
   }
 
@@ -30,19 +37,28 @@ async function request(
     if (isFormData) {
       config.body = body
     } else {
-      config.headers['Content-Type'] =
-        'application/json'
+      config.headers[
+        'Content-Type'
+      ] = 'application/json'
 
-      config.body = JSON.stringify(body)
+      config.body =
+        JSON.stringify(body)
     }
   }
 
   let response
 
   try {
-    response = await fetch(url, config)
+    response =
+      await fetch(
+        url,
+        config,
+      )
   } catch (error) {
-    if (error.name === 'AbortError') {
+    if (
+      error.name ===
+      'AbortError'
+    ) {
       throw error
     }
 
@@ -54,11 +70,18 @@ async function request(
   let data = null
 
   const contentType =
-    response.headers.get('content-type')
+    response.headers.get(
+      'content-type',
+    )
 
-  if (contentType?.includes('application/json')) {
+  if (
+    contentType?.includes(
+      'application/json',
+    )
+  ) {
     try {
-      data = await response.json()
+      data =
+        await response.json()
     } catch {
       data = null
     }
@@ -69,21 +92,38 @@ async function request(
       data?.message ||
       `Yêu cầu thất bại với mã ${response.status}.`
 
+    if (response.status === 429) {
+      message =
+        'Bạn đang gửi quá nhiều yêu cầu. Vui lòng chờ một lúc rồi thử lại.'
+    }
+
     if (data?.errors) {
       const validationMessages =
-        Object.values(data.errors)
+        Object.values(
+          data.errors,
+        )
           .flat()
           .filter(Boolean)
 
-      if (validationMessages.length > 0) {
-        message = validationMessages.join(' ')
+      if (
+        validationMessages.length >
+        0
+      ) {
+        message =
+          validationMessages.join(
+            ' ',
+          )
       }
     }
 
-    const error = new Error(message)
+    const error =
+      new Error(message)
 
-    error.status = response.status
-    error.data = data
+    error.status =
+      response.status
+
+    error.data =
+      data
 
     throw error
   }
@@ -92,42 +132,75 @@ async function request(
 }
 
 export const apiClient = {
-  get(endpoint, options = {}) {
-    return request(endpoint, {
-      ...options,
-      method: 'GET',
-    })
+  get(
+    endpoint,
+    options = {},
+  ) {
+    return request(
+      endpoint,
+      {
+        ...options,
+        method: 'GET',
+      },
+    )
   },
 
-  post(endpoint, body, options = {}) {
-    return request(endpoint, {
-      ...options,
-      method: 'POST',
-      body,
-    })
+  post(
+    endpoint,
+    body,
+    options = {},
+  ) {
+    return request(
+      endpoint,
+      {
+        ...options,
+        method: 'POST',
+        body,
+      },
+    )
   },
 
-  put(endpoint, body, options = {}) {
-    return request(endpoint, {
-      ...options,
-      method: 'PUT',
-      body,
-    })
+  put(
+    endpoint,
+    body,
+    options = {},
+  ) {
+    return request(
+      endpoint,
+      {
+        ...options,
+        method: 'PUT',
+        body,
+      },
+    )
   },
 
-  patch(endpoint, body, options = {}) {
-    return request(endpoint, {
-      ...options,
-      method: 'PATCH',
-      body,
-    })
+  patch(
+    endpoint,
+    body,
+    options = {},
+  ) {
+    return request(
+      endpoint,
+      {
+        ...options,
+        method: 'PATCH',
+        body,
+      },
+    )
   },
 
-  delete(endpoint, options = {}) {
-    return request(endpoint, {
-      ...options,
-      method: 'DELETE',
-    })
+  delete(
+    endpoint,
+    options = {},
+  ) {
+    return request(
+      endpoint,
+      {
+        ...options,
+        method: 'DELETE',
+      },
+    )
   },
 }
 

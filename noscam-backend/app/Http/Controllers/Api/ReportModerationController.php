@@ -37,7 +37,59 @@ class ReportModerationController extends Controller
 
         $newStatus = $validated['status'];
 
-        if ($report->status === $newStatus) {
+        $result = DB::transaction(
+            function () use (
+                $report,
+                $newStatus
+            ) {
+                $lockedReport = Report::query()
+                    ->whereKey($report->id)
+                    ->lockForUpdate()
+                    ->firstOrFail();
+
+                if (
+                    $lockedReport->status ===
+                    $newStatus
+                ) {
+                    return [
+                        'report' =>
+                            $lockedReport,
+
+                        'unchanged' =>
+                            true,
+                    ];
+                }
+
+                if (
+                    $newStatus ===
+                    'approved'
+                ) {
+                    $updatedReport =
+                        $this->approve(
+                            $lockedReport
+                        );
+                } else {
+                    $updatedReport =
+                        $this->reject(
+                            $lockedReport
+                        );
+                }
+
+                return [
+                    'report' =>
+                        $updatedReport,
+
+                    'unchanged' =>
+                        false,
+                ];
+            }
+        );
+
+        /** @var Report $updatedReport */
+        $updatedReport =
+            $result['report'];
+
+        if ($result['unchanged']) {
             return response()->json([
                 'message' =>
                     $newStatus === 'approved'
@@ -45,40 +97,34 @@ class ReportModerationController extends Controller
                         : 'Báo cáo đã ở trạng thái từ chối.',
 
                 'data' => [
-                    'id' => $report->id,
-                    'status' => $report->status,
-                    'updated_at' => $report->updated_at,
+                    'id' =>
+                        $updatedReport->id,
+
+                    'status' =>
+                        $updatedReport->status,
+
+                    'updated_at' =>
+                        $updatedReport->updated_at,
                 ],
             ]);
         }
 
-        $report = DB::transaction(
-            function () use (
-                $report,
-                $newStatus
-            ) {
-                if ($newStatus === 'approved') {
-                    return $this->approve(
-                        $report
-                    );
-                }
-
-                return $this->reject(
-                    $report
-                );
-            }
-        );
-
         return response()->json([
             'message' =>
-                $report->status === 'approved'
+                $updatedReport->status ===
+                'approved'
                     ? 'Báo cáo đã được duyệt.'
                     : 'Báo cáo đã bị từ chối.',
 
             'data' => [
-                'id' => $report->id,
-                'status' => $report->status,
-                'updated_at' => $report->updated_at,
+                'id' =>
+                    $updatedReport->id,
+
+                'status' =>
+                    $updatedReport->status,
+
+                'updated_at' =>
+                    $updatedReport->updated_at,
             ],
         ]);
     }
@@ -100,11 +146,9 @@ class ReportModerationController extends Controller
             $entities
         );
 
-        foreach ($entities as $entity) {
-            $this->riskService->update(
-                $entity
-            );
-        }
+        $this->updateRiskForEntities(
+            $entities
+        );
 
         return $report->refresh();
     }
@@ -127,11 +171,9 @@ class ReportModerationController extends Controller
             )
             ->delete();
 
-        foreach ($entities as $entity) {
-            $this->riskService->update(
-                $entity
-            );
-        }
+        $this->updateRiskForEntities(
+            $entities
+        );
 
         return $report->refresh();
     }
@@ -201,18 +243,24 @@ class ReportModerationController extends Controller
 
             if (! $entity->is_active) {
                 $entity->update([
-                    'is_active' => true,
+                    'is_active' =>
+                        true,
                 ]);
             }
 
-            $entities->push($entity);
+            $entities->push(
+                $entity
+            );
         }
 
-        $entities = $entities
-            ->unique('id')
-            ->values();
+        $entities =
+            $entities
+                ->unique('id')
+                ->values();
 
-        if ($entities->isNotEmpty()) {
+        if (
+            $entities->isNotEmpty()
+        ) {
             $report
                 ->entities()
                 ->syncWithoutDetaching(
@@ -229,20 +277,29 @@ class ReportModerationController extends Controller
         Report $report,
         Collection $entities
     ): void {
-        $items = $entities
-            ->values()
-            ->all();
+        $items =
+            $entities
+                ->values()
+                ->all();
 
-        $count = count($items);
+        $count =
+            count($items);
 
-        for ($i = 0; $i < $count; $i++) {
+        for (
+            $i = 0;
+            $i < $count;
+            $i++
+        ) {
             for (
                 $j = $i + 1;
                 $j < $count;
                 $j++
             ) {
-                $first = $items[$i];
-                $second = $items[$j];
+                $first =
+                    $items[$i];
+
+                $second =
+                    $items[$j];
 
                 EntityRelation::firstOrCreate([
                     'entity_id' =>
@@ -275,11 +332,28 @@ class ReportModerationController extends Controller
         }
     }
 
+    private function updateRiskForEntities(
+        Collection $entities
+    ): void {
+        foreach (
+            $entities
+                ->unique('id')
+                ->values()
+            as $entity
+        ) {
+            $this->riskService->update(
+                $entity
+            );
+        }
+    }
+
     private function normalizeValue(
         string $type,
         string $value
     ): string {
-        $value = trim($value);
+        $value = trim(
+            $value
+        );
 
         return match ($type) {
             'phone' =>
@@ -318,7 +392,9 @@ class ReportModerationController extends Controller
     private function normalizePhone(
         string $value
     ): string {
-        $value = trim($value);
+        $value = trim(
+            $value
+        );
 
         $hasVietnamCountryCode =
             preg_match(
@@ -357,9 +433,10 @@ class ReportModerationController extends Controller
     private function normalizeWebsite(
         string $value
     ): string {
-        $value = strtolower(
-            trim($value)
-        );
+        $value =
+            strtolower(
+                trim($value)
+            );
 
         $value =
             preg_replace(

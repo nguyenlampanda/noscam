@@ -1,4 +1,6 @@
-import apiClient from './apiClient'
+import apiClient, {
+  API_BASE_URL,
+} from './apiClient'
 
 const TOKEN_KEY =
   'noscam_admin_token'
@@ -9,7 +11,9 @@ export function getAdminToken() {
   )
 }
 
-export function setAdminToken(token) {
+export function setAdminToken(
+  token,
+) {
   localStorage.setItem(
     TOKEN_KEY,
     token,
@@ -23,7 +27,8 @@ export function removeAdminToken() {
 }
 
 function authOptions() {
-  const token = getAdminToken()
+  const token =
+    getAdminToken()
 
   return {
     headers: {
@@ -33,13 +38,35 @@ function authOptions() {
   }
 }
 
+async function adminRequest(
+  callback,
+) {
+  try {
+    return await callback()
+  } catch (error) {
+    if (
+      error?.status === 401 ||
+      error?.status === 403
+    ) {
+      removeAdminToken()
+    }
+
+    throw error
+  }
+}
+
 export const adminService = {
-  async login(email, password) {
+  async login(
+    email,
+    password,
+  ) {
     const response =
       await apiClient.post(
         '/admin/login',
         {
-          email,
+          email:
+            email.trim(),
+
           password,
         },
       )
@@ -58,22 +85,40 @@ export const adminService = {
     return response.data
   },
 
+  async me() {
+    return adminRequest(
+      () =>
+        apiClient.get(
+          '/admin/me',
+          authOptions(),
+        ),
+    )
+  },
+
   async logout() {
     try {
-      await apiClient.post(
-        '/admin/logout',
-        undefined,
-        authOptions(),
-      )
+      if (getAdminToken()) {
+        await apiClient.post(
+          '/admin/logout',
+          undefined,
+          authOptions(),
+        )
+      }
+    } catch {
+      // Vẫn xóa token local nếu server
+      // không còn nhận phiên hiện tại.
     } finally {
       removeAdminToken()
     }
   },
 
   async getDashboard() {
-    return apiClient.get(
-      '/admin/dashboard',
-      authOptions(),
+    return adminRequest(
+      () =>
+        apiClient.get(
+          '/admin/dashboard',
+          authOptions(),
+        ),
     )
   },
 
@@ -102,16 +147,22 @@ export const adminService = {
       )
     }
 
-    return apiClient.get(
-      `/admin/reports?${params.toString()}`,
-      authOptions(),
+    return adminRequest(
+      () =>
+        apiClient.get(
+          `/admin/reports?${params.toString()}`,
+          authOptions(),
+        ),
     )
   },
 
   async getReport(id) {
-    return apiClient.get(
-      `/admin/reports/${id}`,
-      authOptions(),
+    return adminRequest(
+      () =>
+        apiClient.get(
+          `/admin/reports/${id}`,
+          authOptions(),
+        ),
     )
   },
 
@@ -119,10 +170,13 @@ export const adminService = {
     id,
     status,
   ) {
-    return apiClient.patch(
-      `/admin/reports/${id}/status`,
-      { status },
-      authOptions(),
+    return adminRequest(
+      () =>
+        apiClient.patch(
+          `/admin/reports/${id}/status`,
+          { status },
+          authOptions(),
+        ),
     )
   },
 
@@ -130,23 +184,55 @@ export const adminService = {
     const token =
       getAdminToken()
 
-    const response =
-      await fetch(
-        `http://127.0.0.1:8000/api/admin/evidences/${id}`,
-        {
-          headers: {
-            Accept: '*/*',
-
-            Authorization:
-              `Bearer ${token}`,
-          },
-        },
-      )
-
-    if (!response.ok) {
+    if (!token) {
       const error =
         new Error(
-          'Không thể tải evidence.',
+          'Phiên đăng nhập Admin không hợp lệ.',
+        )
+
+      error.status = 401
+
+      throw error
+    }
+
+    let response
+
+    try {
+      response =
+        await fetch(
+          `${API_BASE_URL}/admin/evidences/${id}`,
+          {
+            headers: {
+              Accept: '*/*',
+
+              Authorization:
+                `Bearer ${token}`,
+            },
+          },
+        )
+    } catch {
+      throw new Error(
+        'Không thể kết nối tới máy chủ để tải evidence.',
+      )
+    }
+
+    if (!response.ok) {
+      if (
+        response.status === 401 ||
+        response.status === 403
+      ) {
+        removeAdminToken()
+      }
+
+      const error =
+        new Error(
+          response.status === 401
+            ? 'Phiên đăng nhập đã hết hạn.'
+            : response.status === 403
+              ? 'Bạn không có quyền xem evidence.'
+              : response.status === 404
+                ? 'Không tìm thấy evidence.'
+                : 'Không thể tải evidence.',
         )
 
       error.status =

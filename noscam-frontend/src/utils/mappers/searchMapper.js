@@ -4,40 +4,88 @@ export function mapSearchResult(data) {
   }
 
   return {
-    type: data.type || 'Không xác định',
+    type:
+      data.type ||
+      'Không xác định',
 
-    riskScore: Number(data.risk_score ?? 0),
-    riskLabel: data.risk_label || 'Chưa xác định',
-    riskLevel: data.risk_level || 'medium',
+    value:
+      data.value || '',
 
-    reports: Number(data.reports ?? 0),
+    riskScore:
+      Number(
+        data.risk_score ?? 0,
+      ),
+
+    riskLabel:
+      data.risk_label ||
+      'Chưa xác định',
+
+    riskLevel:
+      data.risk_level ||
+      'medium',
+
+    reports:
+      Number(
+        data.reports ?? 0,
+      ),
 
     firstDetected:
-      data.first_detected || 'Chưa có dữ liệu',
+      data.first_detected ||
+      'Chưa có dữ liệu',
 
     lastReport:
-      data.last_report || 'Chưa có dữ liệu',
+      data.last_report ||
+      'Chưa có dữ liệu',
 
     status:
-      data.status || 'Chưa xác định',
+      data.status ||
+      'Chưa xác định',
 
-    riskFactors: (data.risk_factors || []).map(
+    riskFactors: (
+      data.risk_factors || []
+    ).map(
       (factor, index) => ({
-        id: factor.id ?? index + 1,
-        title: factor.title || '',
-        description: factor.description || '',
-        severity: factor.severity || 'medium',
+        id:
+          factor.id ??
+          index + 1,
+
+        title:
+          factor.title || '',
+
+        description:
+          factor.description || '',
+
+        severity:
+          factor.severity ||
+          'medium',
       }),
     ),
 
     relatedInformation: (
       data.related_information || []
-    ).map((item, index) => ({
-      id: item.id ?? index + 1,
-      type: item.type || '',
-      value: item.value || '',
-    })),
+    ).map(
+      (item, index) => ({
+        id:
+          item.id ??
+          index + 1,
 
-    sources: data.sources || [],
+        type:
+          item.type || '',
+
+        value:
+          item.value || '',
+      }),
+    ),
+
+    sources:
+      Array.isArray(
+        data.sources,
+      )
+        ? data.sources
+        : [],
+
+    disclaimer:
+      data.disclaimer ||
+      'Risk Score chỉ mang tính cảnh báo dựa trên dữ liệu hệ thống, không phải kết luận một cá nhân hoặc tổ chức là lừa đảo.',
   }
 }
