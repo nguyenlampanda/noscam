@@ -25,20 +25,18 @@ class ReportModerationController extends Controller
         Request $request,
         Report $report
     ): JsonResponse {
-        $validated =
-            $request->validate([
-                'status' => [
-                    'required',
-                    'string',
-                    Rule::in([
-                        'approved',
-                        'rejected',
-                    ]),
-                ],
-            ]);
+        $validated = $request->validate([
+            'status' => [
+                'required',
+                'string',
+                Rule::in([
+                    'approved',
+                    'rejected',
+                ]),
+            ],
+        ]);
 
-        $newStatus =
-            $validated['status'];
+        $newStatus = $validated['status'];
 
         $result = DB::transaction(
             function () use (
@@ -46,110 +44,72 @@ class ReportModerationController extends Controller
                 $report,
                 $newStatus
             ) {
-                $lockedReport =
-                    Report::query()
-                        ->whereKey(
-                            $report->id
-                        )
-                        ->lockForUpdate()
-                        ->firstOrFail();
+                $lockedReport = Report::query()
+                    ->whereKey($report->id)
+                    ->lockForUpdate()
+                    ->firstOrFail();
 
-                $oldStatus =
-                    $lockedReport->status;
+                $oldStatus = $lockedReport->status;
 
-                if (
-                    $oldStatus ===
-                    $newStatus
-                ) {
+                if ($oldStatus === $newStatus) {
                     return [
-                        'report' =>
-                            $lockedReport,
-
-                        'unchanged' =>
-                            true,
+                        'report' => $lockedReport,
+                        'unchanged' => true,
                     ];
                 }
 
-                if (
-                    $newStatus ===
-                    'approved'
-                ) {
-                    $updatedReport =
-                        $this->approve(
-                            $lockedReport
-                        );
+                if ($newStatus === 'approved') {
+                    $updatedReport = $this->approve(
+                        $lockedReport
+                    );
                 } else {
-                    $updatedReport =
-                        $this->reject(
-                            $lockedReport
-                        );
+                    $updatedReport = $this->reject(
+                        $lockedReport
+                    );
                 }
 
                 ReportModerationLog::create([
-                    'report_id' =>
-                        $lockedReport->id,
-
-                    'user_id' =>
-                        $request->user()?->id,
-
-                    'from_status' =>
-                        $oldStatus,
-
-                    'to_status' =>
-                        $newStatus,
+                    'report_id' => $lockedReport->id,
+                    'user_id' => $request->user()?->id,
+                    'from_status' => $oldStatus,
+                    'to_status' => $newStatus,
                 ]);
 
                 return [
-                    'report' =>
-                        $updatedReport,
-
-                    'unchanged' =>
-                        false,
+                    'report' => $updatedReport,
+                    'unchanged' => false,
                 ];
             }
         );
 
         /** @var Report $updatedReport */
-        $updatedReport =
-            $result['report'];
+        $updatedReport = $result['report'];
 
         if ($result['unchanged']) {
             return response()->json([
                 'message' =>
-                    $newStatus ===
-                    'approved'
+                    $newStatus === 'approved'
                         ? 'Báo cáo đã ở trạng thái đã duyệt.'
                         : 'Báo cáo đã ở trạng thái từ chối.',
 
                 'data' => [
-                    'id' =>
-                        $updatedReport->id,
-
-                    'status' =>
-                        $updatedReport->status,
-
-                    'updated_at' =>
-                        $updatedReport->updated_at,
+                    'id' => $updatedReport->id,
+                    'status' => $updatedReport->status,
+                    'updated_at' => $updatedReport->updated_at,
                 ],
             ]);
         }
 
         return response()->json([
             'message' =>
-                $updatedReport->status ===
-                'approved'
+                $updatedReport->status === 'approved'
                     ? 'Báo cáo đã được duyệt.'
                     : 'Báo cáo đã bị từ chối.',
 
             'data' => [
-                'id' =>
-                    $updatedReport->id,
-
-                'status' =>
-                    $updatedReport->status,
-
-                'updated_at' =>
-                    $updatedReport->updated_at,
+                'id' => $updatedReport->id,
+                'status' => $updatedReport->status,
+                'updated_at' => $updatedReport->updated_at,
             ],
         ]);
     }
@@ -161,10 +121,9 @@ class ReportModerationController extends Controller
             'status' => 'approved',
         ]);
 
-        $entities =
-            $this->publishEntities(
-                $report
-            );
+        $entities = $this->publishEntities(
+            $report
+        );
 
         $this->createRelations(
             $report,
@@ -181,10 +140,9 @@ class ReportModerationController extends Controller
     private function reject(
         Report $report
     ): Report {
-        $entities =
-            $report
-                ->entities()
-                ->get();
+        $entities = $report
+            ->entities()
+            ->get();
 
         $report->update([
             'status' => 'rejected',
@@ -208,24 +166,16 @@ class ReportModerationController extends Controller
         Report $report
     ): Collection {
         $entityData = [
-            'phone' =>
-                $report->phone,
-
-            'bank_account' =>
-                $report->bank_account,
-
-            'social' =>
-                $report->social,
-
-            'website' =>
-                $report->website,
+            'phone' => $report->phone,
+            'bank_account' => $report->bank_account,
+            'social' => $report->social,
+            'website' => $report->website,
         ];
 
         $entities = collect();
 
         foreach (
-            $entityData
-            as $type => $value
+            $entityData as $type => $value
         ) {
             if (! filled($value)) {
                 continue;
@@ -237,59 +187,38 @@ class ReportModerationController extends Controller
                     $value
                 );
 
-            if (
-                $normalizedValue === ''
-            ) {
+            if ($normalizedValue === '') {
                 continue;
             }
 
-            $entity =
-                Entity::firstOrCreate(
-                    [
-                        'type' =>
-                            $type,
-
-                        'normalized_value' =>
-                            $normalizedValue,
-                    ],
-                    [
-                        'value' =>
-                            trim($value),
-
-                        'report_count' =>
-                            0,
-
-                        'risk_score' =>
-                            0,
-
-                        'risk_level' =>
-                            'safe',
-
-                        'is_active' =>
-                            true,
-                    ]
-                );
+            $entity = Entity::firstOrCreate(
+                [
+                    'type' => $type,
+                    'normalized_value' => $normalizedValue,
+                ],
+                [
+                    'value' => trim($value),
+                    'report_count' => 0,
+                    'risk_score' => 0,
+                    'risk_level' => 'safe',
+                    'is_active' => true,
+                ]
+            );
 
             if (! $entity->is_active) {
                 $entity->update([
-                    'is_active' =>
-                        true,
+                    'is_active' => true,
                 ]);
             }
 
-            $entities->push(
-                $entity
-            );
+            $entities->push($entity);
         }
 
-        $entities =
-            $entities
-                ->unique('id')
-                ->values();
+        $entities = $entities
+            ->unique('id')
+            ->values();
 
-        if (
-            $entities->isNotEmpty()
-        ) {
+        if ($entities->isNotEmpty()) {
             $report
                 ->entities()
                 ->syncWithoutDetaching(
@@ -306,56 +235,33 @@ class ReportModerationController extends Controller
         Report $report,
         Collection $entities
     ): void {
-        $items =
-            $entities
-                ->values()
-                ->all();
+        $items = $entities
+            ->values()
+            ->all();
 
-        $count =
-            count($items);
+        $count = count($items);
 
-        for (
-            $i = 0;
-            $i < $count;
-            $i++
-        ) {
+        for ($i = 0; $i < $count; $i++) {
             for (
                 $j = $i + 1;
                 $j < $count;
                 $j++
             ) {
-                $first =
-                    $items[$i];
-
-                $second =
-                    $items[$j];
+                $first = $items[$i];
+                $second = $items[$j];
 
                 EntityRelation::firstOrCreate([
-                    'entity_id' =>
-                        $first->id,
-
-                    'related_entity_id' =>
-                        $second->id,
-
-                    'report_id' =>
-                        $report->id,
-
-                    'relation_type' =>
-                        'reported_together',
+                    'entity_id' => $first->id,
+                    'related_entity_id' => $second->id,
+                    'report_id' => $report->id,
+                    'relation_type' => 'reported_together',
                 ]);
 
                 EntityRelation::firstOrCreate([
-                    'entity_id' =>
-                        $second->id,
-
-                    'related_entity_id' =>
-                        $first->id,
-
-                    'report_id' =>
-                        $report->id,
-
-                    'relation_type' =>
-                        'reported_together',
+                    'entity_id' => $second->id,
+                    'related_entity_id' => $first->id,
+                    'report_id' => $report->id,
+                    'relation_type' => 'reported_together',
                 ]);
             }
         }
@@ -380,8 +286,7 @@ class ReportModerationController extends Controller
         string $type,
         string $value
     ): string {
-        $value =
-            trim($value);
+        $value = trim($value);
 
         return match ($type) {
             'phone' =>
@@ -391,7 +296,7 @@ class ReportModerationController extends Controller
 
             'bank_account' =>
                 preg_replace(
-                    '/\D+/',
+                    '~[^0-9]+~',
                     '',
                     $value
                 ) ?? '',
@@ -409,7 +314,7 @@ class ReportModerationController extends Controller
             default =>
                 strtolower(
                     preg_replace(
-                        '/\s+/',
+                        '~\s+~',
                         '',
                         $value
                     ) ?? ''
@@ -420,18 +325,17 @@ class ReportModerationController extends Controller
     private function normalizePhone(
         string $value
     ): string {
-        $value =
-            trim($value);
+        $value = trim($value);
 
         $hasVietnamCountryCode =
             preg_match(
-                '/^\s*(?:\+84|84)[\s.\-()]*/',
+                '~^\s*(?:\+84|84)[\s.()_-]*~',
                 $value
             ) === 1;
 
         $digits =
             preg_replace(
-                '/\D+/',
+                '~[^0-9]+~',
                 '',
                 $value
             ) ?? '';
@@ -447,11 +351,10 @@ class ReportModerationController extends Controller
                 '84'
             )
         ) {
-            return '0'.
-                substr(
-                    $digits,
-                    2
-                );
+            return '0'.substr(
+                $digits,
+                2
+            );
         }
 
         return $digits;
@@ -460,28 +363,27 @@ class ReportModerationController extends Controller
     private function normalizeWebsite(
         string $value
     ): string {
-        $value =
-            strtolower(
-                trim($value)
-            );
+        $value = strtolower(
+            trim($value)
+        );
 
         $value =
             preg_replace(
-                '#^https?://#',
+                '~^https?://~',
                 '',
                 $value
             ) ?? '';
 
         $value =
             preg_replace(
-                '#^www\.#',
+                '~^www\.~',
                 '',
                 $value
             ) ?? '';
 
         $value =
             preg_replace(
-                '#[?#].*$#',
+                '~[?#].*$~',
                 '',
                 $value
             ) ?? '';
