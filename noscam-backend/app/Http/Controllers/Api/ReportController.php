@@ -346,7 +346,7 @@ class ReportController extends Controller
 
         $normalized =
             preg_replace(
-                '~\s+~',
+                '~[^0-9]+~',
                 '',
                 trim((string) $value)
             ) ?? '';

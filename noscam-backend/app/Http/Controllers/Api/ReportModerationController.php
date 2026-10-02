@@ -367,41 +367,77 @@ class ReportModerationController extends Controller
             trim($value)
         );
 
-        $value =
-            preg_replace(
-                '~^https?://~',
-                '',
-                $value
-            ) ?? '';
+        $value = preg_replace(
+            '~^https?://~',
+            '',
+            $value
+        ) ?? '';
 
-        $value =
-            preg_replace(
-                '~^www\.~',
-                '',
-                $value
-            ) ?? '';
+        $value = preg_replace(
+            '~^www\.~',
+            '',
+            $value
+        ) ?? '';
 
-        $value =
-            preg_replace(
-                '~[?#].*$~',
-                '',
-                $value
-            ) ?? '';
+        /*
+         * Website entity dùng domain
+         * làm canonical value.
+         */
+        $value = preg_replace(
+            '~[/?#].*$~',
+            '',
+            $value
+        ) ?? '';
 
-        return rtrim(
-            $value,
-            '/'
-        );
+        return trim($value);
     }
 
     private function normalizeSocial(
         string $value
     ): string {
-        return strtolower(
-            rtrim(
-                trim($value),
-                '/'
-            )
+        $value = strtolower(
+            trim($value)
+        );
+
+        $value = preg_replace(
+            '~^https?://~',
+            '',
+            $value
+        ) ?? '';
+
+        $value = preg_replace(
+            '~^www\.~',
+            '',
+            $value
+        ) ?? '';
+
+        $value = preg_replace(
+            '~^m\.facebook\.com/~',
+            'facebook.com/',
+            $value
+        ) ?? $value;
+
+        $value = preg_replace(
+            '~^fb\.com/~',
+            'facebook.com/',
+            $value
+        ) ?? $value;
+
+        $value = preg_replace(
+            '~^telegram\.me/~',
+            't.me/',
+            $value
+        ) ?? $value;
+
+        $value = preg_replace(
+            '~[?#].*$~',
+            '',
+            $value
+        ) ?? '';
+
+        return rtrim(
+            $value,
+            '/'
         );
     }
 }
