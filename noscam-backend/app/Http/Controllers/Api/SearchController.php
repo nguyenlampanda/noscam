@@ -57,7 +57,7 @@ class SearchController extends Controller
         if ($entity === null) {
             return response()->json([
                 'message' =>
-                    'Chưa ghi nhận dữ liệu cảnh báo.',
+                'Chưa ghi nhận dữ liệu cảnh báo.',
 
                 'data' => null,
             ]);
@@ -75,97 +75,97 @@ class SearchController extends Controller
 
         $relatedInformation =
             $relations
-                ->map(
-                    function (
-                        EntityRelation $relation
-                    ): ?array {
-                        $relatedEntity =
-                            $relation
-                                ->relatedEntity;
+            ->map(
+                function (
+                    EntityRelation $relation
+                ): ?array {
+                    $relatedEntity =
+                        $relation
+                        ->relatedEntity;
 
-                        if (
-                            $relatedEntity ===
-                                null ||
-                            ! $relatedEntity
-                                ->is_active ||
-                            $relatedEntity
-                                ->report_count <= 0
-                        ) {
-                            return null;
-                        }
-
-                        return [
-                            'id' =>
-                                $relatedEntity
-                                    ->id,
-
-                            'type' =>
-                                $relatedEntity
-                                    ->type,
-
-                            'value' =>
-                                $relatedEntity
-                                    ->value,
-                        ];
+                    if (
+                        $relatedEntity ===
+                        null ||
+                        ! $relatedEntity
+                            ->is_active ||
+                        $relatedEntity
+                        ->report_count <= 0
+                    ) {
+                        return null;
                     }
-                )
-                ->filter()
-                ->unique(
-                    fn (array $item) =>
-                        $item['id']
-                )
-                ->values()
-                ->all();
+
+                    return [
+                        'id' =>
+                        $relatedEntity
+                            ->id,
+
+                        'type' =>
+                        $relatedEntity
+                            ->type,
+
+                        'value' =>
+                        $relatedEntity
+                            ->value,
+                    ];
+                }
+            )
+            ->filter()
+            ->unique(
+                fn(array $item) =>
+                $item['id']
+            )
+            ->values()
+            ->all();
 
         return response()->json([
             'data' => [
                 'type' =>
-                    $entity->type,
+                $entity->type,
 
                 'value' =>
-                    $entity->value,
+                $entity->value,
 
                 'risk_score' =>
-                    $entity->risk_score,
+                $entity->risk_score,
 
                 'risk_label' =>
-                    $this->riskLabel(
-                        $entity
-                            ->risk_level
-                    ),
+                $this->riskLabel(
+                    $entity
+                        ->risk_level
+                ),
 
                 'risk_level' =>
-                    $entity
-                        ->risk_level,
+                $entity
+                    ->risk_level,
 
                 'reports' =>
-                    $entity
-                        ->report_count,
+                $entity
+                    ->report_count,
 
                 'first_detected' =>
-                    $entity
-                        ->first_detected_at
-                        ?->format(
-                            'd/m/Y'
-                        ),
-
-                'last_report' =>
-                    $entity
-                        ->last_report_at
-                        ?->format(
-                            'd/m/Y'
-                        ),
-
-                'status' =>
-                    'Có dữ liệu cảnh báo',
-
-                'risk_factors' =>
-                    $this->riskFactors(
-                        $entity
+                $entity
+                    ->first_detected_at
+                    ?->format(
+                        'd/m/Y'
                     ),
 
+                'last_report' =>
+                $entity
+                    ->last_report_at
+                    ?->format(
+                        'd/m/Y'
+                    ),
+
+                'status' =>
+                'Có dữ liệu cảnh báo',
+
+                'risk_factors' =>
+                $this->riskFactors(
+                    $entity
+                ),
+
                 'related_information' =>
-                    $relatedInformation,
+                $relatedInformation,
 
                 'sources' => [
                     'Báo cáo từ cộng đồng',
@@ -173,7 +173,7 @@ class SearchController extends Controller
                 ],
 
                 'disclaimer' =>
-                    'Risk Score chỉ mang tính cảnh báo dựa trên dữ liệu hệ thống, không phải kết luận một cá nhân hoặc tổ chức là lừa đảo.',
+                'Risk Score chỉ mang tính cảnh báo dựa trên dữ liệu hệ thống, không phải kết luận một cá nhân hoặc tổ chức là lừa đảo.',
             ],
         ]);
     }
@@ -327,7 +327,7 @@ class SearchController extends Controller
 
         $value =
             preg_replace(
-                '#[?#].*$#',
+                '~[?#].*$~',
                 '',
                 $value
             ) ?? '';
@@ -354,22 +354,22 @@ class SearchController extends Controller
     ): string {
         return match ($level) {
             'safe' =>
-                'Chưa ghi nhận rủi ro',
+            'Chưa ghi nhận rủi ro',
 
             'low' =>
-                'Rủi ro thấp',
+            'Rủi ro thấp',
 
             'medium' =>
-                'Rủi ro trung bình',
+            'Rủi ro trung bình',
 
             'high' =>
-                'Rủi ro cao',
+            'Rủi ro cao',
 
             'dangerous' =>
-                'Rủi ro rất cao',
+            'Rủi ro rất cao',
 
             default =>
-                'Chưa xác định',
+            'Chưa xác định',
         };
     }
 
@@ -385,35 +385,35 @@ class SearchController extends Controller
                 'id' => 1,
 
                 'title' =>
-                    'Có báo cáo từ cộng đồng',
+                'Có báo cáo từ cộng đồng',
 
                 'description' =>
-                    "Hệ thống hiện ghi nhận {$entity->report_count} báo cáo liên quan.",
+                "Hệ thống hiện ghi nhận {$entity->report_count} báo cáo liên quan.",
 
                 'severity' =>
-                    $entity
-                        ->report_count >= 5
-                        ? 'high'
-                        : 'medium',
+                $entity
+                    ->report_count >= 5
+                    ? 'high'
+                    : 'medium',
             ];
         }
 
         if (
             $entity
-                ->last_report_at !==
+            ->last_report_at !==
             null
         ) {
             $factors[] = [
                 'id' => 2,
 
                 'title' =>
-                    'Có lịch sử báo cáo',
+                'Có lịch sử báo cáo',
 
                 'description' =>
-                    'Thông tin này đã xuất hiện trong dữ liệu báo cáo của hệ thống.',
+                'Thông tin này đã xuất hiện trong dữ liệu báo cáo của hệ thống.',
 
                 'severity' =>
-                    'medium',
+                'medium',
             ];
         }
 
