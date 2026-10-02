@@ -703,44 +703,223 @@ class SearchController extends Controller
     private function riskFactors(
         Entity $entity
     ): array {
+        $reports = $entity
+            ->reports()
+            ->where(
+                'reports.status',
+                'approved'
+            )
+            ->get();
+
+        if ($reports->isEmpty()) {
+            return [];
+        }
+
         $factors = [];
 
-        if (
-            $entity->report_count > 0
-        ) {
+        /*
+         * 1. Số báo cáo đã được duyệt
+         */
+        $reportCount =
+            $reports->count();
+
+        $factors[] = [
+            'id' =>
+                'report_count',
+
+            'title' =>
+                'Có báo cáo đã được kiểm duyệt',
+
+            'description' =>
+                "Hệ thống ghi nhận {$reportCount} báo cáo đã được duyệt có liên quan đến thông tin này.",
+
+            'severity' =>
+                match (true) {
+                    $reportCount >= 5 =>
+                        'high',
+
+                    $reportCount >= 2 =>
+                        'medium',
+
+                    default =>
+                        'low',
+                },
+        ];
+
+        /*
+         * 2. Đa dạng nguồn gửi.
+         *
+         * submitter_hash được tạo từ IP đã HMAC,
+         * vì vậy không gọi đây là số người báo.
+         */
+        $sourceCount = $reports
+            ->pluck('submitter_hash')
+            ->filter()
+            ->unique()
+            ->count();
+
+        if ($sourceCount >= 2) {
             $factors[] = [
-                'id' => 1,
+                'id' =>
+                    'source_diversity',
 
                 'title' =>
-                    'Có báo cáo từ cộng đồng',
+                    'Báo cáo đến từ nhiều nguồn gửi',
 
                 'description' =>
-                    "Hệ thống hiện ghi nhận {$entity->report_count} báo cáo liên quan.",
+                    "Hệ thống ghi nhận báo cáo từ {$sourceCount} nguồn gửi khác nhau. Đây là tín hiệu kỹ thuật và không đồng nghĩa với {$sourceCount} người khác nhau.",
 
                 'severity' =>
-                    $entity->report_count >= 5
+                    $sourceCount >= 5
                         ? 'high'
                         : 'medium',
             ];
         }
 
-        if (
-            $entity->last_report_at !== null
-        ) {
+        /*
+         * 3. Thiệt hại do người gửi khai báo.
+         * Không diễn đạt như thiệt hại đã xác minh.
+         */
+        $totalLoss = $reports
+            ->sum(
+                fn ($report) =>
+                    max(
+                        0,
+                        (float) (
+                            $report->loss_amount
+                            ?? 0
+                        )
+                    )
+            );
+
+        if ($totalLoss > 0) {
+            $formattedLoss =
+                number_format(
+                    $totalLoss,
+                    0,
+                    ',',
+                    '.'
+                );
+
             $factors[] = [
-                'id' => 2,
+                'id' =>
+                    'reported_loss',
 
                 'title' =>
-                    'Có lịch sử báo cáo',
+                    'Có thiệt hại được khai báo',
 
                 'description' =>
-                    'Thông tin này đã xuất hiện trong dữ liệu báo cáo của hệ thống.',
+                    "Tổng số tiền được người gửi khai báo trong các báo cáo đã duyệt là {$formattedLoss} ₫. Số tiền này chưa được NoScam xác minh độc lập.",
 
                 'severity' =>
-                    'medium',
+                    match (true) {
+                        $totalLoss >=
+                            50_000_000 =>
+                                'high',
+
+                        $totalLoss >=
+                            5_000_000 =>
+                                'medium',
+
+                        default =>
+                            'low',
+                    },
+            ];
+        }
+
+        /*
+         * 4. Độ gần đây của báo cáo.
+         */
+        $latestReport = $reports
+            ->sortByDesc(
+                'created_at'
+            )
+            ->first();
+
+        if (
+            $latestReport?->created_at
+        ) {
+            $days =
+                (int) floor(
+                    now()->diffInDays(
+                        $latestReport->created_at,
+                        true
+                    )
+                );
+
+            if ($days <= 30) {
+                $factors[] = [
+                    'id' =>
+                        'recent_activity',
+
+                    'title' =>
+                        'Có báo cáo gần đây',
+
+                    'description' =>
+                        $days === 0
+                            ? 'Hệ thống ghi nhận báo cáo đã duyệt trong hôm nay.'
+                            : "Báo cáo đã duyệt gần nhất được ghi nhận khoảng {$days} ngày trước.",
+
+                    'severity' =>
+                        $days <= 7
+                            ? 'high'
+                            : 'medium',
+                ];
+            } elseif ($days <= 365) {
+                $factors[] = [
+                    'id' =>
+                        'report_history',
+
+                    'title' =>
+                        'Có lịch sử báo cáo',
+
+                    'description' =>
+                        "Báo cáo đã duyệt gần nhất được ghi nhận khoảng {$days} ngày trước.",
+
+                    'severity' =>
+                        'low',
+                ];
+            }
+        }
+
+        /*
+         * 5. Các dữ liệu khác xuất hiện cùng entity.
+         *
+         * Chỉ relation của report đã duyệt còn tồn tại
+         * trong luồng moderation hiện tại.
+         */
+        $relatedCount =
+            EntityRelation::query()
+                ->where(
+                    'entity_id',
+                    $entity->id
+                )
+                ->distinct(
+                    'related_entity_id'
+                )
+                ->count(
+                    'related_entity_id'
+                );
+
+        if ($relatedCount > 0) {
+            $factors[] = [
+                'id' =>
+                    'related_information',
+
+                'title' =>
+                    'Có dữ liệu liên quan',
+
+                'description' =>
+                    "Thông tin này đã xuất hiện cùng {$relatedCount} dữ liệu khác trong các báo cáo đã duyệt.",
+
+                'severity' =>
+                    $relatedCount >= 3
+                        ? 'high'
+                        : 'medium',
             ];
         }
 
         return $factors;
     }
+
 }
