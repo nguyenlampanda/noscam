@@ -28,10 +28,48 @@ function useReport() {
       } catch (err) {
         setData(null)
 
-        setError(
+        const errorCode =
+          err?.data?.code || null
+
+        let errorMessage =
           err?.message ||
-            'Không thể gửi báo cáo. Vui lòng thử lại.',
-        )
+          'Không thể gửi báo cáo. Vui lòng thử lại.'
+
+        let errorType = 'server'
+
+        if (
+          err?.status === 409 &&
+          errorCode === 'DUPLICATE_REPORT'
+        ) {
+          errorType = 'duplicate'
+
+          errorMessage =
+            err?.data?.message ||
+            'Báo cáo có nội dung tương tự vừa được gửi. Vui lòng không gửi lặp lại liên tục.'
+        } else if (err?.status === 422) {
+          errorType = 'validation'
+
+          errorMessage =
+            err?.message ||
+            'Một số thông tin chưa hợp lệ. Vui lòng kiểm tra lại.'
+        } else if (err?.status === 429) {
+          errorType = 'rate_limit'
+
+          errorMessage =
+            'Bạn đang gửi quá nhiều báo cáo. Vui lòng chờ một lúc rồi thử lại.'
+        } else if (
+          !err?.status ||
+          err?.status >= 500
+        ) {
+          errorType = 'server'
+        }
+
+        setError({
+          type: errorType,
+          code: errorCode,
+          status: err?.status || null,
+          message: errorMessage,
+        })
 
         setStatus(REQUEST_STATUS.ERROR)
 

@@ -32,6 +32,15 @@ function ReportForm() {
   const isSuccess = status === 'success'
   const isError = status === 'error'
 
+const errorTitle =
+  error?.type === 'duplicate'
+    ? 'Báo cáo đã được gửi gần đây'
+    : error?.type === 'validation'
+      ? 'Thông tin chưa hợp lệ'
+      : error?.type === 'rate_limit'
+        ? 'Bạn đang gửi quá nhiều báo cáo'
+        : 'Không thể gửi báo cáo'
+
   const handleChange = (event) => {
     const { name, value } = event.target
 
@@ -131,21 +140,21 @@ function ReportForm() {
         </p>
       </div>
 
-      {isError && (
-        <div
-          role="alert"
-          className="mt-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3"
-        >
-          <p className="text-sm font-semibold text-red-700">
-            Không thể gửi báo cáo
-          </p>
+    {isError && (
+  <div
+    role="alert"
+    className="mt-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3"
+  >
+    <p className="text-sm font-semibold text-red-700">
+      {errorTitle}
+    </p>
 
-          <p className="mt-1 text-xs leading-5 text-red-600">
-            {error ||
-              'Đã xảy ra lỗi trong quá trình gửi dữ liệu. Vui lòng kiểm tra lại và thử lần nữa.'}
-          </p>
-        </div>
-      )}
+    <p className="mt-1 text-xs leading-5 text-red-600">
+      {error?.message ||
+        'Đã xảy ra lỗi trong quá trình gửi dữ liệu. Vui lòng kiểm tra lại và thử lần nữa.'}
+    </p>
+  </div>
+)}
 
       <fieldset
         disabled={isSubmitting}

@@ -19,16 +19,20 @@ class Report extends Model
         'loss_amount',
         'occurred_at',
         'status',
+        'submission_fingerprint',
+        'submitter_hash',
+    ];
+
+    protected $hidden = [
+        'submission_fingerprint',
+        'submitter_hash',
     ];
 
     protected function casts(): array
     {
         return [
-            'loss_amount' =>
-                'decimal:2',
-
-            'occurred_at' =>
-                'date',
+            'loss_amount' => 'decimal:2',
+            'occurred_at' => 'date',
         ];
     }
 
