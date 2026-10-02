@@ -185,7 +185,7 @@ function AdminReportDetailPage() {
 
           <Link
             to="/admin/reports"
-            className="mt-5 inline-flex rounded-xl bg-white/10 px-4 py-2.5 text-sm font-bold text-white"
+            className="mt-5 inline-flex rounded-xl bg-white/10 px-4 py-2.5 text-sm font-bold text-slate-950"
           >
             ← Quay lại danh sách
           </Link>
@@ -226,7 +226,7 @@ function AdminReportDetailPage() {
         <div className="mt-6 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <div className="flex flex-wrap items-center gap-3">
-              <h1 className="text-3xl font-black tracking-[-0.04em] text-white">
+              <h1 className="text-3xl font-black tracking-[-0.04em] text-slate-950">
                 Report #{report.id}
               </h1>
 
@@ -235,7 +235,7 @@ function AdminReportDetailPage() {
               />
             </div>
 
-            <p className="mt-3 text-sm text-slate-400">
+            <p className="mt-3 text-sm text-slate-500">
               Gửi lúc{' '}
               {formatDateTime(
                 report.created_at,
@@ -397,7 +397,7 @@ function AdminReportDetailPage() {
                         }}
                         className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
                       >
-                        <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
+                        <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">
                           {formatEntityType(
                             entity.type,
                           )}
@@ -454,7 +454,7 @@ function AdminReportDetailPage() {
           </div>
 
           <aside className="space-y-5 xl:sticky xl:top-24 xl:self-start">
-            <div className="overflow-hidden rounded-3xl border border-white/10 bg-white">
+            <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white">
               <div
                 className={`h-1.5 ${statusLine(
                   report.status,
@@ -462,7 +462,7 @@ function AdminReportDetailPage() {
               />
 
               <div className="p-6">
-                <div className="text-xs font-bold uppercase tracking-[0.16em] text-slate-400">
+                <div className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
                   Quyết định kiểm duyệt
                 </div>
 
@@ -535,7 +535,7 @@ function AdminReportDetailPage() {
                   )}
                 </div>
 
-                <div className="mt-6 border-t border-slate-100 pt-5 text-xs leading-5 text-slate-400">
+                <div className="mt-6 border-t border-slate-100 pt-5 text-xs leading-5 text-slate-500">
                   Mỗi thay đổi trạng thái
                   được ghi lại trong
                   lịch sử kiểm duyệt.
@@ -543,12 +543,12 @@ function AdminReportDetailPage() {
               </div>
             </div>
 
-            <div className="rounded-3xl border border-white/10 bg-white/[0.05] p-5">
+            <div className="rounded-3xl border border-slate-200 bg-white/[0.05] p-5">
               <div className="text-xs font-bold uppercase tracking-[0.15em] text-slate-500">
                 Lưu ý
               </div>
 
-              <p className="mt-3 text-xs leading-5 text-slate-400">
+              <p className="mt-3 text-xs leading-5 text-slate-500">
                 Việc duyệt báo cáo chỉ
                 xác nhận dữ liệu đủ điều
                 kiện tham gia hệ thống
@@ -685,7 +685,7 @@ function ConfirmationDialog({
               type="button"
               disabled={processing}
               onClick={onConfirm}
-              className={`flex-1 rounded-xl px-4 py-3 text-sm font-bold text-white disabled:opacity-60 ${
+              className={`flex-1 rounded-xl px-4 py-3 text-sm font-bold text-slate-950 disabled:opacity-60 ${
                 approving
                   ? 'bg-blue-600 hover:bg-blue-700'
                   : 'bg-red-600 hover:bg-red-700'
@@ -743,12 +743,12 @@ function MiniStat({
   value,
 }) {
   return (
-    <div className="min-w-24 rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-3">
+    <div className="min-w-24 rounded-2xl border border-slate-200 bg-white/[0.05] px-4 py-3">
       <div className="text-[10px] font-bold uppercase tracking-wide text-slate-500">
         {label}
       </div>
 
-      <div className="mt-1 text-lg font-black text-white">
+      <div className="mt-1 text-lg font-black text-slate-950">
         {value}
       </div>
     </div>
@@ -769,7 +769,7 @@ function Info({
 
   return (
     <div>
-      <div className="text-[10px] font-bold uppercase tracking-[0.13em] text-slate-400">
+      <div className="text-[10px] font-bold uppercase tracking-[0.13em] text-slate-500">
         {label}
       </div>
 
@@ -842,8 +842,8 @@ function AdminPage({
   children,
 }) {
   return (
-    <div className="min-h-screen bg-slate-950">
-      <header className="sticky top-0 z-40 border-b border-white/10 bg-slate-950/80 backdrop-blur-xl">
+    <div className="min-h-screen bg-slate-50">
+      <header className="sticky top-0 z-40 border-b border-slate-200/80 bg-white/90 backdrop-blur-xl shadow-sm">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 sm:px-6">
           <Link
             to="/admin/reports"
@@ -854,7 +854,7 @@ function AdminPage({
             </div>
 
             <div>
-              <div className="font-bold text-white">
+              <div className="font-bold text-slate-950">
                 NoScam.vn
               </div>
 
@@ -866,7 +866,7 @@ function AdminPage({
 
           <Link
             to="/admin/reports"
-            className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-bold text-slate-300 transition hover:bg-white/10"
+            className="rounded-xl border border-slate-200 bg-white/5 px-4 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-100"
           >
             Danh sách
           </Link>
@@ -876,7 +876,7 @@ function AdminPage({
       <main className="relative overflow-hidden">
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute left-1/2 top-0 h-[500px] w-[900px] -translate-x-1/2 rounded-full bg-blue-600/10 blur-[140px]"
+          className="pointer-events-none absolute left-1/2 top-0 h-[500px] w-[900px] -translate-x-1/2 rounded-full bg-blue-400/10 blur-[140px]"
         />
 
         <div className="relative mx-auto max-w-7xl px-5 py-8 sm:px-6">

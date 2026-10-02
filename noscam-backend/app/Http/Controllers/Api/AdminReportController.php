@@ -39,6 +39,7 @@ class AdminReportController extends Controller
             ! in_array(
                 $status,
                 [
+                    'all',
                     'pending',
                     'approved',
                     'rejected',
@@ -54,16 +55,19 @@ class AdminReportController extends Controller
 
         $query =
             Report::query()
-                ->where(
-                    'status',
-                    $status
-                )
                 ->with([
                     'evidences:id,report_id,original_name,mime_type,file_size',
                 ])
                 ->withCount(
                     'evidences'
                 );
+
+        if ($status !== 'all') {
+            $query->where(
+                'status',
+                $status
+            );
+        }
 
         if ($search !== '') {
             $query->where(

@@ -21,6 +21,11 @@ import adminService from '../../services/adminService'
 
 const tabs = [
   {
+    value: 'all',
+    label: 'Tất cả',
+    countKey: 'total',
+  },
+  {
     value: 'pending',
     label: 'Chờ duyệt',
     countKey: 'pending',
@@ -368,8 +373,8 @@ function AdminReportsPage() {
     ])
 
   return (
-    <div className="min-h-screen bg-slate-950">
-      <header className="sticky top-0 z-40 border-b border-white/10 bg-slate-950/80 backdrop-blur-xl">
+    <div className="min-h-screen bg-slate-50">
+      <header className="sticky top-0 z-40 border-b border-slate-200/80 bg-white/90 backdrop-blur-xl shadow-sm">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 sm:px-6">
           <Link
             to="/admin/reports"
@@ -387,7 +392,7 @@ function AdminReportsPage() {
               </motion.div>
 
               <div>
-                <div className="font-bold tracking-tight text-white">
+                <div className="font-bold tracking-tight text-slate-950">
                   NoScam.vn
                 </div>
 
@@ -401,7 +406,7 @@ function AdminReportsPage() {
           <div className="flex items-center gap-3">
             <Link
               to="/"
-              className="hidden rounded-xl px-4 py-2 text-sm font-semibold text-slate-400 transition hover:bg-white/5 hover:text-white sm:block"
+              className="hidden rounded-xl px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-100 hover:text-slate-950 sm:block"
             >
               Xem website
             </Link>
@@ -409,7 +414,7 @@ function AdminReportsPage() {
             <button
               type="button"
               onClick={handleLogout}
-              className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-300 transition hover:bg-white/10 hover:text-white"
+              className="rounded-xl border border-slate-200 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 hover:text-slate-950"
             >
               Đăng xuất
             </button>
@@ -420,7 +425,7 @@ function AdminReportsPage() {
       <main className="relative overflow-hidden">
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute left-1/2 top-0 h-[520px] w-[900px] -translate-x-1/2 rounded-full bg-blue-600/10 blur-[130px]"
+          className="pointer-events-none absolute left-1/2 top-0 h-[520px] w-[900px] -translate-x-1/2 rounded-full bg-blue-400/10 blur-[130px]"
         />
 
         <div className="relative mx-auto max-w-7xl px-5 py-8 sm:px-6 sm:py-10">
@@ -464,11 +469,11 @@ function AdminReportsPage() {
                 Hệ thống kiểm duyệt
               </div>
 
-              <h1 className="mt-3 text-3xl font-black tracking-[-0.04em] text-white sm:text-4xl">
+              <h1 className="mt-3 text-3xl font-black tracking-[-0.04em] text-slate-950 sm:text-4xl">
                 Quản lý báo cáo
               </h1>
 
-              <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-400 sm:text-base">
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-500 sm:text-base">
                 Xem xét dữ liệu do
                 người dùng gửi trước
                 khi thông tin được
@@ -477,14 +482,14 @@ function AdminReportsPage() {
               </p>
             </div>
 
-            <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-5 py-4 backdrop-blur">
+            <div className="rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
               <div className="flex items-end justify-between gap-8">
                 <div>
                   <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                     Đang chờ xử lý
                   </div>
 
-                  <div className="mt-1 text-2xl font-black text-white">
+                  <div className="mt-1 text-2xl font-black text-slate-950">
                     {dashboardLoading
                       ? '—'
                       : counts.pending ??
@@ -503,7 +508,7 @@ function AdminReportsPage() {
                 </div>
               </div>
 
-              <div className="mt-3 h-1.5 w-56 max-w-full overflow-hidden rounded-full bg-white/10">
+              <div className="mt-3 h-1.5 w-56 max-w-full overflow-hidden rounded-full bg-slate-100">
                 <motion.div
                   className="h-full rounded-full bg-amber-400"
                   initial={{
@@ -548,34 +553,42 @@ function AdminReportsPage() {
                   }
                   tone={item.tone}
                   active={
-                    status ===
-                    item.key
-                  }
-                  onClick={
                     item.key ===
                     'total'
-                      ? null
-                      : () =>
-                          changeStatus(
-                            item.key,
-                          )
+                      ? status === 'all'
+                      : status ===
+                        item.key
+                  }
+                  onClick={() =>
+                    changeStatus(
+                      item.key ===
+                        'total'
+                        ? 'all'
+                        : item.key,
+                    )
                   }
                 />
               ),
             )}
 
-            <StatCard
-              label="Cảnh báo công khai"
-              value={
-                dashboardLoading
-                  ? '—'
-                  : publicAlerts
-              }
-              tone="blue"
-            />
+            <Link
+              to="/alerts"
+              className="block"
+            >
+              <StatCard
+                label="Cảnh báo công khai"
+                value={
+                  dashboardLoading
+                    ? '—'
+                    : publicAlerts
+                }
+                tone="blue"
+                hint="Xem danh sách →"
+              />
+            </Link>
           </motion.section>
 
-          <section className="mt-8 overflow-hidden rounded-3xl border border-white/10 bg-white shadow-2xl shadow-black/20">
+          <section className="mt-8 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl shadow-black/20">
             <div className="border-b border-slate-200 bg-slate-50/80">
               <div className="flex overflow-x-auto px-2 sm:px-4">
                 {tabs.map((tab) => (
@@ -631,7 +644,7 @@ function AdminReportsPage() {
                 className="flex flex-col gap-3 lg:flex-row"
               >
                 <div className="relative min-w-0 flex-1">
-                  <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
+                  <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-500">
                     ⌕
                   </span>
 
@@ -648,13 +661,13 @@ function AdminReportsPage() {
                       )
                     }
                     placeholder="Tìm ID, SĐT, STK, ngân hàng, website, social..."
-                    className="w-full rounded-2xl border border-slate-200 bg-white py-3.5 pl-11 pr-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
+                    className="w-full rounded-2xl border border-slate-200 bg-white py-3.5 pl-11 pr-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-500 focus:border-blue-400 focus:ring-4 focus:ring-blue-50"
                   />
                 </div>
 
                 <button
                   type="submit"
-                  className="rounded-2xl bg-slate-950 px-6 py-3.5 text-sm font-bold text-white transition hover:bg-blue-700"
+                  className="rounded-2xl bg-blue-600 px-6 py-3.5 text-sm font-bold text-white transition hover:bg-blue-700"
                 >
                   Tìm kiếm
                 </button>
@@ -724,13 +737,13 @@ function AdminReportsPage() {
                   opacity: 1,
                   scale: 1,
                 }}
-                className="rounded-3xl border border-white/10 bg-white/[0.04] p-12 text-center"
+                className="rounded-3xl border border-slate-200 bg-white p-12 text-center shadow-sm"
               >
-                <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-white/5 text-xl text-slate-400">
+                <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-white/5 text-xl text-slate-500">
                   ⌕
                 </div>
 
-                <div className="mt-4 font-bold text-white">
+                <div className="mt-4 font-bold text-slate-950">
                   Không tìm thấy báo
                   cáo
                 </div>
@@ -838,18 +851,19 @@ function StatCard({
   tone,
   active = false,
   onClick,
+  hint = '',
 }) {
   const toneStyles = {
     slate:
-      'from-slate-500/15 to-slate-500/5 text-slate-300',
+      'from-slate-50 to-white text-slate-950',
     amber:
-      'from-amber-400/20 to-amber-400/5 text-amber-300',
+      'from-amber-50 to-white text-amber-700',
     emerald:
-      'from-emerald-400/20 to-emerald-400/5 text-emerald-300',
+      'from-emerald-50 to-white text-emerald-700',
     red:
-      'from-red-400/20 to-red-400/5 text-red-300',
+      'from-red-50 to-white text-red-700',
     blue:
-      'from-blue-400/20 to-blue-400/5 text-blue-300',
+      'from-blue-50 to-white text-blue-700',
   }
 
   const Component =
@@ -878,8 +892,8 @@ function StatCard({
       }}
       className={`relative overflow-hidden rounded-2xl border p-5 text-left ${
         active
-          ? 'border-blue-400/50 bg-blue-500/10'
-          : 'border-white/10 bg-white/[0.04]'
+          ? 'border-blue-300 bg-blue-50'
+          : 'border-slate-200 bg-white shadow-sm'
       } ${
         onClick
           ? 'cursor-pointer'
@@ -903,11 +917,17 @@ function StatCard({
             toneStyles[tone]
               ?.split(' ')
               .at(-1) ??
-            'text-white'
+            'text-slate-950'
           }`}
         >
           {value}
         </div>
+
+        {hint && (
+          <div className="mt-3 text-xs font-bold text-blue-400">
+            {hint}
+          </div>
+        )}
       </div>
     </Component>
   )
@@ -953,7 +973,7 @@ function ReportCard({
       whileHover={{
         y: -2,
       }}
-      className="overflow-hidden rounded-3xl border border-white/10 bg-white shadow-xl shadow-black/10"
+      className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-xl shadow-black/10"
     >
       <div
         className={`h-1 ${
@@ -998,7 +1018,7 @@ function ReportCard({
               )}
             </div>
 
-            <div className="mt-2 text-xs font-medium text-slate-400">
+            <div className="mt-2 text-xs font-medium text-slate-500">
               Gửi lúc{' '}
               {formatDateTime(
                 report.created_at,
@@ -1065,7 +1085,7 @@ function ReportCard({
                   key={`${signal.label}-${signal.value}`}
                   className="max-w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2"
                 >
-                  <span className="mr-2 text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                  <span className="mr-2 text-[10px] font-bold uppercase tracking-wide text-slate-500">
                     {signal.label}
                   </span>
 
@@ -1217,7 +1237,7 @@ function ModerationDialog({
           </p>
 
           <div className="mt-5 rounded-2xl bg-slate-50 p-4">
-            <div className="text-[11px] font-bold uppercase tracking-wide text-slate-400">
+            <div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">
               Nội dung
             </div>
 
@@ -1241,7 +1261,7 @@ function ModerationDialog({
               type="button"
               disabled={processing}
               onClick={onConfirm}
-              className={`flex-1 rounded-xl px-4 py-3 text-sm font-bold text-white transition disabled:cursor-not-allowed disabled:opacity-60 ${
+              className={`flex-1 rounded-xl px-4 py-3 text-sm font-bold text-slate-950 transition disabled:cursor-not-allowed disabled:opacity-60 ${
                 approving
                   ? 'bg-blue-600 hover:bg-blue-700'
                   : 'bg-red-600 hover:bg-red-700'
@@ -1329,18 +1349,18 @@ function Pagination({
             ),
           )
         }
-        className="rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-bold text-slate-300 transition hover:bg-white/10 disabled:opacity-30"
+        className="rounded-xl border border-slate-200 bg-white/5 px-4 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-100 disabled:opacity-30"
       >
         ← Trước
       </button>
 
-      <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-slate-400">
+      <div className="rounded-xl border border-slate-200 bg-white/5 px-4 py-2.5 text-sm text-slate-500">
         Trang{' '}
-        <strong className="text-white">
+        <strong className="text-slate-950">
           {page}
         </strong>{' '}
         /{' '}
-        <strong className="text-white">
+        <strong className="text-slate-950">
           {lastPage}
         </strong>
       </div>
@@ -1359,7 +1379,7 @@ function Pagination({
             ),
           )
         }
-        className="rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-bold text-slate-300 transition hover:bg-white/10 disabled:opacity-30"
+        className="rounded-xl border border-slate-200 bg-white/5 px-4 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-100 disabled:opacity-30"
       >
         Sau →
       </button>
@@ -1414,7 +1434,7 @@ function Info({
 
   return (
     <div>
-      <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">
+      <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500">
         {label}
       </div>
 
