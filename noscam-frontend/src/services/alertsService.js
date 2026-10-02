@@ -1,51 +1,87 @@
 import apiClient from './apiClient'
 
 import { API_ENDPOINTS } from '../constants/api'
-import {
-  getPagination,
-  getResponseData,
-} from '../utils/apiResponse'
-
+import { getPagination } from '../utils/apiResponse'
 import { mapAlerts } from '../utils/mappers/alertMapper'
 
 export async function getAlerts(
   filters = {},
   options = {},
 ) {
-  const params = new URLSearchParams()
+  const params =
+    new URLSearchParams()
 
   if (
     filters.category &&
     filters.category !== 'all'
   ) {
-    params.set('category', filters.category)
+    params.set(
+      'category',
+      filters.category,
+    )
+  }
+
+  if (
+    filters.risk &&
+    filters.risk !== 'all'
+  ) {
+    params.set(
+      'risk',
+      filters.risk,
+    )
+  }
+
+  if (filters.sort) {
+    params.set(
+      'sort',
+      filters.sort,
+    )
   }
 
   if (filters.page) {
-    params.set('page', String(filters.page))
+    params.set(
+      'page',
+      String(filters.page),
+    )
   }
 
-  const queryString = params.toString()
+  if (filters.perPage) {
+    params.set(
+      'per_page',
+      String(filters.perPage),
+    )
+  }
 
-  const endpoint = queryString
-    ? `${API_ENDPOINTS.ALERTS}?${queryString}`
-    : API_ENDPOINTS.ALERTS
+  const queryString =
+    params.toString()
 
-  const response = await apiClient.get(
-    endpoint,
-    {
-      signal: options.signal,
-    },
-  )
+  const endpoint =
+    queryString
+      ? `${API_ENDPOINTS.ALERTS}?${queryString}`
+      : API_ENDPOINTS.ALERTS
 
-  const data = getResponseData(response)
+  const response =
+    await apiClient.get(
+      endpoint,
+      {
+        signal:
+          options.signal,
+      },
+    )
 
   return {
     alerts: mapAlerts(
-      Array.isArray(data) ? data : [],
+      Array.isArray(response?.data)
+        ? response.data
+        : [],
     ),
 
-    pagination: getPagination(response),
+    pagination:
+      getPagination(response),
+
+    filters:
+      response?.meta?.filters ??
+      {},
   }
 }
 
