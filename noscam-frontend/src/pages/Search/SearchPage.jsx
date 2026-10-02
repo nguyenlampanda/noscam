@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { motion } from 'motion/react'
 import {
   Link,
   useSearchParams,
@@ -34,6 +35,35 @@ import EmptyState
 import { useSearch }
   from '../../hooks/useSearch'
 
+const containerVariants = {
+  hidden: {},
+  visible: {
+    transition: {
+      staggerChildren: 0.1,
+    },
+  },
+}
+
+const itemVariants = {
+  hidden: {
+    opacity: 0,
+    y: 22,
+  },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      duration: 0.5,
+      ease: [
+        0.16,
+        1,
+        0.3,
+        1,
+      ],
+    },
+  },
+}
+
 function SearchPage() {
   const [searchParams] =
     useSearchParams()
@@ -64,24 +94,43 @@ function SearchPage() {
 
   if (!query) {
     return (
-      <section className="py-12 sm:py-20">
+      <section className="relative overflow-hidden py-16 sm:py-24">
+        <div
+          aria-hidden="true"
+          className="noscam-grid absolute inset-0 opacity-50"
+        />
+
         <Container>
-          <div className="mx-auto max-w-3xl">
-            <h1 className="text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">
+          <motion.div
+            initial={{
+              opacity: 0,
+              y: 25,
+            }}
+            animate={{
+              opacity: 1,
+              y: 0,
+            }}
+            className="relative mx-auto max-w-3xl"
+          >
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-600">
+              NOSCAM CHECK
+            </p>
+
+            <h1 className="mt-3 text-3xl font-bold tracking-[-0.035em] text-slate-950 sm:text-4xl">
               Kiểm tra thông tin
             </h1>
 
-            <p className="mt-3 text-sm leading-6 text-slate-500 sm:text-base sm:leading-7">
+            <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-500 sm:text-base sm:leading-7">
               Nhập số điện thoại,
               số tài khoản, website
               hoặc tài khoản mạng xã
               hội bạn muốn kiểm tra.
             </p>
 
-            <div className="mt-7 sm:mt-8">
+            <div className="mt-8">
               <SearchBar />
             </div>
-          </div>
+          </motion.div>
         </Container>
       </section>
     )
@@ -89,26 +138,72 @@ function SearchPage() {
 
   return (
     <>
-      <section className="border-b border-slate-200 bg-slate-50/60 py-8 sm:py-10">
-        <Container>
-          <div className="mx-auto max-w-5xl">
-            <p className="text-sm font-semibold text-blue-600">
-              Kết quả tra cứu
-            </p>
+      <section className="relative overflow-hidden border-b border-slate-200 bg-slate-50/70 py-9 sm:py-12">
+        <div
+          aria-hidden="true"
+          className="noscam-grid absolute inset-0 opacity-40"
+        />
 
-            <h1 className="mt-2 text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">
+        <motion.div
+          aria-hidden="true"
+          className="absolute -right-24 -top-24 h-72 w-72 rounded-full bg-blue-100/50 blur-3xl"
+          animate={{
+            scale: [
+              1,
+              1.15,
+              1,
+            ],
+          }}
+          transition={{
+            duration: 6,
+            repeat: Infinity,
+          }}
+        />
+
+        <Container>
+          <motion.div
+            initial={{
+              opacity: 0,
+              y: 18,
+            }}
+            animate={{
+              opacity: 1,
+              y: 0,
+            }}
+            className="relative mx-auto max-w-5xl"
+          >
+            <div className="flex items-center gap-2">
+              <motion.span
+                className="h-2 w-2 rounded-full bg-blue-600"
+                animate={{
+                  opacity: [
+                    0.4,
+                    1,
+                    0.4,
+                  ],
+                }}
+                transition={{
+                  duration: 1.5,
+                  repeat: Infinity,
+                }}
+              />
+
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-blue-600">
+                Kết quả tra cứu
+              </p>
+            </div>
+
+            <h1 className="mt-3 text-2xl font-bold tracking-[-0.035em] text-slate-950 sm:text-4xl">
               Đánh giá thông tin
               trước khi giao dịch
             </h1>
 
-            <div className="mt-6 sm:mt-7">
+            <div className="mt-7">
               <SearchBar
-                initialValue={
-                  query
-                }
+                initialValue={query}
               />
             </div>
-          </div>
+          </motion.div>
         </Container>
       </section>
 
@@ -122,30 +217,63 @@ function SearchPage() {
 
             {status ===
               'error' && (
-              <ErrorState
-                title="Không thể kiểm tra thông tin"
-                description={
-                  error ||
-                  'NoScam chưa thể kết nối tới hệ thống dữ liệu. Vui lòng thử lại.'
-                }
-                onRetry={
-                  handleRetry
-                }
-              />
+              <motion.div
+                initial={{
+                  opacity: 0,
+                  y: 15,
+                }}
+                animate={{
+                  opacity: 1,
+                  y: 0,
+                }}
+              >
+                <ErrorState
+                  title="Không thể kiểm tra thông tin"
+                  description={
+                    error ||
+                    'NoScam chưa thể kết nối tới hệ thống dữ liệu. Vui lòng thử lại.'
+                  }
+                  onRetry={
+                    handleRetry
+                  }
+                />
+              </motion.div>
             )}
 
             {status ===
               'empty' && (
-              <EmptyState
-                query={query}
-              />
+              <motion.div
+                initial={{
+                  opacity: 0,
+                  y: 15,
+                }}
+                animate={{
+                  opacity: 1,
+                  y: 0,
+                }}
+              >
+                <EmptyState
+                  query={query}
+                />
+              </motion.div>
             )}
 
             {status ===
               'success' &&
               result && (
-                <>
-                  <div className="grid gap-4 sm:gap-6 lg:grid-cols-[0.8fr_1.2fr]">
+                <motion.div
+                  variants={
+                    containerVariants
+                  }
+                  initial="hidden"
+                  animate="visible"
+                >
+                  <motion.div
+                    variants={
+                      itemVariants
+                    }
+                    className="grid gap-4 sm:gap-6 lg:grid-cols-[0.8fr_1.2fr]"
+                  >
                     <RiskScore
                       score={
                         result.riskScore
@@ -162,17 +290,27 @@ function SearchPage() {
                       query={query}
                       result={result}
                     />
-                  </div>
+                  </motion.div>
 
-                  <div className="mt-4 sm:mt-6">
+                  <motion.div
+                    variants={
+                      itemVariants
+                    }
+                    className="mt-4 sm:mt-6"
+                  >
                     <RiskFactors
                       factors={
                         result.riskFactors
                       }
                     />
-                  </div>
+                  </motion.div>
 
-                  <div className="mt-4 grid gap-4 sm:mt-6 sm:gap-6 lg:grid-cols-2">
+                  <motion.div
+                    variants={
+                      itemVariants
+                    }
+                    className="mt-4 grid gap-4 sm:mt-6 sm:gap-6 lg:grid-cols-2"
+                  >
                     <RelatedInformation
                       items={
                         result.relatedInformation
@@ -184,30 +322,45 @@ function SearchPage() {
                         result.sources
                       }
                     />
-                  </div>
+                  </motion.div>
 
-                  <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50/60 p-5 sm:mt-6 sm:p-6">
-                    <p className="text-sm font-semibold text-slate-950">
-                      Lưu ý về kết quả
-                    </p>
+                  <motion.div
+                    variants={
+                      itemVariants
+                    }
+                    className="mt-4 overflow-hidden rounded-3xl border border-amber-200 bg-amber-50/60 p-5 sm:mt-6 sm:p-6"
+                  >
+                    <div className="flex gap-4">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700">
+                        !
+                      </div>
 
-                    <p className="mt-2 text-sm leading-6 text-slate-600">
-                      {result.disclaimer}
-                    </p>
+                      <div>
+                        <p className="text-sm font-semibold text-slate-950">
+                          Lưu ý về kết quả
+                        </p>
 
-                    <p className="mt-3 text-xs leading-5 text-slate-500">
-                      Không nên sử dụng
-                      Risk Score như căn
-                      cứ duy nhất để đưa
-                      ra quyết định giao
-                      dịch. Hãy đối chiếu
-                      thêm thông tin người
-                      nhận, nội dung giao
-                      dịch và các nguồn
-                      đáng tin cậy khác.
-                    </p>
-                  </div>
-                </>
+                        <p className="mt-2 text-sm leading-6 text-slate-600">
+                          {
+                            result.disclaimer
+                          }
+                        </p>
+
+                        <p className="mt-3 text-xs leading-5 text-slate-500">
+                          Không nên sử dụng
+                          Risk Score như căn
+                          cứ duy nhất để đưa
+                          ra quyết định giao
+                          dịch. Hãy đối chiếu
+                          thêm thông tin người
+                          nhận, nội dung giao
+                          dịch và các nguồn
+                          đáng tin cậy khác.
+                        </p>
+                      </div>
+                    </div>
+                  </motion.div>
+                </motion.div>
               )}
           </div>
         </Container>
@@ -220,27 +373,83 @@ function DataSources({
   sources = [],
 }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
-      <h2 className="text-lg font-semibold text-slate-950">
-        Nguồn dữ liệu
-      </h2>
+    <motion.div
+      initial={{
+        opacity: 0,
+        y: 15,
+      }}
+      animate={{
+        opacity: 1,
+        y: 0,
+      }}
+      transition={{
+        delay: 0.25,
+      }}
+      className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6"
+    >
+      <div className="flex items-center gap-3">
+        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100">
+          <motion.div
+            className="h-2.5 w-2.5 rounded-full bg-slate-600"
+            animate={{
+              scale: [
+                1,
+                1.4,
+                1,
+              ],
+            }}
+            transition={{
+              duration: 2,
+              repeat: Infinity,
+            }}
+          />
+        </div>
 
-      <p className="mt-2 text-sm leading-6 text-slate-500">
+        <div>
+          <h2 className="text-lg font-semibold text-slate-950">
+            Nguồn dữ liệu
+          </h2>
+
+          <p className="text-xs text-slate-400">
+            Dữ liệu dùng để đánh giá
+          </p>
+        </div>
+      </div>
+
+      <p className="mt-4 text-sm leading-6 text-slate-500">
         Các nhóm dữ liệu được sử
         dụng để tổng hợp kết quả
         cảnh báo.
       </p>
 
       {sources.length > 0 ? (
-        <div className="mt-5 space-y-3">
+        <div className="mt-5 space-y-2.5">
           {sources.map(
-            (source) => (
-              <div
+            (source, index) => (
+              <motion.div
                 key={source}
-                className="rounded-xl bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-600"
+                initial={{
+                  opacity: 0,
+                  x: 12,
+                }}
+                animate={{
+                  opacity: 1,
+                  x: 0,
+                }}
+                transition={{
+                  delay:
+                    0.35 +
+                    index * 0.08,
+                }}
+                whileHover={{
+                  x: 4,
+                }}
+                className="flex items-center gap-3 rounded-xl bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-600"
               >
+                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-blue-500" />
+
                 {source}
-              </div>
+              </motion.div>
             ),
           )}
         </div>
@@ -251,7 +460,7 @@ function DataSources({
         </p>
       )}
 
-      <div className="mt-6 border-t border-slate-200 pt-5 sm:mt-7 sm:pt-6">
+      <div className="mt-6 border-t border-slate-200 pt-5">
         <p className="text-sm font-semibold text-slate-950">
           Bạn có thêm thông tin?
         </p>
@@ -263,14 +472,21 @@ function DataSources({
           cáo để bổ sung dữ liệu.
         </p>
 
-        <Link
-          to="/report"
-          className="mt-4 inline-flex text-sm font-semibold text-blue-600 hover:text-blue-700"
+        <motion.div
+          whileHover={{
+            x: 4,
+          }}
+          className="mt-4 inline-flex"
         >
-          Gửi báo cáo →
-        </Link>
+          <Link
+            to="/report"
+            className="text-sm font-semibold text-blue-600 hover:text-blue-700"
+          >
+            Gửi báo cáo →
+          </Link>
+        </motion.div>
       </div>
-    </div>
+    </motion.div>
   )
 }
 
