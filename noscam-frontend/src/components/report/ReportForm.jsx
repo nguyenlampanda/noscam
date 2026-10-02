@@ -1,81 +1,76 @@
-import { useState } from 'react'
+import { useState } from "react";
 
-import EvidenceUpload from './EvidenceUpload'
-import { banks, scamTypes } from '../../data/reportOptions'
-import useReport from '../../hooks/useReport'
+import EvidenceUpload from "./EvidenceUpload";
+import { banks, scamTypes } from "../../data/reportOptions";
+import useReport from "../../hooks/useReport";
 
 const initialForm = {
-  scamType: '',
-  phone: '',
-  bankAccount: '',
-  bank: '',
-  social: '',
-  website: '',
-  description: '',
-  lossAmount: '',
-  occurredAt: '',
-}
+  scamType: "",
+  phone: "",
+  bankAccount: "",
+  bank: "",
+  social: "",
+  website: "",
+  description: "",
+  lossAmount: "",
+  occurredAt: "",
+  websiteConfirm: "",
+};
 
 function ReportForm() {
-  const [formData, setFormData] = useState(initialForm)
-  const [evidences, setEvidences] = useState([])
+  const [formData, setFormData] = useState(initialForm);
+  const [evidences, setEvidences] = useState([]);
 
-  const {
-    status,
-    error,
-    message,
-    submitReport,
-    reset,
-  } = useReport()
+  const { status, error, message, submitReport, reset } = useReport();
 
-  const isSubmitting = status === 'loading'
-  const isSuccess = status === 'success'
-  const isError = status === 'error'
+  const isSubmitting = status === "loading";
+  const isSuccess = status === "success";
+  const isError = status === "error";
 
-const errorTitle =
-  error?.type === 'duplicate'
-    ? 'Báo cáo đã được gửi gần đây'
-    : error?.type === 'validation'
-      ? 'Thông tin chưa hợp lệ'
-      : error?.type === 'rate_limit'
-        ? 'Bạn đang gửi quá nhiều báo cáo'
-        : 'Không thể gửi báo cáo'
+  const errorTitle =
+    error?.type === "duplicate"
+      ? "Báo cáo đã được gửi gần đây"
+      : error?.type === "validation"
+        ? "Thông tin chưa hợp lệ"
+        : error?.type === "rate_limit"
+          ? "Bạn đang gửi quá nhiều báo cáo"
+          : "Không thể gửi báo cáo";
 
   const handleChange = (event) => {
-    const { name, value } = event.target
+    const { name, value } = event.target;
 
     setFormData((current) => ({
       ...current,
       [name]: value,
-    }))
+    }));
 
     if (isError) {
-      reset()
+      reset();
     }
-  }
+  };
 
   const handleSubmit = async (event) => {
-    event.preventDefault()
+    event.preventDefault();
 
     const result = await submitReport({
       ...formData,
       evidences,
-    })
+    });
 
     if (result) {
-      setFormData(initialForm)
-      setEvidences([])
+      setFormData(initialForm);
+      setEvidences([]);
     }
-  }
+  };
 
   const handleCreateAnother = () => {
-    reset()
-    setFormData(initialForm)
-    setEvidences([])
-  }
+    reset();
+    setFormData(initialForm);
+    setEvidences([]);
+  };
 
   const inputClass =
-    'mt-2 h-12 w-full min-w-0 rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400 sm:px-4'
+    "mt-2 h-12 w-full min-w-0 rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400 sm:px-4";
 
   if (isSuccess) {
     return (
@@ -103,13 +98,13 @@ const errorTitle =
 
         <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">
           {message ||
-            'NoScam đã ghi nhận báo cáo của bạn. Thông tin sẽ được sử dụng làm dữ liệu để đối chiếu và hỗ trợ quá trình đánh giá rủi ro.'}
+            "NoScam đã ghi nhận báo cáo của bạn. Thông tin sẽ được sử dụng làm dữ liệu để đối chiếu và hỗ trợ quá trình đánh giá rủi ro."}
         </p>
 
         <div className="mx-auto mt-6 max-w-md rounded-xl bg-slate-50 p-4 text-left">
           <p className="text-xs leading-5 text-slate-500">
-            Việc tiếp nhận báo cáo không đồng nghĩa NoScam đã xác nhận
-            cá nhân hoặc tổ chức được báo cáo có hành vi lừa đảo.
+            Việc tiếp nhận báo cáo không đồng nghĩa NoScam đã xác nhận cá nhân
+            hoặc tổ chức được báo cáo có hành vi lừa đảo.
           </p>
         </div>
 
@@ -121,7 +116,7 @@ const errorTitle =
           Gửi báo cáo khác
         </button>
       </div>
-    )
+    );
   }
 
   return (
@@ -129,37 +124,48 @@ const errorTitle =
       onSubmit={handleSubmit}
       className="min-w-0 rounded-2xl border border-slate-200 bg-white p-5 sm:p-8"
     >
+      <div
+        aria-hidden="true"
+        className="absolute left-[-10000px] top-auto h-px w-px overflow-hidden"
+      >
+        <label htmlFor="websiteConfirm">Leave this field empty</label>
+
+        <input
+          id="websiteConfirm"
+          name="websiteConfirm"
+          type="text"
+          value={formData.websiteConfirm}
+          onChange={handleChange}
+          tabIndex={-1}
+          autoComplete="off"
+        />
+      </div>
       <div>
         <h2 className="text-lg font-semibold text-slate-950 sm:text-xl">
           Thông tin báo cáo
         </h2>
 
         <p className="mt-2 text-sm leading-6 text-slate-500">
-          Cung cấp những thông tin bạn biết. Bạn không bắt buộc phải có
-          đầy đủ tất cả các trường bên dưới.
+          Cung cấp những thông tin bạn biết. Bạn không bắt buộc phải có đầy đủ
+          tất cả các trường bên dưới.
         </p>
       </div>
 
-    {isError && (
-  <div
-    role="alert"
-    className="mt-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3"
-  >
-    <p className="text-sm font-semibold text-red-700">
-      {errorTitle}
-    </p>
+      {isError && (
+        <div
+          role="alert"
+          className="mt-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3"
+        >
+          <p className="text-sm font-semibold text-red-700">{errorTitle}</p>
 
-    <p className="mt-1 text-xs leading-5 text-red-600">
-      {error?.message ||
-        'Đã xảy ra lỗi trong quá trình gửi dữ liệu. Vui lòng kiểm tra lại và thử lần nữa.'}
-    </p>
-  </div>
-)}
+          <p className="mt-1 text-xs leading-5 text-red-600">
+            {error?.message ||
+              "Đã xảy ra lỗi trong quá trình gửi dữ liệu. Vui lòng kiểm tra lại và thử lần nữa."}
+          </p>
+        </div>
+      )}
 
-      <fieldset
-        disabled={isSubmitting}
-        className="min-w-0"
-      >
+      <fieldset disabled={isSubmitting} className="min-w-0">
         <div className="mt-7 grid gap-5 sm:mt-8 sm:grid-cols-2 sm:gap-6">
           <div className="sm:col-span-2">
             <label
@@ -176,9 +182,7 @@ const errorTitle =
               onChange={handleChange}
               className={inputClass}
             >
-              <option value="">
-                Chọn loại sự việc
-              </option>
+              <option value="">Chọn loại sự việc</option>
 
               {scamTypes.map((type) => (
                 <option key={type} value={type}>
@@ -243,9 +247,7 @@ const errorTitle =
               onChange={handleChange}
               className={inputClass}
             >
-              <option value="">
-                Chọn ngân hàng
-              </option>
+              <option value="">Chọn ngân hàng</option>
 
               {banks.map((bank) => (
                 <option key={bank} value={bank}>
@@ -314,9 +316,7 @@ const errorTitle =
               className={inputClass}
             />
 
-            <p className="mt-2 text-xs text-slate-400">
-              Đơn vị: VNĐ
-            </p>
+            <p className="mt-2 text-xs text-slate-400">Đơn vị: VNĐ</p>
           </div>
 
           <div>
@@ -374,9 +374,9 @@ const errorTitle =
             />
 
             <span className="text-xs leading-5 text-slate-500">
-              Tôi xác nhận thông tin cung cấp là đúng theo hiểu biết của
-              mình và đồng ý rằng báo cáo này chỉ là một nguồn dữ liệu để
-              NoScam xem xét, đối chiếu và đánh giá.
+              Tôi xác nhận thông tin cung cấp là đúng theo hiểu biết của mình và
+              đồng ý rằng báo cáo này chỉ là một nguồn dữ liệu để NoScam xem
+              xét, đối chiếu và đánh giá.
             </span>
           </label>
 
@@ -392,14 +392,12 @@ const errorTitle =
               />
             )}
 
-            {isSubmitting
-              ? 'Đang gửi báo cáo...'
-              : 'Gửi báo cáo'}
+            {isSubmitting ? "Đang gửi báo cáo..." : "Gửi báo cáo"}
           </button>
         </div>
       </fieldset>
     </form>
-  )
+  );
 }
 
-export default ReportForm
+export default ReportForm;

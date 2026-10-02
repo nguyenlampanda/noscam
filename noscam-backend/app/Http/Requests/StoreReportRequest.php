@@ -68,6 +68,12 @@ class StoreReportRequest extends FormRequest
                 'before_or_equal:today',
             ],
 
+            'website_confirm' => [
+                'nullable',
+                'string',
+                'max:200',
+            ],
+
             'evidences' => [
                 'nullable',
                 'array',
@@ -127,6 +133,15 @@ class StoreReportRequest extends FormRequest
     {
         return [
             function ($validator) {
+                /*
+                 * Nếu honeypot có dữ liệu thì không cần
+                 * validation tiếp ở đây.
+                 * Controller sẽ xử lý âm thầm.
+                 */
+                if (filled($this->website_confirm)) {
+                    return;
+                }
+
                 $hasInformation =
                     filled($this->phone) ||
                     filled($this->bank_account) ||
@@ -142,7 +157,107 @@ class StoreReportRequest extends FormRequest
                             'Vui lòng cung cấp ít nhất một thông tin liên quan.'
                         );
                 }
+
+                $this->validatePhone($validator);
+                $this->validateBankAccount($validator);
+                $this->validateWebsite($validator);
             },
         ];
+    }
+
+    private function validatePhone(
+        $validator
+    ): void {
+        if (! filled($this->phone)) {
+            return;
+        }
+
+        $digits =
+            preg_replace(
+                '~[^0-9]+~',
+                '',
+                (string) $this->phone
+            ) ?? '';
+
+        if (
+            strlen($digits) < 9 ||
+            strlen($digits) > 12
+        ) {
+            $validator
+                ->errors()
+                ->add(
+                    'phone',
+                    'Số điện thoại không hợp lệ.'
+                );
+        }
+    }
+
+    private function validateBankAccount(
+        $validator
+    ): void {
+        if (! filled($this->bank_account)) {
+            return;
+        }
+
+        $value =
+            preg_replace(
+                '~[\s-]+~',
+                '',
+                (string) $this->bank_account
+            ) ?? '';
+
+        if (
+            ! preg_match(
+                '~^[A-Za-z0-9]{4,30}$~',
+                $value
+            )
+        ) {
+            $validator
+                ->errors()
+                ->add(
+                    'bank_account',
+                    'Số tài khoản không hợp lệ.'
+                );
+        }
+    }
+
+    private function validateWebsite(
+        $validator
+    ): void {
+        if (! filled($this->website)) {
+            return;
+        }
+
+        $website = trim(
+            (string) $this->website
+        );
+
+        if (
+            ! preg_match(
+                '~^https?://~i',
+                $website
+            )
+        ) {
+            $website =
+                'https://' . $website;
+        }
+
+        $host = parse_url(
+            $website,
+            PHP_URL_HOST
+        );
+
+        if (
+            ! is_string($host) ||
+            $host === '' ||
+            ! str_contains($host, '.')
+        ) {
+            $validator
+                ->errors()
+                ->add(
+                    'website',
+                    'Website không hợp lệ.'
+                );
+        }
     }
 }

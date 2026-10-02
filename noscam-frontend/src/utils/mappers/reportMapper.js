@@ -11,6 +11,10 @@ export function mapReportPayload(formData) {
     description: formData.description?.trim(),
     loss_amount: formData.lossAmount,
     occurred_at: formData.occurredAt,
+
+    // Honeypot chống bot.
+    // Người dùng thật không nhìn thấy và không điền field này.
+    website_confirm: formData.websiteConfirm,
   }
 
   Object.entries(fields).forEach(([key, value]) => {

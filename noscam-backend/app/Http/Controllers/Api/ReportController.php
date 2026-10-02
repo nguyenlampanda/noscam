@@ -20,6 +20,18 @@ class ReportController extends Controller
     public function store(
         StoreReportRequest $request
     ): JsonResponse {
+        if (filled($request->input('website_confirm'))) {
+    return response()->json([
+        'message' =>
+            'Báo cáo đã được gửi và đang chờ kiểm duyệt.',
+
+        'data' => [
+            'id' => null,
+            'status' => 'pending',
+            'created_at' => now(),
+        ],
+    ], 201);
+}
         $validated = $request->validated();
 
         $reportData = collect($validated)
