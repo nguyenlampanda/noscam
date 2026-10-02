@@ -139,10 +139,17 @@ export function mapSearchResult(data) {
         value:
           item.value || '',
 
+        normalizedValue:
+          item.normalized_value || '',
+
         riskScore:
           Number(
             item.risk_score ?? 0,
           ),
+
+        riskLabel:
+          item.risk_label ||
+          'Chưa xác định',
 
         riskLevel:
           item.risk_level ||
@@ -152,6 +159,14 @@ export function mapSearchResult(data) {
           Number(
             item.reports ?? 0,
           ),
+
+        sharedReports:
+          Number(
+            item.shared_reports ?? 0,
+          ),
+
+        relationLabel:
+          item.relation_label || '',
       }),
     ),
 

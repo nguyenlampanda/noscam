@@ -60,22 +60,47 @@ class SearchController extends Controller
             ]);
         }
 
-        $entity->load(
-            'relations.relatedEntity'
-        );
-
-        /** @var Collection<int, EntityRelation> $relations */
-        $relations = $entity->getRelation(
-            'relations'
-        );
+        /*
+         * Related Information V2
+         *
+         * Gom các relation theo related entity để:
+         * - không hiển thị trùng
+         * - biết xuất hiện cùng nhau bao nhiêu lần
+         * - chỉ tính relation có report đã approved
+         */
+        $relations = EntityRelation::query()
+            ->with([
+                'relatedEntity',
+                'report',
+            ])
+            ->where(
+                'entity_id',
+                $entity->id
+            )
+            ->whereHas(
+                'report',
+                fn ($query) =>
+                    $query->where(
+                        'status',
+                        'approved'
+                    )
+            )
+            ->get();
 
         $relatedInformation = $relations
+            ->groupBy(
+                'related_entity_id'
+            )
             ->map(
                 function (
-                    EntityRelation $relation
+                    Collection $group
                 ): ?array {
+                    /** @var EntityRelation|null $relation */
+                    $relation =
+                        $group->first();
+
                     $relatedEntity =
-                        $relation->relatedEntity;
+                        $relation?->relatedEntity;
 
                     if (
                         $relatedEntity === null ||
@@ -84,6 +109,12 @@ class SearchController extends Controller
                     ) {
                         return null;
                     }
+
+                    $sharedReports = $group
+                        ->pluck('report_id')
+                        ->filter()
+                        ->unique()
+                        ->count();
 
                     return [
                         'id' =>
@@ -100,21 +131,43 @@ class SearchController extends Controller
                         'value' =>
                             $relatedEntity->value,
 
+                        'normalized_value' =>
+                            $relatedEntity
+                                ->normalized_value,
+
                         'risk_score' =>
                             $relatedEntity->risk_score,
+
+                        'risk_label' =>
+                            $this->riskLabel(
+                                $relatedEntity
+                                    ->risk_level
+                            ),
 
                         'risk_level' =>
                             $relatedEntity->risk_level,
 
                         'reports' =>
                             $relatedEntity->report_count,
+
+                        /*
+                         * Số report approved mà hai
+                         * entity cùng xuất hiện.
+                         */
+                        'shared_reports' =>
+                            $sharedReports,
+
+                        'relation_label' =>
+                            $sharedReports === 1
+                                ? 'Xuất hiện cùng trong 1 báo cáo đã duyệt'
+                                : "Xuất hiện cùng trong {$sharedReports} báo cáo đã duyệt",
                     ];
                 }
             )
             ->filter()
-            ->unique(
+            ->sortByDesc(
                 fn (array $item) =>
-                    $item['id']
+                    $item['shared_reports']
             )
             ->values()
             ->all();
@@ -223,10 +276,29 @@ class SearchController extends Controller
          * số điện thoại match nhầm số tài khoản.
          */
         if ($search['type'] !== 'generic') {
+            $types =
+                in_array(
+                    $search['type'],
+                    [
+                        'facebook',
+                        'tiktok',
+                        'telegram',
+                        'zalo',
+                    ],
+                    true
+                )
+                    ? [
+                        'social',
+                        $search['type'],
+                    ]
+                    : [
+                        $search['type'],
+                    ];
+
             return (clone $base)
-                ->where(
+                ->whereIn(
                     'type',
-                    $search['type']
+                    $types
                 )
                 ->where(
                     'normalized_value',
