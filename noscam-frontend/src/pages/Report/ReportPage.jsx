@@ -80,12 +80,12 @@ function ReportPage() {
               </span>
 
               <p className="text-sm font-semibold text-blue-600">
-                Báo cáo cộng đồng
+                NoScam Community Report
               </p>
             </div>
 
             <h1 className="mt-3 max-w-3xl text-3xl font-bold tracking-[-0.04em] text-slate-950 sm:text-5xl">
-              Báo cáo trường hợp đáng ngờ
+              Gửi báo cáo để cộng đồng có thêm dữ liệu đối chiếu
             </h1>
 
             <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-500 sm:text-base sm:leading-7">
@@ -133,7 +133,7 @@ function ReportPage() {
                   />
 
                   <h2 className="text-sm font-semibold text-slate-950">
-                    Nên cung cấp gì?
+                    Một báo cáo hữu ích gồm
                   </h2>
                 </div>
 
@@ -225,7 +225,7 @@ function ReportPage() {
                   </div>
 
                   <h2 className="text-sm font-semibold text-slate-950">
-                    Bảo vệ thông tin
+                    Không gửi dữ liệu bí mật
                   </h2>
                 </div>
 

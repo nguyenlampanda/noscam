@@ -234,7 +234,7 @@ function ReportForm() {
           }}
           className="relative mt-6 text-xl font-semibold text-slate-950"
         >
-          Đã nhận báo cáo
+          Báo cáo đang chờ kiểm duyệt
         </motion.h2>
 
         <p className="relative mx-auto mt-3 max-w-md text-sm leading-6 text-slate-500">
@@ -286,7 +286,7 @@ function ReportForm() {
       transition={{
         duration: 0.5,
       }}
-      className="relative min-w-0 overflow-hidden rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8"
+      className="relative min-w-0 overflow-hidden rounded-3xl border border-slate-200 bg-white p-5 shadow-xl shadow-slate-200/40 sm:p-8"
     >
       <div
         aria-hidden="true"
@@ -313,7 +313,7 @@ function ReportForm() {
         <div className="flex items-start justify-between gap-5">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.15em] text-blue-600">
-              Gửi dữ liệu
+              Báo cáo cộng đồng
             </p>
 
             <h2 className="mt-2 text-xl font-semibold text-slate-950 sm:text-2xl">
@@ -446,7 +446,7 @@ function ReportForm() {
         <FormSection
           number="01"
           title="Phân loại sự việc"
-          description="Chọn nhóm gần nhất với trường hợp bạn muốn báo cáo."
+          description="Chọn nhóm phù hợp nhất để hệ thống phân loại báo cáo."
         >
           <label
             htmlFor="scamType"
@@ -484,7 +484,7 @@ function ReportForm() {
         <FormSection
           number="02"
           title="Thông tin liên quan"
-          description="Điền những dữ liệu bạn có. Không cần phải có đầy đủ tất cả."
+          description="Chỉ cần nhập những dữ liệu bạn biết. Có ít nhất một thông tin nhận diện sẽ giúp việc đối chiếu chính xác hơn."
         >
           <div className="grid gap-5 sm:grid-cols-2 sm:gap-6">
             <Field
@@ -615,7 +615,7 @@ function ReportForm() {
         <FormSection
           number="03"
           title="Diễn biến sự việc"
-          description="Thông tin càng rõ ràng càng giúp quá trình đối chiếu dữ liệu tốt hơn."
+          description="Mô tả diễn biến theo những gì bạn biết và tránh đưa thông tin bí mật như mật khẩu, OTP hoặc mã PIN."
         >
           <div className="grid gap-5 sm:grid-cols-2 sm:gap-6">
             <Field
@@ -704,7 +704,7 @@ function ReportForm() {
         <FormSection
           number="04"
           title="Bằng chứng"
-          description="Không bắt buộc, nhưng bằng chứng có thể giúp việc kiểm duyệt và đối chiếu rõ ràng hơn."
+          description="Không bắt buộc. Ảnh chụp hoặc tài liệu liên quan có thể hỗ trợ quá trình kiểm duyệt và đối chiếu."
         >
           <EvidenceUpload
             files={evidences}
@@ -718,7 +718,7 @@ function ReportForm() {
         </FormSection>
 
         <div className="mt-8 border-t border-slate-200 pt-7">
-          <label className="group flex cursor-pointer items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 transition-colors hover:border-blue-200 hover:bg-blue-50/40">
+          <label className="group flex cursor-pointer items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 transition-all hover:-translate-y-0.5 hover:border-blue-200 hover:bg-blue-50/50 hover:shadow-sm">
             <input
               type="checkbox"
               required
@@ -790,7 +790,7 @@ function ReportForm() {
 
             <span className="relative">
               {isSubmitting
-                ? 'Đang gửi & bảo vệ dữ liệu...'
+                ? 'Đang gửi báo cáo...'
                 : 'Gửi báo cáo'}
             </span>
 
@@ -844,7 +844,7 @@ function FormSection({
       transition={{
         duration: 0.45,
       }}
-      className="mt-8 border-t border-slate-100 pt-8 first:border-0"
+      className="group mt-8 border-t border-slate-100 pt-8 first:border-0"
     >
       <div className="mb-6 flex gap-4">
         <motion.div
@@ -854,7 +854,7 @@ function FormSection({
           viewport={{
             once: true,
           }}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-950 text-xs font-bold text-white"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-950 text-xs font-bold text-white shadow-lg shadow-slate-950/10 transition-colors group-hover:bg-blue-600"
         >
           {number}
         </motion.div>
