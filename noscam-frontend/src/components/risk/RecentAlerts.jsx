@@ -148,12 +148,12 @@ function RecentAlerts() {
               </span>
 
               <p className="text-sm font-semibold text-blue-600">
-                Dữ liệu hệ thống
+                Cập nhật từ hệ thống
               </p>
             </div>
 
             <h2 className="mt-2 text-2xl font-bold tracking-[-0.035em] text-slate-950 sm:text-4xl">
-              Cảnh báo gần đây
+              Tín hiệu rủi ro gần đây
             </h2>
 
             <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-500 sm:text-base sm:leading-7">
@@ -172,7 +172,7 @@ function RecentAlerts() {
               to="/alerts"
               className="text-sm font-semibold text-slate-700 transition-colors hover:text-blue-600"
             >
-              Xem tất cả cảnh báo →
+              Xem toàn bộ dữ liệu cảnh báo →
             </Link>
           </motion.div>
         </motion.div>

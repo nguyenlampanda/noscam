@@ -21,6 +21,12 @@ const steps = [
     description:
       'Xem Risk Score, số báo cáo, dữ liệu liên quan và các yếu tố cần lưu ý trước khi giao dịch.',
   },
+  {
+    number: '04',
+    title: 'Tự quyết định',
+    description:
+      'Dùng các tín hiệu NoScam cung cấp làm thông tin tham khảo trước khi quyết định tiếp tục giao dịch.',
+  },
 ]
 
 function HowItWorks() {
@@ -80,7 +86,7 @@ function HowItWorks() {
             }}
           />
 
-          <div className="relative grid gap-4 sm:gap-6 lg:grid-cols-3">
+          <div className="relative grid gap-4 sm:gap-6 lg:grid-cols-4">
             {steps.map(
               (step, index) => (
                 <motion.div

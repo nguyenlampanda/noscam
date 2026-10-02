@@ -109,7 +109,7 @@ function ReportCTA() {
                 />
 
                 <p className="text-sm font-semibold text-blue-400">
-                  Cộng đồng cùng cảnh báo
+                  Đóng góp dữ liệu cộng đồng
                 </p>
               </div>
 
@@ -119,7 +119,7 @@ function ReportCTA() {
               </h2>
 
               <p className="mt-4 text-sm leading-6 text-slate-300 sm:text-base sm:leading-7">
-                Gửi báo cáo để NoScam ghi
+                Báo cáo trường hợp này để NoScam ghi
                 nhận thông tin và hỗ trợ
                 cộng đồng có thêm dữ liệu
                 tham khảo trước khi giao
@@ -141,7 +141,7 @@ function ReportCTA() {
                 to="/report"
                 className="group flex h-12 w-full items-center justify-center gap-3 rounded-xl bg-white px-6 text-sm font-semibold text-slate-950 shadow-xl shadow-black/20 transition-colors hover:bg-blue-50 sm:w-auto"
               >
-                Gửi báo cáo
+                Báo cáo trường hợp này
 
                 <motion.span
                   animate={{
