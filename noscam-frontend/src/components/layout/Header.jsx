@@ -172,7 +172,7 @@ function Header() {
               to="/report"
               className="inline-flex rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-slate-950/10 transition-colors hover:bg-blue-600"
             >
-              Báo cáo scam
+              Gửi báo cáo
             </NavLink>
           </motion.div>
 
@@ -342,7 +342,7 @@ function Header() {
                     }
                     className="mt-3 flex h-11 w-full items-center justify-center rounded-xl bg-slate-950 px-4 text-sm font-semibold text-white"
                   >
-                    Báo cáo scam
+                    Gửi báo cáo
                   </NavLink>
                 </motion.div>
               </motion.nav>

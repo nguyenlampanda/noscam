@@ -6,7 +6,7 @@ const footerLinks = [
   { name: 'Cảnh báo', path: '/alerts' },
   { name: 'Hướng dẫn', path: '/guide' },
   { name: 'Giới thiệu', path: '/about' },
-  { name: 'Báo cáo scam', path: '/report' },
+  { name: 'Gửi báo cáo', path: '/report' },
 ]
 
 function Footer() {

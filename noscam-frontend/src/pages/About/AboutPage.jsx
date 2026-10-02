@@ -196,7 +196,7 @@ function AboutPage() {
               />
 
               <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-                Ví dụ một lần kiểm tra
+                Một lần kiểm tra có thể đối chiếu
               </p>
 
               <div className="mt-5 space-y-3">
@@ -435,8 +435,7 @@ function AboutPage() {
             </p>
 
             <h2 className="mt-2 text-2xl font-bold tracking-[-0.035em] text-slate-950 sm:text-4xl">
-              Cách NoScam trình bày dữ
-              liệu
+              Cách NoScam trình bày dữ liệu
             </h2>
           </motion.div>
 
