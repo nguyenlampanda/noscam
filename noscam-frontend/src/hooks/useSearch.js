@@ -10,6 +10,8 @@ import { searchInformation } from '../services/searchService'
 
 export function useSearch() {
   const [data, setData] = useState(null)
+  const [meta, setMeta] = useState(null)
+  const [message, setMessage] = useState('')
   const [status, setStatus] = useState(
     REQUEST_STATUS.IDLE,
   )
@@ -20,36 +22,65 @@ export function useSearch() {
   const search = useCallback(async (query) => {
     controllerRef.current?.abort()
 
-    const controller = new AbortController()
-    controllerRef.current = controller
+    const controller =
+      new AbortController()
 
-    setStatus(REQUEST_STATUS.LOADING)
+    controllerRef.current =
+      controller
+
+    setStatus(
+      REQUEST_STATUS.LOADING,
+    )
     setError(null)
     setData(null)
+    setMeta(null)
+    setMessage('')
 
     try {
-      const result = await searchInformation(
-        query,
-        {
-          signal: controller.signal,
-        },
+      const response =
+        await searchInformation(
+          query,
+          {
+            signal:
+              controller.signal,
+          },
+        )
+
+      if (
+        controller.signal.aborted
+      ) {
+        return null
+      }
+
+      setMeta(
+        response?.meta || null,
       )
 
-      if (controller.signal.aborted) {
-        return null
+      setMessage(
+        response?.message || '',
+      )
+
+      if (!response?.result) {
+        setStatus(
+          REQUEST_STATUS.EMPTY,
+        )
+
+        return response
       }
 
-      if (!result) {
-        setStatus(REQUEST_STATUS.EMPTY)
-        return null
-      }
+      setData(
+        response.result,
+      )
 
-      setData(result)
-      setStatus(REQUEST_STATUS.SUCCESS)
+      setStatus(
+        REQUEST_STATUS.SUCCESS,
+      )
 
-      return result
+      return response
     } catch (err) {
-      if (err.name === 'AbortError') {
+      if (
+        err.name === 'AbortError'
+      ) {
         return null
       }
 
@@ -58,7 +89,9 @@ export function useSearch() {
           'Không thể kiểm tra thông tin.',
       )
 
-      setStatus(REQUEST_STATUS.ERROR)
+      setStatus(
+        REQUEST_STATUS.ERROR,
+      )
 
       return null
     }
@@ -69,8 +102,13 @@ export function useSearch() {
     controllerRef.current = null
 
     setData(null)
+    setMeta(null)
+    setMessage('')
     setError(null)
-    setStatus(REQUEST_STATUS.IDLE)
+
+    setStatus(
+      REQUEST_STATUS.IDLE,
+    )
   }, [])
 
   useEffect(() => {
@@ -81,6 +119,8 @@ export function useSearch() {
 
   return {
     data,
+    meta,
+    message,
     status,
     error,
     search,

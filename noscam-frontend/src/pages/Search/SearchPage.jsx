@@ -75,6 +75,8 @@ function SearchPage() {
 
   const {
     data: result,
+    meta,
+    message,
     status,
     error,
     search,
@@ -252,9 +254,47 @@ function SearchPage() {
                   y: 0,
                 }}
               >
+                <DetectedSearch
+                  query={query}
+                  meta={meta}
+                />
+
                 <EmptyState
                   query={query}
                 />
+
+                <motion.div
+                  initial={{
+                    opacity: 0,
+                    y: 12,
+                  }}
+                  animate={{
+                    opacity: 1,
+                    y: 0,
+                  }}
+                  transition={{
+                    delay: 0.12,
+                  }}
+                  className="mt-4 rounded-2xl border border-blue-100 bg-blue-50/60 p-5 sm:p-6"
+                >
+                  <p className="text-sm font-semibold text-slate-950">
+                    {message ||
+                      'Chưa ghi nhận dữ liệu cảnh báo cho thông tin này.'}
+                  </p>
+
+                  <p className="mt-2 text-sm leading-6 text-slate-600">
+                    Điều này không đồng nghĩa thông tin trên chắc chắn an toàn.
+                    Hãy tiếp tục kiểm tra trước khi chuyển tiền hoặc cung cấp
+                    thông tin cá nhân.
+                  </p>
+
+                  <Link
+                    to="/report"
+                    className="mt-4 inline-flex text-sm font-semibold text-blue-600 hover:text-blue-700"
+                  >
+                    Gửi báo cáo nếu bạn có thêm thông tin →
+                  </Link>
+                </motion.div>
               </motion.div>
             )}
 
@@ -268,6 +308,11 @@ function SearchPage() {
                   initial="hidden"
                   animate="visible"
                 >
+                  <DetectedSearch
+                    query={query}
+                    meta={meta}
+                  />
+
                   <motion.div
                     variants={
                       itemVariants
@@ -366,6 +411,84 @@ function SearchPage() {
         </Container>
       </section>
     </>
+  )
+}
+
+function DetectedSearch({
+  query,
+  meta,
+}) {
+  const label =
+    meta?.detectedTypeLabel ||
+    'Thông tin'
+
+  const normalized =
+    meta?.normalizedQuery ||
+    query
+
+  return (
+    <motion.div
+      variants={itemVariants}
+      className="mb-4 overflow-hidden rounded-2xl border border-blue-100 bg-gradient-to-r from-blue-50/90 via-white to-cyan-50/70 p-4 sm:mb-6 sm:p-5"
+    >
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3">
+          <motion.div
+            initial={{
+              scale: 0.75,
+              opacity: 0,
+            }}
+            animate={{
+              scale: 1,
+              opacity: 1,
+            }}
+            className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-600 shadow-lg shadow-blue-600/20"
+          >
+            <motion.span
+              className="absolute h-3 w-3 rounded-full border border-white/80"
+              animate={{
+                scale: [
+                  1,
+                  1.7,
+                  1,
+                ],
+                opacity: [
+                  1,
+                  0.25,
+                  1,
+                ],
+              }}
+              transition={{
+                duration: 2,
+                repeat: Infinity,
+              }}
+            />
+
+            <span className="h-1.5 w-1.5 rounded-full bg-white" />
+          </motion.div>
+
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.14em] text-blue-600">
+              Hệ thống nhận diện
+            </p>
+
+            <p className="mt-1 text-sm font-semibold text-slate-950 sm:text-base">
+              {label}
+            </p>
+          </div>
+        </div>
+
+        <div className="min-w-0 sm:text-right">
+          <p className="text-xs font-medium text-slate-400">
+            Dữ liệu đã chuẩn hóa
+          </p>
+
+          <p className="mt-1 break-all text-sm font-semibold text-slate-700">
+            {normalized}
+          </p>
+        </div>
+      </div>
+    </motion.div>
   )
 }
 

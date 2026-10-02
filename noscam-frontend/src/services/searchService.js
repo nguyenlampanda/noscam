@@ -1,8 +1,7 @@
 import apiClient from './apiClient'
 
 import { API_ENDPOINTS } from '../constants/api'
-import { getResponseData } from '../utils/apiResponse'
-import { mapSearchResult } from '../utils/mappers/searchMapper'
+import { mapSearchResponse } from '../utils/mappers/searchMapper'
 
 export async function searchInformation(
   query,
@@ -27,9 +26,9 @@ export async function searchInformation(
     },
   )
 
-  const data = getResponseData(response)
-
-  return mapSearchResult(data)
+  return mapSearchResponse(
+    response,
+  )
 }
 
 export default {
