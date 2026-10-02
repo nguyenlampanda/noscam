@@ -214,10 +214,12 @@ function AdminReportsPage() {
     ])
 
   useEffect(() => {
+    // oxlint-disable-next-line react/set-state-in-effect
     loadDashboard()
   }, [loadDashboard])
 
   useEffect(() => {
+    // oxlint-disable-next-line react/set-state-in-effect
     loadReports()
   }, [loadReports])
 

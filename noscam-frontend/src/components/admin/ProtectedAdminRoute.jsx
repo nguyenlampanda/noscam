@@ -26,6 +26,7 @@ function ProtectedAdminRoute({
     let active = true
 
     if (!getAdminToken()) {
+      // oxlint-disable-next-line react/set-state-in-effect
       setStatus('guest')
 
       return () => {

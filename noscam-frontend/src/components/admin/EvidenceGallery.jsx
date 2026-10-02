@@ -123,6 +123,7 @@ function EvidenceItem({
       typeof IntersectionObserver ===
       'undefined'
     ) {
+      // oxlint-disable-next-line react/set-state-in-effect
       setShouldLoad(true)
       return
     }

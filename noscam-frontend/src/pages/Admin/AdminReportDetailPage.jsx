@@ -101,6 +101,7 @@ function AdminReportDetailPage() {
     )
 
   useEffect(() => {
+    // oxlint-disable-next-line react/set-state-in-effect
     loadReport()
   }, [loadReport])
 
@@ -543,7 +544,7 @@ function AdminReportDetailPage() {
               </div>
             </div>
 
-            <div className="rounded-3xl border border-slate-200 bg-white/[0.05] p-5">
+            <div className="rounded-3xl border border-slate-200 bg-white p-5">
               <div className="text-xs font-bold uppercase tracking-[0.15em] text-slate-500">
                 Lưu ý
               </div>
@@ -743,7 +744,7 @@ function MiniStat({
   value,
 }) {
   return (
-    <div className="min-w-24 rounded-2xl border border-slate-200 bg-white/[0.05] px-4 py-3">
+    <div className="min-w-24 rounded-2xl border border-slate-200 bg-white px-4 py-3">
       <div className="text-[10px] font-bold uppercase tracking-wide text-slate-500">
         {label}
       </div>
