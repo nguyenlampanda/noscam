@@ -664,46 +664,50 @@ class SearchController extends Controller
             trim($value)
         );
 
-        $value =
-            preg_replace(
-                '~^https?://~',
-                '',
-                $value
-            ) ?? '';
+        $value = preg_replace(
+            '~^https?://~',
+            '',
+            $value
+        ) ?? '';
 
-        $value =
-            preg_replace(
-                '~^www\.~',
-                '',
-                $value
-            ) ?? '';
+        $value = preg_replace(
+            '~^www\.~',
+            '',
+            $value
+        ) ?? '';
 
-        $value =
-            preg_replace(
-                '~[?#].*$~',
-                '',
-                $value
-            ) ?? '';
+        /*
+         * Canonical host phải giống lúc
+         * ReportController lưu report.
+         */
+        $value = preg_replace(
+            '~^m\.facebook\.com/~',
+            'facebook.com/',
+            $value
+        ) ?? $value;
 
-        $value = rtrim(
+        $value = preg_replace(
+            '~^fb\.com/~',
+            'facebook.com/',
+            $value
+        ) ?? $value;
+
+        $value = preg_replace(
+            '~^telegram\.me/~',
+            't.me/',
+            $value
+        ) ?? $value;
+
+        $value = preg_replace(
+            '~[?#].*$~',
+            '',
+            $value
+        ) ?? '';
+
+        return rtrim(
             $value,
             '/'
         );
-
-        /*
-         * Giữ dạng domain/path vì dữ liệu entity
-         * hiện tại có thể đang được lưu theo link.
-         * Chưa ép chỉ còn username để tránh phá
-         * compatibility với dữ liệu cũ.
-         */
-        return match ($type) {
-            'facebook',
-            'tiktok',
-            'telegram',
-            'zalo' => $value,
-
-            default => $value,
-        };
     }
 
     private function typeLabel(

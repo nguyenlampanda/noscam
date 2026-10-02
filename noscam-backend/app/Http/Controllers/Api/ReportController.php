@@ -363,36 +363,36 @@ class ReportController extends Controller
             return null;
         }
 
-        $value =
-            Str::lower(
-                trim((string) $value)
-            );
-
-        $value =
-            preg_replace(
-                '~^https?://~',
-                '',
-                $value
-            ) ?? '';
-
-        $value =
-            preg_replace(
-                '~^www\.~',
-                '',
-                $value
-            ) ?? '';
-
-        $value =
-            preg_replace(
-                '~[?#].*$~',
-                '',
-                $value
-            ) ?? '';
-
-        $value = rtrim(
-            $value,
-            '/'
+        $value = Str::lower(
+            trim((string) $value)
         );
+
+        $value = preg_replace(
+            '~^https?://~',
+            '',
+            $value
+        ) ?? '';
+
+        $value = preg_replace(
+            '~^www\.~',
+            '',
+            $value
+        ) ?? '';
+
+        /*
+         * Website entity dùng domain làm
+         * canonical value.
+         *
+         * example.com/path?a=1
+         * -> example.com
+         */
+        $value = preg_replace(
+            '~[/?#].*$~',
+            '',
+            $value
+        ) ?? '';
+
+        $value = trim($value);
 
         return $value === ''
             ? null
@@ -406,10 +406,52 @@ class ReportController extends Controller
             return null;
         }
 
-        $value =
-            Str::lower(
-                trim((string) $value)
-            );
+        $value = Str::lower(
+            trim((string) $value)
+        );
+
+        $value = preg_replace(
+            '~^https?://~',
+            '',
+            $value
+        ) ?? '';
+
+        $value = preg_replace(
+            '~^www\.~',
+            '',
+            $value
+        ) ?? '';
+
+        /*
+         * Chuẩn hóa các host alias phổ biến.
+         */
+        $value = preg_replace(
+            '~^m\.facebook\.com/~',
+            'facebook.com/',
+            $value
+        ) ?? $value;
+
+        $value = preg_replace(
+            '~^fb\.com/~',
+            'facebook.com/',
+            $value
+        ) ?? $value;
+
+        $value = preg_replace(
+            '~^telegram\.me/~',
+            't.me/',
+            $value
+        ) ?? $value;
+
+        /*
+         * Query/hash thường là tracking,
+         * không phải định danh tài khoản.
+         */
+        $value = preg_replace(
+            '~[?#].*$~',
+            '',
+            $value
+        ) ?? '';
 
         $value = rtrim(
             $value,
