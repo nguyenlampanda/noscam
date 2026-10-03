@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\EnsureUserCanModerate;
+use App\Http\Middleware\SecurityHeaders;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -73,6 +74,14 @@ return Application::configure(
     )
     ->withMiddleware(
         function (Middleware $middleware): void {
+            $middleware->append(
+                SecurityHeaders::class
+            );
+
+            $middleware->trustProxies(
+                at: '*'
+            );
+
             $middleware->alias([
                 'moderator' =>
                     EnsureUserCanModerate::class,
