@@ -46,6 +46,24 @@ const AboutPage = lazy(() =>
   ),
 )
 
+const MediatorsPage = lazy(() =>
+  import(
+    '../pages/Mediators/MediatorsPage'
+  ),
+)
+
+const MediatorDetailPage = lazy(() =>
+  import(
+    '../pages/Mediators/MediatorDetailPage'
+  ),
+)
+
+const AdminMediatorsPage = lazy(() =>
+  import(
+    '../pages/Admin/AdminMediatorsPage'
+  ),
+)
+
 const AdminLoginPage = lazy(() =>
   import(
     '../pages/Admin/AdminLoginPage'
@@ -113,6 +131,16 @@ function AppRoutes() {
           />
 
           <Route
+            path="/mediators"
+            element={<MediatorsPage />}
+          />
+
+          <Route
+            path="/mediators/:code"
+            element={<MediatorDetailPage />}
+          />
+
+          <Route
             path="/guide"
             element={<GuidePage />}
           />
@@ -127,6 +155,15 @@ function AppRoutes() {
           path="/admin/login"
           element={
             <AdminLoginPage />
+          }
+        />
+
+        <Route
+          path="/admin/mediators"
+          element={
+            <ProtectedAdminRoute>
+              <AdminMediatorsPage />
+            </ProtectedAdminRoute>
           }
         />
 

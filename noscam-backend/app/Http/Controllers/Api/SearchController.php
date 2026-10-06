@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Entity;
 use App\Models\EntityRelation;
+use App\Models\SystemCounter;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -28,6 +29,13 @@ class SearchController extends Controller
         $query = trim(
             $request->string('q')->toString()
         );
+
+        SystemCounter::query()
+            ->firstOrCreate(
+                ['key' => 'searches'],
+                ['value' => 0]
+            )
+            ->increment('value');
 
         $search = $this->detectSearch($query);
 

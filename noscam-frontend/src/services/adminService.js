@@ -180,6 +180,91 @@ export const adminService = {
     )
   },
 
+  async getMediators(
+    search = '',
+    page = 1,
+    status = '',
+  ) {
+    const params =
+      new URLSearchParams()
+
+    params.set(
+      'page',
+      String(page),
+    )
+
+    if (search.trim()) {
+      params.set(
+        'search',
+        search.trim(),
+      )
+    }
+
+    if (status) {
+      params.set(
+        'status',
+        status,
+      )
+    }
+
+    return adminRequest(
+      () =>
+        apiClient.get(
+          `/admin/mediators?${params.toString()}`,
+          authOptions(),
+        ),
+    )
+  },
+
+  async getMediator(id) {
+    return adminRequest(
+      () =>
+        apiClient.get(
+          `/admin/mediators/${id}`,
+          authOptions(),
+        ),
+    )
+  },
+
+  async createMediator(data) {
+    return adminRequest(
+      () =>
+        apiClient.post(
+          '/admin/mediators',
+          data,
+          authOptions(),
+        ),
+    )
+  },
+
+  async updateMediator(
+    id,
+    data,
+  ) {
+    return adminRequest(
+      () =>
+        apiClient.put(
+          `/admin/mediators/${id}`,
+          data,
+          authOptions(),
+        ),
+    )
+  },
+
+  async addMediatorDeposit(
+    id,
+    data,
+  ) {
+    return adminRequest(
+      () =>
+        apiClient.post(
+          `/admin/mediators/${id}/deposits`,
+          data,
+          authOptions(),
+        ),
+    )
+  },
+
   async getEvidence(id) {
     const token =
       getAdminToken()

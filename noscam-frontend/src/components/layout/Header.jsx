@@ -23,6 +23,10 @@ const navigation = [
     path: '/alerts',
   },
   {
+    name: 'Trung gian',
+    path: '/mediators',
+  },
+  {
     name: 'Hướng dẫn',
     path: '/guide',
   },

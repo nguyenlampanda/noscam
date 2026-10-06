@@ -32,6 +32,13 @@ import ErrorState
 import EmptyState
   from '../../components/common/EmptyState'
 
+import CommunityFeedback
+  from '../../components/search/CommunityFeedback'
+
+import MediatorLookup
+  from '../../components/mediators/MediatorLookup'
+
+
 import { useSearch }
   from '../../hooks/useSearch'
 
@@ -259,8 +266,23 @@ function SearchPage() {
                   meta={meta}
                 />
 
+                <MediatorLookup
+                  query={query}
+                />
+
                 <EmptyState
                   query={query}
+                />
+
+                <CommunityFeedback
+                  type={
+                    meta?.detectedType ||
+                    'generic'
+                  }
+                  value={
+                    meta?.normalizedQuery ||
+                    query
+                  }
                 />
 
                 <motion.div
@@ -295,6 +317,7 @@ function SearchPage() {
                     Gửi báo cáo nếu bạn có thêm thông tin →
                   </Link>
                 </motion.div>
+
               </motion.div>
             )}
 
@@ -311,6 +334,10 @@ function SearchPage() {
                   <DetectedSearch
                     query={query}
                     meta={meta}
+                  />
+
+                  <MediatorLookup
+                    query={query}
                   />
 
                   <motion.div
