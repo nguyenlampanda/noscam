@@ -14,11 +14,17 @@ use App\Http\Controllers\Api\PublicStatsController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\ReportModerationController;
 use App\Http\Controllers\Api\SearchController;
+use App\Http\Controllers\Api\AdminSocialCustomerController;
 use App\Http\Controllers\Api\AdminSocialDashboardController;
 use App\Http\Controllers\Api\AdminSocialOrderController;
 use App\Http\Controllers\Api\AdminSocialProviderController;
 use App\Http\Controllers\Api\AdminSocialServiceController;
 use App\Http\Controllers\Api\AdminWalletTopupController;
+use App\Http\Controllers\Api\CustomerAuthController;
+use App\Http\Controllers\Api\WalletController;
+use App\Http\Controllers\Api\SocialServiceController;
+use App\Http\Controllers\Api\SocialOrderController;
+use App\Http\Controllers\Api\CustomerProfileController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -110,6 +116,110 @@ Route::get(
 )->middleware(
     'throttle:public-search'
 );
+
+
+/*
+|--------------------------------------------------------------------------
+| Social Services Public API
+|--------------------------------------------------------------------------
+*/
+
+Route::get(
+    '/social/services',
+    [SocialServiceController::class, 'index']
+)->middleware('throttle:public-search');
+
+Route::get(
+    '/social/services/{service}',
+    [SocialServiceController::class, 'show']
+)->middleware('throttle:public-search');
+
+/*
+|--------------------------------------------------------------------------
+| Customer Auth
+|--------------------------------------------------------------------------
+*/
+
+Route::post(
+    '/auth/register',
+    [CustomerAuthController::class, 'register']
+)->middleware('throttle:customer-auth');
+
+Route::post(
+    '/auth/login',
+    [CustomerAuthController::class, 'login']
+)->middleware('throttle:customer-auth');
+
+/*
+|--------------------------------------------------------------------------
+| Customer Protected API
+|--------------------------------------------------------------------------
+*/
+
+Route::middleware([
+    'auth:sanctum',
+    'throttle:customer-api',
+])->group(function () {
+    Route::get(
+        '/auth/me',
+        [CustomerAuthController::class, 'me']
+    );
+
+    Route::post(
+        '/auth/logout',
+        [CustomerAuthController::class, 'logout']
+    );
+
+    Route::get(
+        '/profile',
+        [CustomerProfileController::class, 'show']
+    );
+
+    Route::put(
+        '/profile',
+        [CustomerProfileController::class, 'update']
+    );
+
+    Route::put(
+        '/profile/password',
+        [CustomerProfileController::class, 'changePassword']
+    );
+
+    Route::get(
+        '/wallet',
+        [WalletController::class, 'show']
+    );
+
+    Route::get(
+        '/wallet/transactions',
+        [WalletController::class, 'transactions']
+    );
+
+    Route::get(
+        '/wallet/topups',
+        [WalletController::class, 'topups']
+    );
+
+    Route::post(
+        '/wallet/topups',
+        [WalletController::class, 'createTopup']
+    );
+
+    Route::get(
+        '/social/orders',
+        [SocialOrderController::class, 'index']
+    );
+
+    Route::post(
+        '/social/orders',
+        [SocialOrderController::class, 'store']
+    );
+
+    Route::get(
+        '/social/orders/{order}',
+        [SocialOrderController::class, 'show']
+    );
+});
 
 /*
 |--------------------------------------------------------------------------
@@ -363,9 +473,29 @@ Route::prefix('admin')
             [AdminSocialOrderController::class, 'show']
         );
 
+        Route::post(
+            '/social/orders/{order}/cancel',
+            [AdminSocialOrderController::class, 'cancel']
+        );
+
         Route::patch(
             '/social/orders/{order}/status',
             [AdminSocialOrderController::class, 'updateStatus']
+        );
+
+        Route::get(
+            '/social/customers',
+            [AdminSocialCustomerController::class, 'index']
+        );
+
+        Route::get(
+            '/social/customers/{user}',
+            [AdminSocialCustomerController::class, 'show']
+        );
+
+        Route::post(
+            '/social/customers/{user}/wallet',
+            [AdminSocialCustomerController::class, 'adjustWallet']
         );
 
         Route::get(

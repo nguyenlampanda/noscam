@@ -31,6 +31,21 @@ export default function AdminSocialTopupsPage() {
   const [status, setStatus] = useState('')
   const [busyId, setBusyId] = useState(null)
 
+  const [manualUsername, setManualUsername] =
+    useState('')
+
+  const [manualAmount, setManualAmount] =
+    useState('')
+
+  const [manualNote, setManualNote] =
+    useState('')
+
+  const [manualBusy, setManualBusy] =
+    useState(false)
+
+  const [success, setSuccess] =
+    useState('')
+
   const load = useCallback(async () => {
     setLoading(true)
     setError('')
@@ -71,6 +86,69 @@ export default function AdminSocialTopupsPage() {
     const timer = setTimeout(load, 250)
     return () => clearTimeout(timer)
   }, [load])
+
+  async function manualCredit(e) {
+    e.preventDefault()
+
+    const username =
+      manualUsername.trim()
+
+    const amount =
+      Number(manualAmount)
+
+    if (!username) {
+      setError('Vui lòng nhập username.')
+      return
+    }
+
+    if (!amount || amount < 1000) {
+      setError(
+        'Số tiền tối thiểu là 1.000đ.',
+      )
+      return
+    }
+
+    if (
+      !window.confirm(
+        `Cộng ${money(amount)} vào ví @${username}?`,
+      )
+    ) {
+      return
+    }
+
+    setManualBusy(true)
+    setError('')
+    setSuccess('')
+
+    try {
+      const response =
+        await adminService
+          .manualCreditSocialWallet({
+            username,
+            amount,
+            note: manualNote.trim(),
+          })
+
+      setSuccess(
+        response?.message ||
+          'Đã cộng tiền vào ví thành công.',
+      )
+
+      setManualUsername('')
+      setManualAmount('')
+      setManualNote('')
+
+      await load()
+    } catch (err) {
+      setError(
+        err?.data?.message ||
+          err?.message ||
+          'Không cộng được tiền.',
+      )
+    } finally {
+      setManualBusy(false)
+    }
+  }
 
   async function approve(item) {
     if (
@@ -147,6 +225,104 @@ export default function AdminSocialTopupsPage() {
         </div>
 
         <SocialAdminNav />
+
+        <motion.form
+          onSubmit={manualCredit}
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mt-6 rounded-3xl border border-blue-100 bg-white p-5 shadow-sm"
+        >
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <div className="text-lg font-black text-slate-950">
+                Cộng tiền thủ công
+              </div>
+
+              <div className="mt-1 text-sm text-slate-500">
+                Nhập username khách hàng để cộng tiền trực tiếp vào ví.
+              </div>
+            </div>
+
+            <div className="rounded-full bg-blue-50 px-3 py-1 text-xs font-black text-blue-600">
+              ADMIN
+            </div>
+          </div>
+
+          <div className="mt-5 grid gap-3 lg:grid-cols-[1fr_220px_1fr_auto]">
+            <div>
+              <label className="mb-2 block text-xs font-black uppercase text-slate-400">
+                Username
+              </label>
+
+              <input
+                value={manualUsername}
+                onChange={(e) =>
+                  setManualUsername(
+                    e.target.value,
+                  )
+                }
+                placeholder="Ví dụ: test1"
+                autoComplete="off"
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 font-bold outline-none transition focus:border-blue-400 focus:bg-white"
+              />
+            </div>
+
+            <div>
+              <label className="mb-2 block text-xs font-black uppercase text-slate-400">
+                Số tiền
+              </label>
+
+              <input
+                type="number"
+                min="1000"
+                step="1000"
+                value={manualAmount}
+                onChange={(e) =>
+                  setManualAmount(
+                    e.target.value,
+                  )
+                }
+                placeholder="200000"
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 font-bold outline-none transition focus:border-blue-400 focus:bg-white"
+              />
+            </div>
+
+            <div>
+              <label className="mb-2 block text-xs font-black uppercase text-slate-400">
+                Ghi chú
+              </label>
+
+              <input
+                value={manualNote}
+                onChange={(e) =>
+                  setManualNote(
+                    e.target.value,
+                  )
+                }
+                placeholder="Nạp test, điều chỉnh số dư..."
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none transition focus:border-blue-400 focus:bg-white"
+              />
+            </div>
+
+            <div className="flex items-end">
+              <button
+                type="submit"
+                disabled={manualBusy}
+                className="w-full whitespace-nowrap rounded-2xl bg-blue-600 px-5 py-3 font-black text-white shadow-sm transition hover:bg-blue-700 disabled:opacity-50"
+              >
+                {manualBusy
+                  ? 'Đang cộng...'
+                  : '+ Cộng tiền'}
+              </button>
+            </div>
+          </div>
+        </motion.form>
+
+        {success && (
+          <div className="mt-4 rounded-2xl border border-emerald-100 bg-emerald-50 p-4 text-sm font-bold text-emerald-700">
+            ✓ {success}
+          </div>
+        )}
 
         <div className="mt-6 grid gap-3 md:grid-cols-[1fr_240px]">
           <input
@@ -240,7 +416,9 @@ export default function AdminSocialTopupsPage() {
 
                         <td className="px-5 py-4">
                           <div className="font-bold">
-                            {item.user?.name || '—'}
+                            {item.user?.username
+                              ? `@${item.user.username}`
+                              : item.user?.name || '—'}
                           </div>
                           <div className="text-xs text-slate-400">
                             {item.user?.email || ''}

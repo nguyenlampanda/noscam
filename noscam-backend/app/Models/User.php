@@ -10,7 +10,8 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 
-#[Fillable(['name', 'email', 'password', 'role'])]
+#[Fillable(['name',
+        'username', 'email', 'password', 'role'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -38,6 +39,16 @@ class User extends Authenticatable
      *
      * @return array<string, string>
      */
+    public function wallet()
+    {
+        return $this->hasOne(Wallet::class);
+    }
+
+    public function socialOrders()
+    {
+        return $this->hasMany(SocialOrder::class);
+    }
+
     protected function casts(): array
     {
         return [

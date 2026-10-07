@@ -39,18 +39,51 @@ return Application::configure(
             );
 
             RateLimiter::for(
+                'customer-auth',
+                function (Request $request) {
+                    $username = strtolower(
+                        (string) $request->input(
+                            'username',
+                            ''
+                        )
+                    );
+
+                    return Limit::perMinute(10)
+                        ->by(
+                            $username.'|'.
+                            $request->ip()
+                        );
+                }
+            );
+
+            RateLimiter::for(
+                'customer-api',
+                function (Request $request) {
+                    $userId =
+                        $request->user()?->id;
+
+                    return Limit::perMinute(120)
+                        ->by(
+                            $userId
+                                ? 'customer:'.$userId
+                                : 'ip:'.$request->ip()
+                        );
+                }
+            );
+
+            RateLimiter::for(
                 'admin-login',
                 function (Request $request) {
-                    $email = strtolower(
+                    $username = strtolower(
                         (string) $request->input(
-                            'email',
+                            'username',
                             ''
                         )
                     );
 
                     return Limit::perMinute(5)
                         ->by(
-                            $email.'|'.
+                            $username.'|'.
                             $request->ip()
                         );
                 }

@@ -21,8 +21,8 @@ const items = [
     label: 'Nhà cung cấp',
   },
   {
-    to: '/admin/social/topups',
-    label: 'Nạp tiền',
+    to: '/admin/social/customers',
+    label: 'Khách hàng',
   },
 ]
 

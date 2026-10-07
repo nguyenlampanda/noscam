@@ -19,7 +19,7 @@ class AdminWalletTopupController extends Controller
     ): JsonResponse {
         $query = WalletTopup::query()
             ->with([
-                'user:id,name,email',
+                'user:id,username,name,email',
             ]);
 
         if ($request->filled('status')) {
@@ -72,6 +72,122 @@ class AdminWalletTopupController extends Controller
                 ->latest()
                 ->paginate(50)
         );
+    }
+
+    public function manualCredit(
+        Request $request,
+        WalletService $walletService
+    ): JsonResponse {
+        $data = $request->validate([
+            'username' => [
+                'required',
+                'string',
+                'max:50',
+            ],
+            'amount' => [
+                'required',
+                'numeric',
+                'min:1000',
+            ],
+            'note' => [
+                'nullable',
+                'string',
+                'max:5000',
+            ],
+        ]);
+
+        $username = strtolower(
+            trim($data['username'])
+        );
+
+        $user = User::query()
+            ->whereRaw(
+                'LOWER(username) = ?',
+                [$username]
+            )
+            ->first();
+
+        if (!$user) {
+            return response()->json([
+                'message' =>
+                    'Không tìm thấy username này.',
+            ], 422);
+        }
+
+        $result = DB::transaction(
+            function () use (
+                $request,
+                $walletService,
+                $user,
+                $data
+            ) {
+                $topup = WalletTopup::create([
+                    'code' =>
+                        $this->topupCode(),
+
+                    'user_id' =>
+                        $user->id,
+
+                    'amount' =>
+                        $data['amount'],
+
+                    'method' =>
+                        'manual',
+
+                    'status' =>
+                        'pending',
+
+                    'note' =>
+                        $data['note']
+                        ?? 'Admin cộng tiền thủ công',
+                ]);
+
+                $walletService->credit(
+                    user: $user,
+                    amount:
+                        (float) $data['amount'],
+                    type: 'deposit',
+                    referenceType:
+                        WalletTopup::class,
+                    referenceId:
+                        $topup->id,
+                    description:
+                        'Admin cộng tiền '
+                        .$topup->code,
+                    createdBy:
+                        $request->user()?->id,
+                    meta: [
+                        'topup_code' =>
+                            $topup->code,
+                        'username' =>
+                            $user->username,
+                        'manual' => true,
+                    ]
+                );
+
+                $topup->update([
+                    'status' =>
+                        'approved',
+                    'reviewed_by' =>
+                        $request->user()?->id,
+                    'reviewed_at' =>
+                        now(),
+                ]);
+
+                return $topup
+                    ->fresh()
+                    ->load(
+                        'user:id,username,name,email'
+                    );
+            },
+            3
+        );
+
+        return response()->json([
+            'message' =>
+                'Đã cộng tiền vào ví thành công.',
+            'data' => $result,
+        ], 201);
     }
 
     public function store(

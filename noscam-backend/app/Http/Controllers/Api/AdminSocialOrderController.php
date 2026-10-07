@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\SocialOrder;
 use App\Services\Social\SocialOrderService;
+use App\Services\Social\SocialOrderProviderService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -17,8 +18,9 @@ class AdminSocialOrderController extends Controller
         $query = SocialOrder::query()
             ->with([
                 'user:id,name,email',
-                'service:id,code,name,platform',
-                'provider:id,name,slug',
+                'service:id,code,name,platform,category',
+                'provider:id,name,slug,status',
+                'providerService:id,social_provider_id,provider_service_id,provider_service_name,cost_price_per_1000,priority,is_active',
             ]);
 
         if ($request->filled('status')) {
@@ -76,6 +78,25 @@ class AdminSocialOrderController extends Controller
         ]);
     }
 
+
+    public function cancel(
+        Request $request,
+        SocialOrder $order,
+        SocialOrderProviderService $providerService
+    ): JsonResponse {
+        $order = $providerService->cancel(
+            $order,
+            $request->user()?->id
+        );
+
+        return response()->json([
+            'message' => $order->status === 'cancelled'
+                ? 'Đã hủy đơn và xử lý hoàn tiền.'
+                : 'Đã gửi yêu cầu hủy đến nhà cung cấp.',
+            'data' => $order,
+        ]);
+    }
+
     public function updateStatus(
         Request $request,
         SocialOrder $order,
@@ -128,7 +149,8 @@ class AdminSocialOrderController extends Controller
                 $order->fresh()->load([
                     'user:id,name,email',
                     'service',
-                    'provider:id,name,slug',
+                    'provider:id,name,slug,status',
+                    'providerService',
                 ]),
         ]);
     }

@@ -107,11 +107,7 @@ function MapModal({
         item.provider_service_name ||
         '',
       code: '',
-      sell_price_per_1000:
-        Number(
-          item.cost_price_per_1000 ||
-            0,
-        ),
+      sell_price_per_1000: '',
       min_quantity:
         item.min_quantity || 1,
       max_quantity:
@@ -125,6 +121,33 @@ function MapModal({
     setError('')
 
     try {
+      const costVnd = Number(
+        item.cost_price_vnd ??
+          item.cost_price_per_1000 ??
+          0,
+      )
+
+      if (
+        mode === 'new' &&
+        (
+          form.sell_price_per_1000 === '' ||
+          Number(form.sell_price_per_1000) <= 0
+        )
+      ) {
+        throw new Error(
+          'Vui lòng thiết lập giá bán trước khi đưa dịch vụ lên bán.',
+        )
+      }
+
+      if (
+        mode === 'new' &&
+        Number(form.sell_price_per_1000) <= costVnd
+      ) {
+        throw new Error(
+          `Giá bán phải cao hơn giá vốn ${costVnd.toLocaleString('vi-VN')}đ / 1.000.`,
+        )
+      }
+
       let payload
 
       if (mode === 'existing') {
@@ -646,6 +669,299 @@ function MapModal({
   )
 }
 
+
+function PriceModal({
+  item,
+  onClose,
+  onDone,
+}) {
+  const service = item.service
+
+  const cost = Number(
+    item.cost_price_vnd ??
+      item.cost_price_per_1000 ??
+      0,
+  )
+
+  const currentPrice =
+    service?.sell_price_per_1000
+
+  const [price, setPrice] = useState(
+    currentPrice == null ||
+      Number(currentPrice) <= 0
+      ? ''
+      : String(currentPrice),
+  )
+
+  const [busy, setBusy] =
+    useState(false)
+
+  const [error, setError] =
+    useState('')
+
+  const sell = Number(price || 0)
+
+  const profit =
+    price === ''
+      ? 0
+      : sell - cost
+
+  const percent =
+    cost > 0 && price !== ''
+      ? (profit / cost) * 100
+      : 0
+
+  async function save() {
+    setError('')
+
+    if (
+      price === '' ||
+      !Number.isFinite(sell) ||
+      sell <= 0
+    ) {
+      setError(
+        'Vui lòng nhập giá bán.',
+      )
+      return
+    }
+
+    if (sell <= cost) {
+      setError(
+        `Giá bán phải cao hơn giá vốn ${vnd(cost)} / 1.000.`,
+      )
+      return
+    }
+
+    if (!service?.id) {
+      setError(
+        'Không tìm thấy dịch vụ NoScam.',
+      )
+      return
+    }
+
+    setBusy(true)
+
+    try {
+      await adminService
+        .updateSocialService(
+          service.id,
+          {
+            platform:
+              service.platform,
+            category:
+              service.category,
+            name:
+              service.name,
+            description:
+              service.description ??
+              null,
+            min_quantity:
+              Number(
+                service.min_quantity ||
+                  item.min_quantity ||
+                  1,
+              ),
+            max_quantity:
+              Number(
+                service.max_quantity ||
+                  item.max_quantity ||
+                  1000000,
+              ),
+            sell_price_per_1000:
+              sell,
+            is_active:
+              service.is_active ??
+              true,
+            sort_order:
+              Number(
+                service.sort_order ||
+                  0,
+              ),
+          },
+        )
+
+      await onDone()
+      onClose()
+    } catch (err) {
+      setError(
+        err?.data?.message ||
+          err?.message ||
+          'Không lưu được giá bán.',
+      )
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <motion.div
+      className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+    >
+      <motion.div
+        initial={{
+          opacity: 0,
+          y: 20,
+          scale: 0.98,
+        }}
+        animate={{
+          opacity: 1,
+          y: 0,
+          scale: 1,
+        }}
+        exit={{
+          opacity: 0,
+          y: 20,
+          scale: 0.98,
+        }}
+        className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl"
+      >
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <div className="text-xs font-bold uppercase tracking-wider text-blue-600">
+              Thiết lập giá bán
+            </div>
+
+            <h2 className="mt-1 text-xl font-black text-slate-950">
+              {service?.name ||
+                item.provider_service_name}
+            </h2>
+
+            <div className="mt-2">
+              <ProviderBadge
+                provider={item.provider}
+              />
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="grid h-10 w-10 place-items-center rounded-xl bg-slate-100 font-black text-slate-500"
+          >
+            ×
+          </button>
+        </div>
+
+        <div className="mt-6 rounded-2xl bg-blue-50 p-4">
+          <div className="text-xs font-bold uppercase tracking-wider text-blue-500">
+            Giá vốn Provider / 1.000
+          </div>
+
+          <div className="mt-1 text-2xl font-black text-blue-700">
+            {vnd(cost)}
+          </div>
+        </div>
+
+        <label className="mt-5 grid gap-2">
+          <span className="text-sm font-bold text-slate-700">
+            Giá bán / 1.000
+          </span>
+
+          <div className="relative">
+            <input
+              type="number"
+              min="0"
+              step="1"
+              value={price}
+              onChange={(e) =>
+                setPrice(e.target.value)
+              }
+              placeholder="Nhập giá bán"
+              className="w-full rounded-2xl border border-slate-200 px-4 py-3.5 pr-24 text-lg font-black outline-none focus:border-blue-400"
+            />
+
+            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">
+              đ / 1.000
+            </span>
+          </div>
+
+          <span className="text-xs font-semibold text-slate-400">
+            Giá bán phải cao hơn giá vốn Provider.
+          </span>
+        </label>
+
+        <div className="mt-5 grid grid-cols-2 gap-3">
+          <div
+            className={`rounded-2xl p-4 ${
+              price === ''
+                ? 'bg-slate-50'
+                : profit > 0
+                  ? 'bg-emerald-50'
+                  : 'bg-red-50'
+            }`}
+          >
+            <div className="text-xs font-bold uppercase tracking-wider text-slate-400">
+              Lợi nhuận / 1.000
+            </div>
+
+            <div
+              className={`mt-1 text-xl font-black ${
+                price === ''
+                  ? 'text-slate-500'
+                  : profit > 0
+                    ? 'text-emerald-700'
+                    : 'text-red-600'
+              }`}
+            >
+              {price === ''
+                ? '—'
+                : `${profit > 0 ? '+' : ''}${vnd(profit)}`}
+            </div>
+          </div>
+
+          <div
+            className={`rounded-2xl p-4 ${
+              price === ''
+                ? 'bg-slate-50'
+                : percent > 0
+                  ? 'bg-emerald-50'
+                  : 'bg-red-50'
+            }`}
+          >
+            <div className="text-xs font-bold uppercase tracking-wider text-slate-400">
+              Biên lợi nhuận
+            </div>
+
+            <div
+              className={`mt-1 text-xl font-black ${
+                price === ''
+                  ? 'text-slate-500'
+                  : percent > 0
+                    ? 'text-emerald-700'
+                    : 'text-red-600'
+              }`}
+            >
+              {price === ''
+                ? '—'
+                : `${percent > 0 ? '+' : ''}${percent.toFixed(1)}%`}
+            </div>
+          </div>
+        </div>
+
+        {error && (
+          <div className="mt-4 rounded-2xl bg-red-50 p-3 text-sm font-semibold text-red-600">
+            {error}
+          </div>
+        )}
+
+        <button
+          type="button"
+          disabled={busy}
+          onClick={save}
+          className="mt-6 w-full rounded-2xl bg-blue-600 px-5 py-3.5 font-black text-white transition hover:bg-blue-700 disabled:opacity-50"
+        >
+          {busy
+            ? 'Đang lưu...'
+            : 'Lưu giá'}
+        </button>
+      </motion.div>
+    </motion.div>
+  )
+}
+
 export default function AdminSocialServicesPage() {
   const [items, setItems] =
     useState([])
@@ -666,6 +982,9 @@ export default function AdminSocialServicesPage() {
     useState('')
 
   const [selected, setSelected] =
+    useState(null)
+
+  const [priceSelected, setPriceSelected] =
     useState(null)
 
   const [search, setSearch] =
@@ -1118,15 +1437,29 @@ export default function AdminSocialServicesPage() {
                           )}
 
                           {item.is_mapped && (
-                            <button
-                              type="button"
-                              onClick={() =>
-                                unmap(item)
-                              }
-                              className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600"
-                            >
-                              Bỏ map
-                            </button>
+                            <>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setPriceSelected(
+                                    item,
+                                  )
+                                }
+                                className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white transition hover:bg-emerald-700"
+                              >
+                                Sửa giá
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  unmap(item)
+                                }
+                                className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600"
+                              >
+                                Bỏ map
+                              </button>
+                            </>
                           )}
                         </div>
                       </td>
@@ -1184,6 +1517,16 @@ export default function AdminSocialServicesPage() {
             services={services}
             onClose={() =>
               setSelected(null)
+            }
+            onDone={load}
+          />
+        )}
+
+        {priceSelected && (
+          <PriceModal
+            item={priceSelected}
+            onClose={() =>
+              setPriceSelected(null)
             }
             onDone={load}
           />

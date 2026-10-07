@@ -9,6 +9,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use App\Services\Social\SocialServiceClassifier;
 use Illuminate\Validation\Rule;
 
 class AdminSocialServiceController extends Controller
@@ -188,6 +189,51 @@ class AdminSocialServiceController extends Controller
             $service
         );
 
+        if (
+            array_key_exists(
+                'sell_price_per_1000',
+                $data
+            ) &&
+            $data['sell_price_per_1000'] !== null
+        ) {
+            $providerServices = $service
+                ->providerServices()
+                ->where('is_active', true)
+                ->with('provider')
+                ->get();
+
+            if ($providerServices->isNotEmpty()) {
+                $maxCostVnd = $providerServices
+                    ->max(
+                        fn ($item) =>
+                            $item->costPriceVnd()
+                    );
+
+                if (
+                    (float) $data[
+                        'sell_price_per_1000'
+                    ] <= $maxCostVnd
+                ) {
+                    return response()->json([
+                        'message' =>
+                            'Giá bán phải cao hơn giá vốn Provider.',
+                        'errors' => [
+                            'sell_price_per_1000' => [
+                                'Giá bán phải lớn hơn '
+                                .number_format(
+                                    $maxCostVnd,
+                                    0,
+                                    ',',
+                                    '.'
+                                )
+                                .'đ / 1.000.',
+                            ],
+                        ],
+                    ], 422);
+                }
+            }
+        }
+
         $service->update($data);
 
         return response()->json([
@@ -276,7 +322,6 @@ class AdminSocialServiceController extends Controller
             ],
 
             'sell_price_per_1000' => [
-                'required_without:social_service_id',
                 'nullable',
                 'numeric',
                 'min:0',
@@ -306,6 +351,33 @@ class AdminSocialServiceController extends Controller
                 'boolean',
             ],
         ]);
+
+        if (
+            empty($data['social_service_id'])
+        ) {
+            $detected = app(
+                SocialServiceClassifier::class
+            )->classify(
+                $providerService
+                    ->provider_service_name
+            );
+
+            if (
+                $detected['platform']
+                !== 'other'
+            ) {
+                $data['platform'] =
+                    $detected['platform'];
+            }
+
+            if (
+                $detected['category']
+                !== 'other'
+            ) {
+                $data['category'] =
+                    $detected['category'];
+            }
+        }
 
         $service = DB::transaction(
             function () use (
@@ -393,9 +465,7 @@ class AdminSocialServiceController extends Controller
                             'max_quantity' =>
                                 $max,
                             'sell_price_per_1000' =>
-                                $data[
-                                    'sell_price_per_1000'
-                                ],
+                                null,
                             'is_active' =>
                                 true,
                             'sort_order' =>
@@ -636,7 +706,7 @@ class AdminSocialServiceController extends Controller
             ],
 
             'sell_price_per_1000' => [
-                'required',
+                'nullable',
                 'numeric',
                 'min:0',
             ],

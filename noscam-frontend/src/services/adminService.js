@@ -477,34 +477,38 @@ export const adminService = {
     )
   },
 
-  async getSocialOrders(
+  async getSocialOrders({
     status = '',
     search = '',
-  ) {
-    const params =
-      new URLSearchParams()
+    page = 1,
+  } = {}) {
+    const params = new URLSearchParams()
 
     if (status) {
-      params.set(
-        'status',
-        status,
-      )
+      params.set('status', status)
     }
 
     if (search.trim()) {
-      params.set(
-        'search',
-        search.trim(),
-      )
+      params.set('search', search.trim())
     }
 
-    const query =
-      params.toString()
+    params.set('page', String(page))
 
     return adminRequest(
       () =>
         apiClient.get(
-          `/admin/social/orders${query ? `?${query}` : ''}`,
+          `/admin/social/orders?${params.toString()}`,
+          authOptions(),
+        ),
+    )
+  },
+
+  async cancelSocialOrder(id) {
+    return adminRequest(
+      () =>
+        apiClient.post(
+          `/admin/social/orders/${id}/cancel`,
+          {},
           authOptions(),
         ),
     )
@@ -588,6 +592,59 @@ export const adminService = {
     )
   },
 
+  async getSocialCustomers({
+    search = '',
+    page = 1,
+  } = {}) {
+    const params = new URLSearchParams()
+
+    if (search.trim()) {
+      params.set('search', search.trim())
+    }
+
+    params.set('page', String(page))
+
+    return adminRequest(
+      () =>
+        apiClient.get(
+          `/admin/social/customers?${params.toString()}`,
+          authOptions(),
+        ),
+    )
+  },
+
+  async getSocialCustomer(id) {
+    return adminRequest(
+      () =>
+        apiClient.get(
+          `/admin/social/customers/${id}`,
+          authOptions(),
+        ),
+    )
+  },
+
+  async adjustSocialCustomerWallet(
+    id,
+    {
+      direction,
+      amount,
+      note = '',
+    },
+  ) {
+    return adminRequest(
+      () =>
+        apiClient.post(
+          `/admin/social/customers/${id}/wallet`,
+          {
+            direction,
+            amount,
+            note,
+          },
+          authOptions(),
+        ),
+    )
+  },
+
   async getSocialTopups({
     status = '',
     search = '',
@@ -614,6 +671,25 @@ export const adminService = {
           `/admin/social/topups${
             query ? `?${query}` : ''
           }`,
+          authOptions(),
+        ),
+    )
+  },
+
+  async manualCreditSocialWallet({
+    username,
+    amount,
+    note = '',
+  }) {
+    return adminRequest(
+      () =>
+        apiClient.post(
+          '/admin/social/topups/manual-credit',
+          {
+            username,
+            amount,
+            note,
+          },
           authOptions(),
         ),
     )

@@ -127,6 +127,35 @@ const AdminSocialTopupsPage = lazy(() =>
   import('../pages/Admin/AdminSocialTopupsPage')
 )
 
+const AdminSocialCustomersPage = lazy(() =>
+  import('../pages/Admin/AdminSocialCustomersPage'),
+)
+
+
+const LoginPage = lazy(() =>
+  import('../pages/LoginPage')
+)
+
+const RegisterPage = lazy(() =>
+  import('../pages/RegisterPage')
+)
+
+const SocialServicesPage = lazy(() =>
+  import('../pages/SocialServicesPage')
+)
+
+const WalletPage = lazy(() =>
+  import('../pages/WalletPage')
+)
+
+const MyOrdersPage = lazy(() =>
+  import('../pages/MyOrdersPage')
+)
+
+const ProfilePage = lazy(() =>
+  import('../pages/ProfilePage')
+)
+
 function AppRoutes() {
   return (
     <Suspense
@@ -174,6 +203,36 @@ function AppRoutes() {
           <Route
             path="/about"
             element={<AboutPage />}
+          />
+
+          <Route
+            path="/social-services"
+            element={<SocialServicesPage />}
+          />
+
+          <Route
+            path="/wallet"
+            element={<WalletPage />}
+          />
+
+          <Route
+            path="/profile"
+            element={<ProfilePage />}
+          />
+
+          <Route
+            path="/my-orders"
+            element={<MyOrdersPage />}
+          />
+
+          <Route
+            path="/login"
+            element={<LoginPage />}
+          />
+
+          <Route
+            path="/register"
+            element={<RegisterPage />}
           />
         </Route>
 
@@ -225,6 +284,15 @@ function AppRoutes() {
           element={
             <ProtectedAdminRoute>
               <AdminSocialOrdersPage />
+            </ProtectedAdminRoute>
+          }
+        />
+
+        <Route
+          path="/admin/social/customers"
+          element={
+            <ProtectedAdminRoute>
+              <AdminSocialCustomersPage />
             </ProtectedAdminRoute>
           }
         />
