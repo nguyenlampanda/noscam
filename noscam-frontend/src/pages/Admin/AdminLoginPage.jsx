@@ -20,7 +20,7 @@ function AdminLoginPage() {
   if (getAdminToken()) {
     return (
       <Navigate
-        to="/admin/reports"
+        to="/admin"
         replace
       />
     )
@@ -35,7 +35,7 @@ function AdminLoginPage() {
     try {
       await adminService.login(email, password)
 
-      navigate('/admin/reports', {
+      navigate('/admin', {
         replace: true,
       })
     } catch (err) {

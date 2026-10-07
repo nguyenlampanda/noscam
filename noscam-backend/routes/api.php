@@ -14,6 +14,11 @@ use App\Http\Controllers\Api\PublicStatsController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\ReportModerationController;
 use App\Http\Controllers\Api\SearchController;
+use App\Http\Controllers\Api\AdminSocialDashboardController;
+use App\Http\Controllers\Api\AdminSocialOrderController;
+use App\Http\Controllers\Api\AdminSocialProviderController;
+use App\Http\Controllers\Api\AdminSocialServiceController;
+use App\Http\Controllers\Api\AdminWalletTopupController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -269,6 +274,118 @@ Route::prefix('admin')
                 AdminMediatorController::class,
                 'addDeposit',
             ]
+        );
+
+        /*
+        |--------------------------------------------------------------------------
+        | Social Services
+        |--------------------------------------------------------------------------
+        */
+
+        Route::get(
+            '/social/dashboard',
+            [AdminSocialDashboardController::class, 'index']
+        );
+
+        Route::get(
+            '/social/providers',
+            [AdminSocialProviderController::class, 'index']
+        );
+
+        Route::get(
+            '/social/providers/{provider}',
+            [AdminSocialProviderController::class, 'show']
+        );
+
+        Route::put(
+            '/social/providers/{provider}',
+            [AdminSocialProviderController::class, 'update']
+        );
+
+        Route::post(
+            '/social/providers/{provider}/test',
+            [AdminSocialProviderController::class, 'test']
+        );
+
+        Route::post(
+            '/social/providers/{provider}/sync',
+            [AdminSocialProviderController::class, 'sync']
+        );
+
+        /*
+        |--------------------------------------------------------------------------
+        | Social Services
+        |--------------------------------------------------------------------------
+        */
+
+        Route::get(
+            '/social/services',
+            [AdminSocialServiceController::class, 'index']
+        );
+
+        Route::get(
+            '/social/provider-services',
+            [AdminSocialServiceController::class, 'providerServices']
+        );
+
+        Route::patch(
+            '/social/provider-services/{providerService}',
+            [AdminSocialServiceController::class, 'updateProviderService']
+        );
+
+        Route::post(
+            '/social/provider-services/{providerService}/map',
+            [AdminSocialServiceController::class, 'mapProviderService']
+        );
+
+        Route::delete(
+            '/social/provider-services/{providerService}/map',
+            [AdminSocialServiceController::class, 'unmapProviderService']
+        );
+
+        Route::post(
+            '/social/services',
+            [AdminSocialServiceController::class, 'store']
+        );
+
+        Route::put(
+            '/social/services/{service}',
+            [AdminSocialServiceController::class, 'update']
+        );
+
+        Route::get(
+            '/social/orders',
+            [AdminSocialOrderController::class, 'index']
+        );
+
+        Route::get(
+            '/social/orders/{order}',
+            [AdminSocialOrderController::class, 'show']
+        );
+
+        Route::patch(
+            '/social/orders/{order}/status',
+            [AdminSocialOrderController::class, 'updateStatus']
+        );
+
+        Route::get(
+            '/social/topups',
+            [AdminWalletTopupController::class, 'index']
+        );
+
+        Route::post(
+            '/social/topups',
+            [AdminWalletTopupController::class, 'store']
+        );
+
+        Route::post(
+            '/social/topups/{topup}/approve',
+            [AdminWalletTopupController::class, 'approve']
+        );
+
+        Route::post(
+            '/social/topups/{topup}/reject',
+            [AdminWalletTopupController::class, 'reject']
         );
 
         /*

@@ -1,0 +1,656 @@
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use App\Http\Controllers\Controller;
+use App\Models\SocialProviderService;
+use App\Models\SocialService;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
+
+class AdminSocialServiceController extends Controller
+{
+    public function index(Request $request): JsonResponse
+    {
+        $query = SocialService::query()
+            ->with([
+                'providerServices' => fn ($q) =>
+                    $q->with('provider')
+                        ->orderBy('priority')
+                        ->orderBy('id'),
+            ]);
+
+        if ($request->filled('platform')) {
+            $query->where(
+                'platform',
+                $request->string('platform')
+            );
+        }
+
+        if ($request->filled('search')) {
+            $search = trim(
+                (string) $request->input('search')
+            );
+
+            $query->where(function ($q) use ($search) {
+                $q->where(
+                    'name',
+                    'like',
+                    "%{$search}%"
+                )->orWhere(
+                    'code',
+                    'like',
+                    "%{$search}%"
+                )->orWhere(
+                    'category',
+                    'like',
+                    "%{$search}%"
+                );
+            });
+        }
+
+        return response()->json(
+            $query
+                ->orderBy('sort_order')
+                ->orderBy('id')
+                ->paginate(
+                    min(
+                        100,
+                        max(
+                            10,
+                            (int) $request->input(
+                                'per_page',
+                                50
+                            )
+                        )
+                    )
+                )
+        );
+    }
+
+    public function providerServices(
+        Request $request
+    ): JsonResponse {
+        $query = SocialProviderService::query()
+            ->with([
+                'provider:id,name,slug,driver,currency,exchange_rate_to_vnd,price_multiplier',
+                'service:id,code,platform,category,name,sell_price_per_1000,is_active',
+            ]);
+
+        if ($request->filled('provider_id')) {
+            $query->where(
+                'social_provider_id',
+                $request->integer('provider_id')
+            );
+        }
+
+        if ($request->filled('mapped')) {
+            $mapped = filter_var(
+                $request->input('mapped'),
+                FILTER_VALIDATE_BOOLEAN
+            );
+
+            $mapped
+                ? $query->whereNotNull(
+                    'social_service_id'
+                )
+                : $query->whereNull(
+                    'social_service_id'
+                );
+        }
+
+        if ($request->filled('active')) {
+            $active = filter_var(
+                $request->input('active'),
+                FILTER_VALIDATE_BOOLEAN
+            );
+
+            $query->where(
+                'is_active',
+                $active
+            );
+        }
+
+        if ($request->filled('search')) {
+            $search = trim(
+                (string) $request->input('search')
+            );
+
+            $query->where(function ($q) use ($search) {
+                $q->where(
+                    'provider_service_name',
+                    'like',
+                    "%{$search}%"
+                )->orWhere(
+                    'provider_service_id',
+                    'like',
+                    "%{$search}%"
+                );
+            });
+        }
+
+        $paginator = $query
+            ->orderBy('social_provider_id')
+            ->orderBy('provider_service_name')
+            ->orderBy('id')
+            ->paginate(
+                min(
+                    100,
+                    max(
+                        10,
+                        (int) $request->input(
+                            'per_page',
+                            50
+                        )
+                    )
+                )
+            );
+
+        $paginator->getCollection()
+            ->transform(
+                fn ($item) =>
+                    $this->serializeProviderService(
+                        $item
+                    )
+            );
+
+        return response()->json(
+            $paginator
+        );
+    }
+
+    public function store(
+        Request $request
+    ): JsonResponse {
+        $data = $this->validated(
+            $request
+        );
+
+        $service = SocialService::create(
+            $data
+        );
+
+        return response()->json([
+            'message' => 'Đã tạo dịch vụ.',
+            'data' => $service,
+        ], 201);
+    }
+
+    public function update(
+        Request $request,
+        SocialService $service
+    ): JsonResponse {
+        $data = $this->validated(
+            $request,
+            $service
+        );
+
+        $service->update($data);
+
+        return response()->json([
+            'message' =>
+                'Đã cập nhật dịch vụ.',
+            'data' =>
+                $service
+                    ->fresh()
+                    ->load(
+                        'providerServices.provider'
+                    ),
+        ]);
+    }
+
+    public function updateProviderService(
+        Request $request,
+        SocialProviderService $providerService
+    ): JsonResponse {
+        $data = $request->validate([
+            'priority' => [
+                'sometimes',
+                'integer',
+                'min:0',
+                'max:100000',
+            ],
+            'is_active' => [
+                'sometimes',
+                'boolean',
+            ],
+        ]);
+
+        $providerService->update(
+            $data
+        );
+
+        return response()->json([
+            'message' =>
+                'Đã cập nhật dịch vụ nguồn.',
+            'data' =>
+                $this->serializeProviderService(
+                    $providerService
+                        ->fresh()
+                        ->load([
+                            'provider',
+                            'service',
+                        ])
+                ),
+        ]);
+    }
+
+    public function mapProviderService(
+        Request $request,
+        SocialProviderService $providerService
+    ): JsonResponse {
+        $data = $request->validate([
+            'social_service_id' => [
+                'nullable',
+                'integer',
+                'exists:social_services,id',
+            ],
+
+            'platform' => [
+                'required_without:social_service_id',
+                'nullable',
+                'in:facebook,instagram,tiktok,other',
+            ],
+
+            'category' => [
+                'required_without:social_service_id',
+                'nullable',
+                'string',
+                'max:100',
+            ],
+
+            'name' => [
+                'required_without:social_service_id',
+                'nullable',
+                'string',
+                'max:255',
+            ],
+
+            'code' => [
+                'nullable',
+                'string',
+                'max:100',
+            ],
+
+            'sell_price_per_1000' => [
+                'required_without:social_service_id',
+                'nullable',
+                'numeric',
+                'min:0',
+            ],
+
+            'min_quantity' => [
+                'nullable',
+                'integer',
+                'min:1',
+            ],
+
+            'max_quantity' => [
+                'nullable',
+                'integer',
+                'min:1',
+            ],
+
+            'priority' => [
+                'nullable',
+                'integer',
+                'min:0',
+                'max:100000',
+            ],
+
+            'is_active' => [
+                'nullable',
+                'boolean',
+            ],
+        ]);
+
+        $service = DB::transaction(
+            function () use (
+                $data,
+                $providerService
+            ) {
+                if (
+                    !empty(
+                        $data['social_service_id']
+                    )
+                ) {
+                    $service =
+                        SocialService::findOrFail(
+                            $data[
+                                'social_service_id'
+                            ]
+                        );
+                } else {
+                    $min = (int) (
+                        $data['min_quantity']
+                        ?? $providerService
+                            ->min_quantity
+                        ?? 1
+                    );
+
+                    $max = (int) (
+                        $data['max_quantity']
+                        ?? $providerService
+                            ->max_quantity
+                        ?? 1000000
+                    );
+
+                    if ($max < $min) {
+                        $max = $min;
+                    }
+
+                    $code = trim(
+                        (string) (
+                            $data['code']
+                            ?? ''
+                        )
+                    );
+
+                    if ($code === '') {
+                        $code =
+                            $this->makeUniqueCode(
+                                $data['platform'],
+                                $data['category'],
+                                $data['name']
+                            );
+                    } else {
+                        $code = Str::upper(
+                            Str::slug(
+                                $code,
+                                '_'
+                            )
+                        );
+
+                        if (
+                            SocialService::where(
+                                'code',
+                                $code
+                            )->exists()
+                        ) {
+                            $code .= '_'
+                                .Str::upper(
+                                    Str::random(5)
+                                );
+                        }
+                    }
+
+                    $service =
+                        SocialService::create([
+                            'code' => $code,
+                            'platform' =>
+                                $data['platform'],
+                            'category' =>
+                                $data['category'],
+                            'name' =>
+                                $data['name'],
+                            'description' =>
+                                null,
+                            'min_quantity' =>
+                                $min,
+                            'max_quantity' =>
+                                $max,
+                            'sell_price_per_1000' =>
+                                $data[
+                                    'sell_price_per_1000'
+                                ],
+                            'is_active' =>
+                                true,
+                            'sort_order' =>
+                                0,
+                            'settings' => [
+                                'created_from_provider_service_id'
+                                    => $providerService->id,
+                            ],
+                        ]);
+                }
+
+                $providerService->update([
+                    'social_service_id' =>
+                        $service->id,
+
+                    'priority' =>
+                        $data['priority']
+                        ?? $providerService
+                            ->priority,
+
+                    'is_active' =>
+                        array_key_exists(
+                            'is_active',
+                            $data
+                        )
+                            ? (bool) $data[
+                                'is_active'
+                            ]
+                            : true,
+                ]);
+
+                return $service;
+            }
+        );
+
+        return response()->json([
+            'message' =>
+                'Đã map dịch vụ nguồn.',
+            'data' =>
+                $service
+                    ->fresh()
+                    ->load(
+                        'providerServices.provider'
+                    ),
+        ]);
+    }
+
+    public function unmapProviderService(
+        SocialProviderService $providerService
+    ): JsonResponse {
+        $providerService->update([
+            'social_service_id' => null,
+        ]);
+
+        return response()->json([
+            'message' =>
+                'Đã bỏ map dịch vụ nguồn.',
+            'data' =>
+                $this->serializeProviderService(
+                    $providerService
+                        ->fresh()
+                        ->load('provider')
+                ),
+        ]);
+    }
+
+    private function makeUniqueCode(
+        string $platform,
+        string $category,
+        string $name
+    ): string {
+        $base = Str::upper(
+            Str::slug(
+                $platform
+                .'_'.$category
+                .'_'.$name,
+                '_'
+            )
+        );
+
+        $base = Str::limit(
+            $base,
+            80,
+            ''
+        );
+
+        $code = $base;
+        $number = 2;
+
+        while (
+            SocialService::where(
+                'code',
+                $code
+            )->exists()
+        ) {
+            $code =
+                $base.'_'.$number;
+
+            $number++;
+        }
+
+        return $code;
+    }
+
+    private function serializeProviderService(
+        SocialProviderService $item
+    ): array {
+        $provider = $item->provider;
+
+        $exchangeRate = (float) (
+            $provider?->exchange_rate_to_vnd
+            ?: 1
+        );
+
+        $multiplier = (float) (
+            $provider?->price_multiplier
+            ?: 1
+        );
+
+        $rawCost = (float) (
+            $item->cost_price_per_1000
+            ?? 0
+        );
+
+        $costVnd =
+            $rawCost
+            * $exchangeRate
+            * $multiplier;
+
+        return [
+            'id' =>
+                $item->id,
+
+            'provider_service_id' =>
+                $item->provider_service_id,
+
+            'provider_service_name' =>
+                $item->provider_service_name,
+
+            'cost_price_per_1000' =>
+                $item->cost_price_per_1000,
+
+            'cost_currency' =>
+                $provider?->currency
+                ?? 'VND',
+
+            'exchange_rate_to_vnd' =>
+                $exchangeRate,
+
+            'price_multiplier' =>
+                $multiplier,
+
+            'cost_price_vnd' =>
+                round(
+                    $costVnd,
+                    4
+                ),
+
+            'min_quantity' =>
+                $item->min_quantity,
+
+            'max_quantity' =>
+                $item->max_quantity,
+
+            'priority' =>
+                $item->priority,
+
+            'is_active' =>
+                $item->is_active,
+
+            'provider_data' =>
+                $item->provider_data,
+
+            'last_synced_at' =>
+                $item->last_synced_at,
+
+            'provider' =>
+                $provider,
+
+            'service' =>
+                $item->service,
+
+            'is_mapped' =>
+                !is_null(
+                    $item->social_service_id
+                ),
+        ];
+    }
+
+    private function validated(
+        Request $request,
+        ?SocialService $service = null
+    ): array {
+        return $request->validate([
+            'code' => [
+                'required',
+                'string',
+                'max:100',
+                Rule::unique(
+                    'social_services',
+                    'code'
+                )->ignore($service?->id),
+            ],
+
+            'platform' => [
+                'required',
+                'in:facebook,instagram,tiktok,other',
+            ],
+
+            'category' => [
+                'required',
+                'string',
+                'max:100',
+            ],
+
+            'name' => [
+                'required',
+                'string',
+                'max:255',
+            ],
+
+            'description' => [
+                'nullable',
+                'string',
+                'max:5000',
+            ],
+
+            'min_quantity' => [
+                'required',
+                'integer',
+                'min:1',
+            ],
+
+            'max_quantity' => [
+                'required',
+                'integer',
+                'gte:min_quantity',
+            ],
+
+            'sell_price_per_1000' => [
+                'required',
+                'numeric',
+                'min:0',
+            ],
+
+            'is_active' => [
+                'required',
+                'boolean',
+            ],
+
+            'sort_order' => [
+                'nullable',
+                'integer',
+                'min:0',
+            ],
+        ]);
+    }
+}

@@ -265,6 +265,251 @@ export const adminService = {
     )
   },
 
+  async getSocialDashboard() {
+    return adminRequest(
+      () =>
+        apiClient.get(
+          '/admin/social/dashboard',
+          authOptions(),
+        ),
+    )
+  },
+
+  async getSocialProviders() {
+    return adminRequest(
+      () =>
+        apiClient.get(
+          '/admin/social/providers',
+          authOptions(),
+        ),
+    )
+  },
+
+  async updateSocialProvider(
+    id,
+    data,
+  ) {
+    return adminRequest(
+      () =>
+        apiClient.put(
+          `/admin/social/providers/${id}`,
+          data,
+          authOptions(),
+        ),
+    )
+  },
+
+  async testSocialProvider(id) {
+    return adminRequest(
+      () =>
+        apiClient.post(
+          `/admin/social/providers/${id}/test`,
+          undefined,
+          authOptions(),
+        ),
+    )
+  },
+
+  async syncSocialProvider(id) {
+    return adminRequest(
+      () =>
+        apiClient.post(
+          `/admin/social/providers/${id}/sync`,
+          undefined,
+          authOptions(),
+        ),
+    )
+  },
+
+  async getSocialServices(
+    platform = '',
+    search = '',
+  ) {
+    const params =
+      new URLSearchParams()
+
+    if (platform) {
+      params.set(
+        'platform',
+        platform,
+      )
+    }
+
+    if (search.trim()) {
+      params.set(
+        'search',
+        search.trim(),
+      )
+    }
+
+    const query =
+      params.toString()
+
+    return adminRequest(
+      () =>
+        apiClient.get(
+          `/admin/social/services${query ? `?${query}` : ''}`,
+          authOptions(),
+        ),
+    )
+  },
+
+  async getSocialProviderServices({
+    providerId = '',
+    mapped = '',
+    active = '',
+    search = '',
+    page = 1,
+    perPage = 50,
+  } = {}) {
+    const params =
+      new URLSearchParams()
+
+    params.set(
+      'page',
+      String(page),
+    )
+
+    params.set(
+      'per_page',
+      String(perPage),
+    )
+
+    if (providerId) {
+      params.set(
+        'provider_id',
+        String(providerId),
+      )
+    }
+
+    if (mapped !== '') {
+      params.set(
+        'mapped',
+        String(mapped),
+      )
+    }
+
+    if (active !== '') {
+      params.set(
+        'active',
+        String(active),
+      )
+    }
+
+    if (search.trim()) {
+      params.set(
+        'search',
+        search.trim(),
+      )
+    }
+
+    return adminRequest(
+      () =>
+        apiClient.get(
+          `/admin/social/provider-services?${params.toString()}`,
+          authOptions(),
+        ),
+    )
+  },
+
+  async updateSocialProviderService(
+    id,
+    data,
+  ) {
+    return adminRequest(
+      () =>
+        apiClient.patch(
+          `/admin/social/provider-services/${id}`,
+          data,
+          authOptions(),
+        ),
+    )
+  },
+
+  async mapSocialProviderService(
+    id,
+    data,
+  ) {
+    return adminRequest(
+      () =>
+        apiClient.post(
+          `/admin/social/provider-services/${id}/map`,
+          data,
+          authOptions(),
+        ),
+    )
+  },
+
+  async unmapSocialProviderService(
+    id,
+  ) {
+    return adminRequest(
+      () =>
+        apiClient.delete(
+          `/admin/social/provider-services/${id}/map`,
+          authOptions(),
+        ),
+    )
+  },
+
+  async createSocialService(data) {
+    return adminRequest(
+      () =>
+        apiClient.post(
+          '/admin/social/services',
+          data,
+          authOptions(),
+        ),
+    )
+  },
+
+  async updateSocialService(
+    id,
+    data,
+  ) {
+    return adminRequest(
+      () =>
+        apiClient.put(
+          `/admin/social/services/${id}`,
+          data,
+          authOptions(),
+        ),
+    )
+  },
+
+  async getSocialOrders(
+    status = '',
+    search = '',
+  ) {
+    const params =
+      new URLSearchParams()
+
+    if (status) {
+      params.set(
+        'status',
+        status,
+      )
+    }
+
+    if (search.trim()) {
+      params.set(
+        'search',
+        search.trim(),
+      )
+    }
+
+    const query =
+      params.toString()
+
+    return adminRequest(
+      () =>
+        apiClient.get(
+          `/admin/social/orders${query ? `?${query}` : ''}`,
+          authOptions(),
+        ),
+    )
+  },
+
   async getEvidence(id) {
     const token =
       getAdminToken()
@@ -328,6 +573,77 @@ export const adminService = {
 
     return response.blob()
   },
+
+  async updateSocialOrderStatus(
+    id,
+    status,
+  ) {
+    return adminRequest(
+      () =>
+        apiClient.patch(
+          `/admin/social/orders/${id}/status`,
+          { status },
+          authOptions(),
+        ),
+    )
+  },
+
+  async getSocialTopups({
+    status = '',
+    search = '',
+  } = {}) {
+    const params =
+      new URLSearchParams()
+
+    if (status) {
+      params.set('status', status)
+    }
+
+    if (search.trim()) {
+      params.set(
+        'search',
+        search.trim(),
+      )
+    }
+
+    const query = params.toString()
+
+    return adminRequest(
+      () =>
+        apiClient.get(
+          `/admin/social/topups${
+            query ? `?${query}` : ''
+          }`,
+          authOptions(),
+        ),
+    )
+  },
+
+  async approveSocialTopup(id) {
+    return adminRequest(
+      () =>
+        apiClient.post(
+          `/admin/social/topups/${id}/approve`,
+          undefined,
+          authOptions(),
+        ),
+    )
+  },
+
+  async rejectSocialTopup(
+    id,
+    note = '',
+  ) {
+    return adminRequest(
+      () =>
+        apiClient.post(
+          `/admin/social/topups/${id}/reject`,
+          { note },
+          authOptions(),
+        ),
+    )
+  },
+
 }
 
 export default adminService

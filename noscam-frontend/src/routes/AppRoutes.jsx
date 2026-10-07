@@ -64,9 +64,27 @@ const AdminMediatorsPage = lazy(() =>
   ),
 )
 
+const AdminDashboardPage = lazy(() =>
+  import(
+    '../pages/Admin/AdminDashboardPage'
+  ),
+)
+
 const AdminLoginPage = lazy(() =>
   import(
     '../pages/Admin/AdminLoginPage'
+  ),
+)
+
+const AdminSocialPage = lazy(() =>
+  import(
+    '../pages/Admin/AdminSocialPage'
+  ),
+)
+
+const AdminSocialServicesPage = lazy(() =>
+  import(
+    '../pages/Admin/AdminSocialServicesPage'
   ),
 )
 
@@ -100,6 +118,14 @@ function RouteLoading() {
     </div>
   )
 }
+
+const AdminSocialOrdersPage = lazy(() =>
+  import('../pages/Admin/AdminSocialOrdersPage')
+)
+
+const AdminSocialTopupsPage = lazy(() =>
+  import('../pages/Admin/AdminSocialTopupsPage')
+)
 
 function AppRoutes() {
   return (
@@ -159,10 +185,55 @@ function AppRoutes() {
         />
 
         <Route
+          path="/admin"
+          element={
+            <ProtectedAdminRoute>
+              <AdminDashboardPage />
+            </ProtectedAdminRoute>
+          }
+        />
+
+        <Route
           path="/admin/mediators"
           element={
             <ProtectedAdminRoute>
               <AdminMediatorsPage />
+            </ProtectedAdminRoute>
+          }
+        />
+
+        <Route
+          path="/admin/social"
+          element={
+            <ProtectedAdminRoute>
+              <AdminSocialPage />
+            </ProtectedAdminRoute>
+          }
+        />
+
+        <Route
+          path="/admin/social/services"
+          element={
+            <ProtectedAdminRoute>
+              <AdminSocialServicesPage />
+            </ProtectedAdminRoute>
+          }
+        />
+
+        <Route
+          path="/admin/social/orders"
+          element={
+            <ProtectedAdminRoute>
+              <AdminSocialOrdersPage />
+            </ProtectedAdminRoute>
+          }
+        />
+
+        <Route
+          path="/admin/social/topups"
+          element={
+            <ProtectedAdminRoute>
+              <AdminSocialTopupsPage />
             </ProtectedAdminRoute>
           }
         />
