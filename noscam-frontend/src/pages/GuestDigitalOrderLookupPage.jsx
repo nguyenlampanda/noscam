@@ -1,0 +1,325 @@
+import { useState } from 'react'
+import { Link } from 'react-router-dom'
+import customerService from '../services/customerService'
+import BankTransferQR from '../components/digital/BankTransferQR'
+
+function money(value) {
+  return Number(value).toLocaleString('vi-VN') + ' ₫'
+}
+
+const statusLabels = {
+  pending: 'Chờ xử lý',
+  processing: 'Đang xử lý',
+  completed: 'Hoàn thành',
+  cancelled: 'Đã hủy',
+}
+
+const paymentLabels = {
+  unpaid: 'Chưa thanh toán',
+  paid: 'Đã thanh toán',
+}
+
+function getLookupTimestamp() {
+  return Date.now()
+}
+
+export default function GuestDigitalOrderLookupPage() {
+  const [orderId, setOrderId] = useState('')
+  const [lookupToken, setLookupToken] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [result, setResult] = useState(null)
+  const [respondingQuote, setRespondingQuote] = useState(false)
+  const [quoteMessage, setQuoteMessage] = useState('')
+  const [quoteError, setQuoteError] = useState('')
+  const [quoteNeedsRefresh, setQuoteNeedsRefresh] = useState(false)
+  const [checkedAt, setCheckedAt] = useState(0)
+
+  async function lookup(event) {
+    event.preventDefault()
+
+    if (loading || respondingQuote) return
+
+    setLoading(true)
+    setError('')
+    setResult(null)
+    setQuoteMessage('')
+    setQuoteError('')
+    setQuoteNeedsRefresh(false)
+
+    try {
+      const response = await customerService.lookupGuestDigitalOrder(
+        orderId.trim(),
+        lookupToken.trim()
+      )
+
+      if (!response?.data?.id) {
+        throw new Error('Dữ liệu đơn hàng không hợp lệ.')
+      }
+
+      setCheckedAt(getLookupTimestamp())
+      setResult(response)
+    } catch (err) {
+      setError(
+        err?.status === 404
+          ? 'Không tìm thấy đơn hàng. Vui lòng kiểm tra mã đơn và mã bí mật.'
+          : err?.message || 'Không thể tra cứu đơn hàng.'
+      )
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function respondToQuote(quote, action) {
+    if (
+      respondingQuote ||
+      loading ||
+      quoteNeedsRefresh ||
+      !result?.data?.id ||
+      quote.status !== 'pending'
+    ) return
+
+    const question = action === 'accept'
+      ? `Chấp nhận báo giá ${money(quote.amount_vnd)}?`
+      : 'Bạn xác nhận từ chối báo giá này?'
+
+    if (!window.confirm(question)) return
+
+    const currentOrderId = result.data.id
+    const currentToken = lookupToken.trim()
+
+    setRespondingQuote(true)
+    setQuoteError('')
+    setQuoteMessage('')
+
+    let responseConfirmed = false
+
+    try {
+      await customerService.respondGuestDigitalQuote(
+        currentOrderId,
+        quote.id,
+        currentToken,
+        action,
+      )
+
+      responseConfirmed = true
+
+      const refreshed = await customerService.lookupGuestDigitalOrder(
+        String(currentOrderId),
+        currentToken,
+      )
+
+      if (!refreshed?.data?.id) {
+        throw new Error('Không thể xác nhận dữ liệu đơn hàng mới.')
+      }
+
+      setCheckedAt(getLookupTimestamp())
+      setResult(refreshed)
+      setQuoteNeedsRefresh(false)
+      setQuoteMessage(
+        action === 'accept'
+          ? 'Đã chấp nhận báo giá. Vui lòng kiểm tra thông tin thanh toán bên dưới.'
+          : 'Đã từ chối báo giá.',
+      )
+    } catch (err) {
+      setQuoteNeedsRefresh(true)
+      setQuoteError(
+        responseConfirmed
+          ? 'API đã xác nhận phản hồi, nhưng chưa tải lại được đơn. Hãy tra cứu lại để kiểm tra.'
+          : err?.status && err.status < 500
+            ? err?.message || 'Không thể phản hồi báo giá. Hãy tra cứu lại trạng thái.'
+            : 'Chưa xác định được kết quả phản hồi. Hãy tra cứu lại trước khi thao tác tiếp.',
+      )
+    } finally {
+      setRespondingQuote(false)
+    }
+  }
+
+  const order = result?.data
+
+  return (
+    <main className="min-h-screen bg-slate-50 px-4 py-10">
+      <div className="mx-auto max-w-2xl">
+        <Link
+          to="/digital-services"
+          className="text-sm font-bold text-blue-700"
+        >
+          ← Danh sách dịch vụ
+        </Link>
+
+        <section className="mt-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+          <h1 className="text-2xl font-extrabold text-slate-900">
+            Tra cứu đơn hàng không cần đăng nhập
+          </h1>
+
+          <p className="mt-3 text-sm leading-6 text-slate-600">
+            Nhập mã đơn hàng và mã tra cứu bí mật đã lưu khi đặt hàng.
+            Không chia sẻ mã bí mật với người khác.
+          </p>
+
+          <form onSubmit={lookup} className="mt-6 space-y-4">
+            <label className="block text-sm font-bold text-slate-700">
+              Mã đơn hàng
+              <input
+                value={orderId}
+                disabled={loading || respondingQuote}
+                onChange={event => {
+                  setOrderId(event.target.value)
+                  setResult(null)
+                }}
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]+"
+                required
+                maxLength={20}
+                placeholder="Ví dụ: 123"
+                className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3"
+              />
+            </label>
+
+            <label className="block text-sm font-bold text-slate-700">
+              Mã tra cứu bí mật
+              <input
+                value={lookupToken}
+                disabled={loading || respondingQuote}
+                onChange={event => {
+                  setLookupToken(event.target.value)
+                  setResult(null)
+                }}
+                type="password"
+                required
+                minLength={64}
+                maxLength={64}
+                pattern="[a-f0-9]{64}"
+                autoComplete="off"
+                spellCheck={false}
+                placeholder="Dán mã bí mật gồm 64 ký tự"
+                className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 font-mono text-sm"
+              />
+            </label>
+
+            {error && (
+              <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">
+                {error}
+              </p>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading || respondingQuote}
+              className="w-full rounded-xl bg-blue-600 px-5 py-3 font-bold text-white disabled:opacity-50"
+            >
+              {loading ? 'Đang tra cứu...' : 'Tra cứu đơn hàng'}
+            </button>
+          </form>
+        </section>
+
+        {order && (
+          <section className="mt-6 space-y-5 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+            <h2 className="text-xl font-extrabold text-slate-900">
+              Đơn hàng #{order.id}
+            </h2>
+
+            <dl className="space-y-3 text-sm">
+              <div>
+                <dt className="font-bold text-slate-600">Trạng thái đơn</dt>
+                <dd>{statusLabels[order.status] || order.status}</dd>
+              </div>
+
+              <div>
+                <dt className="font-bold text-slate-600">Thanh toán</dt>
+                <dd>{paymentLabels[order.payment_status] || order.payment_status}</dd>
+              </div>
+
+              <div>
+                <dt className="font-bold text-slate-600">Số tiền</dt>
+                <dd className="font-bold">
+                  {order.amount_vnd == null
+                    ? 'Đang chờ báo giá'
+                    : money(order.amount_vnd)}
+                </dd>
+              </div>
+            </dl>
+
+            {quoteMessage && (
+              <p role="status" className="rounded-xl bg-green-50 p-3 text-sm text-green-800">
+                {quoteMessage}
+              </p>
+            )}
+
+            {quoteError && (
+              <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">
+                {quoteError}
+              </p>
+            )}
+
+            {Array.isArray(result.quotes) && result.quotes.length > 0 && (
+              <div>
+                <h3 className="font-bold text-slate-900">Lịch sử báo giá</h3>
+                <div className="mt-3 space-y-3">
+                  {result.quotes.map(quote => (
+                    <div
+                      key={quote.id}
+                      className="rounded-xl border border-slate-200 p-4 text-sm"
+                    >
+                      <p className="font-bold">{money(quote.amount_vnd)}</p>
+                      <p className="mt-1 text-slate-600">
+                        {quote.description}
+                      </p>
+                      <p className="mt-1 text-slate-500">
+                        Trạng thái: {quote.status}
+                      </p>
+
+                      {quote.status === 'pending' &&
+                        order.pricing_type === 'quote' &&
+                        order.status === 'pending' &&
+                        order.payment_status === 'unpaid' &&
+                        order.amount_vnd == null &&
+                        (!quote.expires_at ||
+                          new Date(quote.expires_at).getTime() > checkedAt) && (
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              disabled={respondingQuote || loading || quoteNeedsRefresh}
+                              onClick={() => respondToQuote(quote, 'accept')}
+                              className="rounded-lg bg-blue-600 px-4 py-2 font-bold text-white disabled:opacity-50"
+                            >
+                              {respondingQuote ? 'Đang xử lý...' : 'Chấp nhận báo giá'}
+                            </button>
+                            <button
+                              type="button"
+                              disabled={respondingQuote || loading || quoteNeedsRefresh}
+                              onClick={() => respondToQuote(quote, 'reject')}
+                              className="rounded-lg border border-slate-300 px-4 py-2 font-bold text-slate-700 disabled:opacity-50"
+                            >
+                              Từ chối báo giá
+                            </button>
+                          </div>
+                        )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {order.payment_status === 'unpaid' &&
+              order.bank &&
+              order.bank_transfer_content &&
+              Number(order.amount_vnd) > 0 && (
+                <BankTransferQR
+                  bank={order.bank}
+                  amount={Number(order.amount_vnd)}
+                  content={order.bank_transfer_content}
+                />
+              )}
+
+            <p className="text-sm text-slate-500">
+              Chuyển khoản không tự động đánh dấu đã thanh toán.
+              Quản trị viên sẽ xác nhận sau khi đối soát ngân hàng.
+            </p>
+          </section>
+        )}
+      </div>
+    </main>
+  )
+}

@@ -1,0 +1,353 @@
+import { useCallback, useEffect, useState } from 'react'
+import AdminNav from '../../components/admin/AdminNav'
+import apiClient from '../../services/apiClient'
+import { getAdminToken } from '../../services/adminService'
+
+const endpoint = '/admin/digital/services'
+
+const emptyForm = {
+  code: '',
+  category: 'press_pr',
+  name: '',
+  description: '',
+  pricing_type: 'fixed',
+  price_vnd: '',
+  platform: 'other',
+  requirements: [],
+  is_active: false,
+  sort_order: 0,
+}
+
+function auth() {
+  const token = getAdminToken()
+  if (!token) throw new Error('Vui lòng đăng nhập Admin.')
+  return { headers: { Authorization: `Bearer ${token}` } }
+}
+
+function money(value) {
+  if (value === null || value === undefined) return 'Báo giá'
+  return `${Number(value).toLocaleString('vi-VN')}đ`
+}
+
+function normalizeList(response) {
+  const value = response?.data ?? response
+  if (Array.isArray(value)) return value
+  if (Array.isArray(value?.data)) return value.data
+  if (Array.isArray(value?.services)) return value.services
+  throw new Error('Định dạng danh sách API chưa được hỗ trợ.')
+}
+
+export default function AdminDigitalServicesPage() {
+  const [items, setItems] = useState([])
+  const [form, setForm] = useState(emptyForm)
+  const [editingId, setEditingId] = useState(null)
+  const [search, setSearch] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const [message, setMessage] = useState('')
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const response = await apiClient.get(endpoint, auth())
+      setItems(normalizeList(response))
+      setError('')
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    load()
+  }, [load])
+
+  function change(field, value) {
+    setForm(prev => ({ ...prev, [field]: value }))
+  }
+
+  function edit(item) {
+    setEditingId(item.id)
+    setForm({
+      code: item.code ?? '',
+      category: item.category ?? '',
+      name: item.name ?? '',
+      description: item.description ?? '',
+      pricing_type: item.pricing_type ?? 'fixed',
+      price_vnd: item.price_vnd ?? '',
+      platform: item.platform ?? '',
+      requirements: item.requirements ?? [],
+      is_active: Boolean(item.is_active),
+      sort_order: item.sort_order ?? 0,
+    })
+    setError('')
+    setMessage('')
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  function reset() {
+    setEditingId(null)
+    setForm({ ...emptyForm, requirements: [] })
+  }
+
+  async function save(event) {
+    event.preventDefault()
+    setError('')
+    setMessage('')
+
+    if (form.pricing_type === 'fixed' &&
+        (!Number.isFinite(Number(form.price_vnd)) ||
+         Number(form.price_vnd) <= 0)) {
+      setError('Giá cố định phải lớn hơn 0.')
+      return
+    }
+
+    const payload = {
+      ...form,
+      code: form.code.trim(),
+      name: form.name.trim(),
+      category: form.category.trim(),
+      description: form.description.trim(),
+      platform: form.platform.trim(),
+      sort_order: Number(form.sort_order),
+      price_vnd: form.pricing_type === 'fixed'
+        ? Number(form.price_vnd)
+        : null,
+    }
+
+    setSaving(true)
+    try {
+      if (editingId !== null) {
+        await apiClient.put(`${endpoint}/${editingId}`, payload, auth())
+      } else {
+        await apiClient.post(endpoint, payload, auth())
+      }
+      reset()
+      setMessage('Đã lưu dịch vụ thành công.')
+      await load()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function toggle(item) {
+    const next = !item.is_active
+    if (!window.confirm(
+      `${next ? 'Bật' : 'Tắt'} dịch vụ "${item.name}"?`
+    )) return
+
+    setError('')
+    setMessage('')
+    try {
+      await apiClient.patch(
+        `${endpoint}/${item.id}/status`,
+        { is_active: next },
+        auth()
+      )
+      setMessage('Đã cập nhật trạng thái dịch vụ.')
+      await load()
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+
+  const filtered = items.filter(item =>
+    `${item.code} ${item.name} ${item.category} ${item.platform}`
+      .toLocaleLowerCase('vi')
+      .includes(search.toLocaleLowerCase('vi'))
+  )
+
+  const fieldClass =
+    'w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm outline-none focus:border-blue-500'
+
+  return (
+    <div className="min-h-screen bg-slate-50">
+      <AdminNav />
+      <main className="mx-auto max-w-7xl space-y-6 px-5 py-8 lg:px-8">
+        <div>
+          <h1 className="text-2xl font-black text-slate-900">
+            Quản lý dịch vụ số
+          </h1>
+          <p className="mt-2 text-sm text-slate-500">
+            Quản lý dịch vụ PR, hỗ trợ tài khoản và các dịch vụ khác.
+            Dịch vụ mới mặc định tắt.
+          </p>
+        </div>
+
+        {error && (
+          <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+            {error}
+          </div>
+        )}
+        {message && (
+          <div role="status" className="rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-700">
+            {message}
+          </div>
+        )}
+
+        <form onSubmit={save} className="space-y-5 rounded-2xl border border-slate-200 bg-white p-6">
+          <h2 className="text-lg font-bold">
+            {editingId === null ? 'Thêm dịch vụ' : `Chỉnh sửa dịch vụ #${editingId}`}
+          </h2>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <label className="space-y-2 text-sm font-semibold">
+              <span>Mã dịch vụ</span>
+              <input className={fieldClass} required maxLength={100}
+                value={form.code}
+                onChange={e => change('code', e.target.value)} />
+            </label>
+
+            <label className="space-y-2 text-sm font-semibold">
+              <span>Tên dịch vụ</span>
+              <input className={fieldClass} required
+                value={form.name}
+                onChange={e => change('name', e.target.value)} />
+            </label>
+
+            <label className="space-y-2 text-sm font-semibold">
+              <span>Danh mục</span>
+              <select className={fieldClass} value={form.category}
+                onChange={e => change('category', e.target.value)}>
+                <option value="press_pr">Báo chí / PR</option>
+                <option value="account_support">Hỗ trợ tài khoản</option>
+                <option value="digital_other">Dịch vụ số khác</option>
+                {!['press_pr', 'account_support', 'digital_other'].includes(form.category) && (
+                  <option value={form.category}>{form.category}</option>
+                )}
+              </select>
+            </label>
+
+            <label className="space-y-2 text-sm font-semibold">
+              <span>Nền tảng</span>
+              <select className={fieldClass} value={form.platform}
+                onChange={e => change('platform', e.target.value)}>
+                <option value="other">Khác / Tổng hợp</option>
+                <option value="facebook">Facebook</option>
+                <option value="tiktok">TikTok</option>
+                <option value="instagram">Instagram</option>
+                <option value="website">Website</option>
+                {!['other', 'facebook', 'tiktok', 'instagram', 'website'].includes(form.platform) && (
+                  <option value={form.platform}>{form.platform}</option>
+                )}
+              </select>
+            </label>
+
+            <label className="space-y-2 text-sm font-semibold">
+              <span>Hình thức giá</span>
+              <select className={fieldClass} value={form.pricing_type}
+                onChange={e => change('pricing_type', e.target.value)}>
+                <option value="fixed">Giá cố định</option>
+                <option value="quote">Yêu cầu báo giá</option>
+              </select>
+            </label>
+
+            <label className="space-y-2 text-sm font-semibold">
+              <span>Giá (VNĐ)</span>
+              <input type="number" min="0" step="1"
+                className={fieldClass}
+                disabled={form.pricing_type === 'quote'}
+                required={form.pricing_type === 'fixed'}
+                value={form.pricing_type === 'quote' ? '' : form.price_vnd}
+                onChange={e => change('price_vnd', e.target.value)} />
+            </label>
+
+            <label className="space-y-2 text-sm font-semibold">
+              <span>Thứ tự hiển thị</span>
+              <input type="number" min="0" className={fieldClass}
+                value={form.sort_order}
+                onChange={e => change('sort_order', e.target.value)} />
+            </label>
+
+            <label className="flex items-center gap-3 text-sm font-semibold">
+              <input type="checkbox" checked={form.is_active}
+                onChange={e => change('is_active', e.target.checked)} />
+              Bật hiển thị cho khách hàng
+            </label>
+          </div>
+
+          <label className="block space-y-2 text-sm font-semibold">
+            <span>Mô tả dịch vụ</span>
+            <textarea rows={4} className={fieldClass}
+              value={form.description}
+              onChange={e => change('description', e.target.value)} />
+          </label>
+
+          <p className="text-xs text-slate-500">
+            Cấu hình yêu cầu thông tin khách hàng sẽ được bổ sung ở bước tiếp theo.
+            Khi chỉnh sửa, dữ liệu yêu cầu hiện có được giữ nguyên.
+          </p>
+
+          <div className="flex flex-wrap gap-3">
+            <button disabled={saving} type="submit"
+              className="rounded-xl bg-blue-600 px-5 py-3 text-sm font-bold text-white disabled:opacity-50">
+              {saving ? 'Đang lưu...' : editingId === null ? 'Thêm dịch vụ' : 'Lưu thay đổi'}
+            </button>
+            {editingId !== null && (
+              <button type="button" onClick={reset}
+                className="rounded-xl border border-slate-200 px-5 py-3 text-sm font-semibold">
+                Hủy chỉnh sửa
+              </button>
+            )}
+          </div>
+        </form>
+
+        <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-lg font-bold">Danh sách dịch vụ ({items.length})</h2>
+            <button type="button" onClick={load}
+              className="rounded-xl border px-4 py-2 text-sm font-semibold">
+              Tải lại
+            </button>
+          </div>
+
+          <input className={fieldClass}
+            placeholder="Tìm theo tên, mã, danh mục, nền tảng..."
+            value={search}
+            onChange={e => setSearch(e.target.value)} />
+
+          {loading ? (
+            <p className="text-sm text-slate-500">Đang tải dữ liệu...</p>
+          ) : filtered.length === 0 ? (
+            <p className="text-sm text-slate-500">Không có dịch vụ phù hợp.</p>
+          ) : (
+            <div className="space-y-3">
+              {filtered.map(item => (
+                <article key={item.id}
+                  className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-slate-200 p-4">
+                  <div className="min-w-0">
+                    <h3 className="font-bold text-slate-900">{item.name}</h3>
+                    <p className="mt-1 break-all text-xs text-slate-500">
+                      {item.code} · {item.category} · {item.platform}
+                    </p>
+                    <p className="mt-2 text-sm font-semibold">
+                      {item.pricing_type === 'quote'
+                        ? 'Liên hệ báo giá'
+                        : money(item.price_vnd)}
+                      {' · '}
+                      {item.is_active ? 'Đang bật' : 'Đang tắt'}
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button type="button" onClick={() => edit(item)}
+                      className="rounded-lg border px-4 py-2 text-sm font-semibold">
+                      Sửa
+                    </button>
+                    <button type="button" onClick={() => toggle(item)}
+                      className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white">
+                      {item.is_active ? 'Tắt' : 'Bật'}
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
+      </main>
+    </div>
+  )
+}

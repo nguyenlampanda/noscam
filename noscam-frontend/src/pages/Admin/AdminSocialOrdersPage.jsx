@@ -9,6 +9,7 @@ import AdminNav from '../../components/admin/AdminNav'
 import SocialAdminNav from '../../components/admin/social/SocialAdminNav'
 import PlatformIcon from '../../components/social/PlatformIcon'
 import adminService from '../../services/adminService'
+import SocialOrderAuditModal from '../../components/admin/social/SocialOrderAuditModal'
 
 function money(value) {
   return `${Math.round(
@@ -155,6 +156,14 @@ export default function AdminSocialOrdersPage() {
   const [page, setPage] =
     useState(1)
 
+  const [auditOnly, setAuditOnly] =
+    useState(false)
+
+  const [auditCount, setAuditCount] =
+    useState(0)
+
+  const [auditOrder, setAuditOrder] = useState(null)
+
   const [busyId, setBusyId] =
     useState(null)
 
@@ -163,6 +172,21 @@ export default function AdminSocialOrdersPage() {
     setCancelOrder,
   ] = useState(null)
 
+  const loadAuditCount = useCallback(async () => {
+    try {
+      const response =
+        await adminService.getSocialAuditOrders()
+
+      const payload = response?.data?.data
+        ? response.data
+        : response
+
+      setAuditCount(Number(payload?.total || 0))
+    } catch {
+      setAuditCount(0)
+    }
+  }, [])
+
   const load = useCallback(
     async () => {
       setLoading(true)
@@ -170,12 +194,13 @@ export default function AdminSocialOrdersPage() {
 
       try {
         const response =
-          await adminService
-            .getSocialOrders({
-              search,
-              status,
-              page,
-            })
+          await (auditOnly
+            ? adminService.getSocialAuditOrders({ page })
+            : adminService.getSocialOrders({
+                search,
+                status,
+                page,
+              }))
 
         const payload =
           response?.data?.data
@@ -206,7 +231,7 @@ export default function AdminSocialOrdersPage() {
         setLoading(false)
       }
     },
-    [page, search, status],
+    [auditOnly, page, search, status],
   )
 
   useEffect(() => {
@@ -216,6 +241,10 @@ export default function AdminSocialOrdersPage() {
     return () =>
       clearTimeout(timer)
   }, [load])
+
+  useEffect(() => {
+    loadAuditCount()
+  }, [loadAuditCount])
 
   async function confirmCancel() {
     if (!cancelOrder?.id) return
@@ -232,6 +261,7 @@ export default function AdminSocialOrdersPage() {
       setCancelOrder(null)
 
       await load()
+      await loadAuditCount()
     } catch (err) {
       setError(
         err?.data?.message ||
@@ -304,6 +334,30 @@ export default function AdminSocialOrdersPage() {
               ),
             )}
           </select>
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={() => {
+              setAuditOnly((value) => !value)
+              setPage(1)
+            }}
+            className={`rounded-2xl border px-5 py-3 text-sm font-black transition ${
+              auditOnly
+                ? 'border-amber-500 bg-amber-500 text-white shadow-lg shadow-amber-100'
+                : 'border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100'
+            }`}
+          >
+            Cần đối soát ({auditCount})
+          </button>
+
+          {auditOnly && (
+            <span className="text-xs font-semibold text-amber-700">
+              Các đơn đã thử gửi API nhưng chưa xác định kết quả.
+              Không tự gửi lại hoặc hoàn tiền.
+            </span>
+          )}
         </div>
 
         <div className="mt-5 flex items-center justify-between">
@@ -606,6 +660,14 @@ export default function AdminSocialOrdersPage() {
                         </td>
 
                         <td className="px-5 py-4">
+                          <div className="flex flex-col items-start gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setAuditOrder(item)}
+                              className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-2 text-xs font-black text-blue-700 transition hover:bg-blue-600 hover:text-white"
+                            >
+                              Đối soát
+                            </button>
                           {canCancel(item) ? (
                             <button
                               type="button"
@@ -627,6 +689,7 @@ export default function AdminSocialOrdersPage() {
                               —
                             </span>
                           )}
+                          </div>
                         </td>
                       </tr>
                     )
@@ -681,6 +744,13 @@ export default function AdminSocialOrdersPage() {
         </div>
       </main>
 
+      {auditOrder && (
+        <SocialOrderAuditModal
+          order={auditOrder}
+          onClose={() => setAuditOrder(null)}
+        />
+      )}
+
       {cancelOrder &&
         createPortal(
           <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-slate-950/60 p-4">
@@ -690,14 +760,14 @@ export default function AdminSocialOrdersPage() {
               </div>
 
               <h2 className="mt-5 text-2xl font-black text-slate-950">
-                {cancelOrder.provider_order_id
-                  ? 'Yêu cầu hủy đơn hàng?'
+                {(cancelOrder.provider_order_id || Number(cancelOrder.attempts || 0) >= 1)
+                  ? 'Kiểm tra trạng thái trước khi hủy?'
                   : 'Hủy đơn & hoàn tiền?'}
               </h2>
 
               <p className="mt-2 text-sm leading-6 text-slate-500">
-                {cancelOrder.provider_order_id
-                  ? 'Đơn đã được gửi đến nhà cung cấp. Tiền chỉ được hoàn sau khi nhà cung cấp xác nhận hủy.'
+                {(cancelOrder.provider_order_id || Number(cancelOrder.attempts || 0) >= 1)
+                  ? 'Đơn đã thử gửi API. Không được hoàn tiền trước khi xác minh kết quả với Provider.'
                   : 'Đơn chưa được gửi đến nhà cung cấp. Khi hủy, toàn bộ số tiền của đơn sẽ được hoàn lại vào ví khách hàng.'}
               </p>
 
@@ -742,7 +812,7 @@ export default function AdminSocialOrdersPage() {
                   </span>
                 </div>
 
-                {!cancelOrder.provider_order_id && (
+                {!cancelOrder.provider_order_id && Number(cancelOrder.attempts || 0) === 0 && (
                   <div className="flex items-center justify-between gap-4 bg-emerald-50 px-4 py-4">
                     <div>
                       <div className="text-sm font-black text-emerald-700">
@@ -773,7 +843,7 @@ export default function AdminSocialOrdersPage() {
                 )}
               </div>
 
-              {cancelOrder.provider_order_id && (
+              {(cancelOrder.provider_order_id || Number(cancelOrder.attempts || 0) >= 1) && (
                 <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4">
                   <div className="text-sm font-black text-amber-800">
                     Chưa hoàn tiền ngay

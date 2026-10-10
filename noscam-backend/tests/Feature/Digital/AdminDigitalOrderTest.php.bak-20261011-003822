@@ -1,0 +1,402 @@
+<?php
+
+namespace Tests\Feature\Digital;
+
+use App\Models\DigitalOrder;
+use App\Models\DigitalService;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Laravel\Sanctum\Sanctum;
+use Tests\TestCase;
+
+class AdminDigitalOrderTest extends TestCase
+{
+    use RefreshDatabase;
+
+    private function loginAs(string $role): User
+    {
+        $user = User::factory()->create(['role' => $role]);
+
+        Sanctum::actingAs($user);
+
+        return $user;
+    }
+
+    private function createOrder(): DigitalOrder
+    {
+        $customer = User::factory()->create([
+            'role' => 'user',
+        ]);
+
+        $service = DigitalService::create([
+            'code' => 'admin-order-test-' . uniqid(),
+            'category' => 'account_support',
+            'name' => 'Dịch vụ kiểm thử Admin',
+            'description' => 'Kiểm thử danh sách đơn',
+            'pricing_type' => 'fixed',
+            'price_vnd' => 150000,
+            'platform' => 'facebook',
+            'requirements' => [],
+            'is_active' => true,
+            'sort_order' => 0,
+        ]);
+
+        $order = new DigitalOrder();
+
+        $order->user_id = $customer->id;
+        $order->digital_service_id = $service->id;
+        $order->status = 'pending';
+        $order->pricing_type = 'fixed';
+        $order->amount_vnd = 150000;
+        $order->payment_status = 'unpaid';
+        $order->request_data = [
+            'details' => 'Yêu cầu kiểm thử',
+        ];
+        $order->customer_note = 'Ghi chú khách hàng';
+
+        $order->save();
+
+        return $order;
+    }
+
+    public function test_guest_cannot_view_admin_orders(): void
+    {
+        $this->getJson('/api/admin/digital/orders')
+            ->assertUnauthorized();
+
+        $this->getJson('/api/admin/digital/orders/1')
+            ->assertUnauthorized();
+    }
+
+    public function test_customer_cannot_view_admin_orders(): void
+    {
+        $order = $this->createOrder();
+
+        $this->loginAs('user');
+
+        $this->getJson('/api/admin/digital/orders')
+            ->assertForbidden();
+
+        $this->getJson(
+            "/api/admin/digital/orders/{$order->id}"
+        )->assertForbidden();
+    }
+
+    public function test_moderator_cannot_view_admin_orders(): void
+    {
+        $order = $this->createOrder();
+
+        $this->loginAs('moderator');
+
+        $this->getJson('/api/admin/digital/orders')
+            ->assertForbidden();
+
+        $this->getJson(
+            "/api/admin/digital/orders/{$order->id}"
+        )->assertForbidden();
+    }
+
+    public function test_admin_can_list_orders(): void
+    {
+        $order = $this->createOrder();
+
+        $this->loginAs('admin');
+
+        $this->getJson('/api/admin/digital/orders')
+            ->assertOk()
+            ->assertJsonPath('total', 1)
+            ->assertJsonPath('data.0.id', $order->id)
+            ->assertJsonPath('data.0.status', 'pending')
+            ->assertJsonPath(
+                'data.0.payment_status',
+                'unpaid'
+            );
+    }
+
+    public function test_admin_can_filter_and_search_orders(): void
+    {
+        $order = $this->createOrder();
+
+        $this->loginAs('admin');
+
+        $this->getJson(
+            '/api/admin/digital/orders?status=pending&payment_status=unpaid'
+        )
+            ->assertOk()
+            ->assertJsonPath('total', 1);
+
+        $this->getJson(
+            '/api/admin/digital/orders?status=completed'
+        )
+            ->assertOk()
+            ->assertJsonPath('total', 0);
+
+        $this->getJson(
+            '/api/admin/digital/orders?search=' . $order->id
+        )
+            ->assertOk()
+            ->assertJsonPath('total', 1);
+
+        $this->getJson(
+            '/api/admin/digital/orders?status=invalid'
+        )->assertUnprocessable();
+    }
+
+    public function test_admin_can_find_and_view_guest_order(): void
+    {
+        $order = $this->createOrder();
+
+        $order->user_id = null;
+        $order->guest_name = 'Khach Kiem Thu Digital';
+        $order->guest_phone = '0912345678';
+        $order->guest_email = 'guest-digital@example.test';
+        $order->guest_lookup_hash = hash('sha256', 'guest-admin-test-secret');
+        $order->save();
+
+        $this->loginAs('admin');
+
+        foreach ([
+            'Khach Kiem Thu',
+            '0912345678',
+            'guest-digital@example.test',
+        ] as $term) {
+            $this->getJson(
+                '/api/admin/digital/orders?search=' . urlencode($term)
+            )
+                ->assertOk()
+                ->assertJsonPath('total', 1)
+                ->assertJsonPath('data.0.id', $order->id)
+                ->assertJsonPath(
+                    'data.0.guest_name',
+                    'Khach Kiem Thu Digital'
+                )
+                ->assertJsonPath(
+                    'data.0.guest_phone',
+                    '0912345678'
+                );
+        }
+
+        $this->getJson(
+            "/api/admin/digital/orders/{$order->id}"
+        )
+            ->assertOk()
+            ->assertJsonPath(
+                'data.guest_email',
+                'guest-digital@example.test'
+            )
+            ->assertJsonPath('data.user_id', null);
+
+        $this->assertDatabaseHas('digital_orders', [
+            'id' => $order->id,
+            'payment_status' => 'unpaid',
+            'status' => 'pending',
+        ]);
+    }
+
+    public function test_admin_can_view_order_detail(): void
+    {
+        $order = $this->createOrder();
+
+        $this->loginAs('admin');
+
+        $this->getJson(
+            "/api/admin/digital/orders/{$order->id}"
+        )
+            ->assertOk()
+            ->assertJsonPath('data.id', $order->id)
+            ->assertJsonPath(
+                'data.customer_note',
+                'Ghi chú khách hàng'
+            )
+            ->assertJsonPath(
+                'data.service.name',
+                'Dịch vụ kiểm thử Admin'
+            );
+
+        $this->getJson('/api/admin/digital/orders/999999')
+            ->assertNotFound();
+    }
+
+    public function test_admin_reading_orders_does_not_change_payment(): void
+    {
+        $order = $this->createOrder();
+
+        $this->loginAs('admin');
+
+        $this->getJson('/api/admin/digital/orders')
+            ->assertOk();
+
+        $this->getJson(
+            "/api/admin/digital/orders/{$order->id}"
+        )->assertOk();
+
+        $this->assertDatabaseHas('digital_orders', [
+            'id' => $order->id,
+            'status' => 'pending',
+            'payment_status' => 'unpaid',
+            'amount_vnd' => 150000,
+        ]);
+    }
+
+    public function test_guest_cannot_update_order_status(): void
+    {
+        $order = $this->createOrder();
+
+        $this->patchJson(
+            "/api/admin/digital/orders/{$order->id}/status",
+            ['status' => 'processing']
+        )->assertUnauthorized();
+
+        $this->assertDatabaseHas('digital_orders', [
+            'id' => $order->id,
+            'status' => 'pending',
+        ]);
+
+        $this->assertDatabaseCount(
+            'digital_order_status_histories',
+            0
+        );
+    }
+
+    public function test_customer_and_moderator_cannot_update_status(): void
+    {
+        $order = $this->createOrder();
+
+        foreach (['user', 'moderator'] as $role) {
+            $this->loginAs($role);
+
+            $this->patchJson(
+                "/api/admin/digital/orders/{$order->id}/status",
+                ['status' => 'processing']
+            )->assertForbidden();
+        }
+
+        $this->assertDatabaseHas('digital_orders', [
+            'id' => $order->id,
+            'status' => 'pending',
+        ]);
+
+        $this->assertDatabaseCount(
+            'digital_order_status_histories',
+            0
+        );
+    }
+
+    public function test_admin_can_move_pending_order_to_processing(): void
+    {
+        $order = $this->createOrder();
+        $admin = $this->loginAs('admin');
+
+        $this->patchJson(
+            "/api/admin/digital/orders/{$order->id}/status",
+            [
+                'status' => 'processing',
+                'note' => 'Đã tiếp nhận yêu cầu.',
+            ]
+        )
+            ->assertOk()
+            ->assertJsonPath('data.status', 'processing');
+
+        $this->assertDatabaseHas('digital_orders', [
+            'id' => $order->id,
+            'status' => 'processing',
+            'payment_status' => 'unpaid',
+            'amount_vnd' => 150000,
+        ]);
+
+        $this->assertDatabaseHas(
+            'digital_order_status_histories',
+            [
+                'digital_order_id' => $order->id,
+                'admin_user_id' => $admin->id,
+                'old_status' => 'pending',
+                'new_status' => 'processing',
+                'note' => 'Đã tiếp nhận yêu cầu.',
+            ]
+        );
+    }
+
+    public function test_invalid_transition_does_not_create_history(): void
+    {
+        $order = $this->createOrder();
+        $this->loginAs('admin');
+
+        $this->patchJson(
+            "/api/admin/digital/orders/{$order->id}/status",
+            ['status' => 'completed']
+        )->assertUnprocessable();
+
+        $this->patchJson(
+            "/api/admin/digital/orders/{$order->id}/status",
+            ['status' => 'invalid']
+        )->assertUnprocessable();
+
+        $this->assertDatabaseHas('digital_orders', [
+            'id' => $order->id,
+            'status' => 'pending',
+        ]);
+
+        $this->assertDatabaseCount(
+            'digital_order_status_histories',
+            0
+        );
+    }
+
+    public function test_unpaid_order_cannot_be_completed(): void
+    {
+        $order = $this->createOrder();
+        $this->loginAs('admin');
+
+        $this->patchJson(
+            "/api/admin/digital/orders/{$order->id}/status",
+            ['status' => 'processing']
+        )->assertOk();
+
+        $this->patchJson(
+            "/api/admin/digital/orders/{$order->id}/status",
+            ['status' => 'completed']
+        )->assertUnprocessable();
+
+        $this->assertDatabaseHas('digital_orders', [
+            'id' => $order->id,
+            'status' => 'processing',
+            'payment_status' => 'unpaid',
+            'completed_at' => null,
+        ]);
+
+        $this->assertDatabaseCount(
+            'digital_order_status_histories',
+            1
+        );
+    }
+
+    public function test_cancelled_order_is_final_and_payment_unchanged(): void
+    {
+        $order = $this->createOrder();
+        $this->loginAs('admin');
+
+        $this->patchJson(
+            "/api/admin/digital/orders/{$order->id}/status",
+            ['status' => 'cancelled']
+        )->assertOk();
+
+        $this->patchJson(
+            "/api/admin/digital/orders/{$order->id}/status",
+            ['status' => 'processing']
+        )->assertUnprocessable();
+
+        $this->assertDatabaseHas('digital_orders', [
+            'id' => $order->id,
+            'status' => 'cancelled',
+            'payment_status' => 'unpaid',
+            'amount_vnd' => 150000,
+            'paid_at' => null,
+        ]);
+
+        $this->assertDatabaseCount(
+            'digital_order_status_histories',
+            1
+        );
+    }
+
+}

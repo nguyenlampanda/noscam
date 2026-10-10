@@ -1,0 +1,116 @@
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use App\Http\Controllers\Controller;
+use App\Models\DigitalOrder;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
+
+class AdminDigitalOrderController extends Controller
+{
+    private function authorizeAdmin(Request $request): void
+    {
+        abort_unless(
+            $request->user()?->isAdmin(),
+            403,
+            'Chỉ quản trị viên được truy cập đơn dịch vụ số.'
+        );
+    }
+
+    public function index(Request $request): JsonResponse
+    {
+        $this->authorizeAdmin($request);
+
+        $filters = $request->validate([
+            'status' => [
+                'sometimes',
+                Rule::in([
+                    'pending',
+                    'processing',
+                    'in_progress',
+                    'completed',
+                    'cancelled',
+                    'rejected',
+                    'failed',
+                ]),
+            ],
+            'payment_status' => [
+                'sometimes',
+                Rule::in([
+                    'unpaid',
+                    'pending',
+                    'paid',
+                    'refunded',
+                ]),
+            ],
+            'search' => ['sometimes', 'string', 'max:100'],
+            'page' => ['sometimes', 'integer', 'min:1'],
+        ]);
+
+        $query = DigitalOrder::query()
+            ->with([
+                'service:id,code,name,category,platform',
+                'user:id,username',
+            ]);
+
+        if (!empty($filters['status'])) {
+            $query->where('status', $filters['status']);
+        }
+
+        if (!empty($filters['payment_status'])) {
+            $query->where(
+                'payment_status',
+                $filters['payment_status']
+            );
+        }
+
+        if (!empty($filters['search'])) {
+            $search = trim($filters['search']);
+
+            $query->where(function ($q) use ($search) {
+                if (ctype_digit($search)) {
+                    $q->whereKey((int) $search);
+                } else {
+                    $q->whereHas('user', function ($userQuery) use ($search) {
+                        $userQuery->where(
+                            'username',
+                            'like',
+                            '%' . $search . '%'
+                        );
+                    })->orWhereHas(
+                        'service',
+                        function ($serviceQuery) use ($search) {
+                            $serviceQuery->where(
+                                'name',
+                                'like',
+                                '%' . $search . '%'
+                            );
+                        }
+                    );
+                }
+            });
+        }
+
+        return response()->json(
+            $query->orderByDesc('id')->paginate(30)
+        );
+    }
+
+    public function show(
+        Request $request,
+        DigitalOrder $digitalOrder
+    ): JsonResponse {
+        $this->authorizeAdmin($request);
+
+        $digitalOrder->load([
+            'service:id,code,name,category,platform',
+            'user:id,username',
+        ]);
+
+        return response()->json([
+            'data' => $digitalOrder,
+        ]);
+    }
+}

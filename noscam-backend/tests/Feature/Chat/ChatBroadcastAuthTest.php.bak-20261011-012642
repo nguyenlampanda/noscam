@@ -1,0 +1,103 @@
+<?php
+
+namespace Tests\Feature\Chat;
+
+use App\Models\ChatConversation;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Laravel\Sanctum\Sanctum;
+use Tests\TestCase;
+
+class ChatBroadcastAuthTest extends TestCase
+{
+    use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // Dùng Reverb để kiểm tra quyền private channel thật sự.
+        // Chỉ áp dụng cho file test này.
+        config([
+            'broadcasting.default' => 'reverb',
+            'broadcasting.connections.reverb.key' => 'test-reverb-key',
+            'broadcasting.connections.reverb.secret' => 'test-reverb-secret',
+            'broadcasting.connections.reverb.app_id' => 'test-reverb-app',
+        ]);
+
+        app()->forgetInstance('broadcast.manager');
+    }
+
+    private function conversation(): ChatConversation
+    {
+        $customer = User::factory()->create(['role' => 'user']);
+
+        return ChatConversation::create([
+            'customer_id' => $customer->id,
+        ]);
+    }
+
+    private function authorizeChannel(int $conversationId)
+    {
+        return $this->postJson('/api/broadcasting/auth', [
+            'socket_id' => '1234.5678',
+            'channel_name' => 'private-chat.'.$conversationId,
+        ]);
+    }
+
+    public function test_guest_cannot_authorize_chat_channel(): void
+    {
+        $conversation = $this->conversation();
+
+        $this->authorizeChannel($conversation->id)
+            ->assertUnauthorized();
+    }
+
+    public function test_customer_can_authorize_own_channel(): void
+    {
+        $conversation = $this->conversation();
+
+        Sanctum::actingAs($conversation->customer);
+
+        $this->authorizeChannel($conversation->id)
+            ->assertOk();
+    }
+
+    public function test_customer_cannot_authorize_other_channel(): void
+    {
+        $conversation = $this->conversation();
+
+        $otherCustomer = User::factory()->create([
+            'role' => 'user',
+        ]);
+
+        Sanctum::actingAs($otherCustomer);
+
+        $this->authorizeChannel($conversation->id)
+            ->assertForbidden();
+    }
+
+    public function test_admin_can_authorize_chat_channel(): void
+    {
+        $conversation = $this->conversation();
+
+        Sanctum::actingAs(
+            User::factory()->create(['role' => 'admin'])
+        );
+
+        $this->authorizeChannel($conversation->id)
+            ->assertOk();
+    }
+
+    public function test_moderator_cannot_authorize_chat_channel(): void
+    {
+        $conversation = $this->conversation();
+
+        Sanctum::actingAs(
+            User::factory()->create(['role' => 'moderator'])
+        );
+
+        $this->authorizeChannel($conversation->id)
+            ->assertForbidden();
+    }
+}

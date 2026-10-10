@@ -17,6 +17,10 @@ use App\Http\Controllers\Api\SearchController;
 use App\Http\Controllers\Api\AdminSocialCustomerController;
 use App\Http\Controllers\Api\AdminSocialDashboardController;
 use App\Http\Controllers\Api\AdminSocialOrderController;
+use App\Http\Controllers\Api\AdminSocialOrderAuditController;
+use App\Http\Controllers\Api\AdminSocialOrderReconciliationController;
+use App\Http\Controllers\Api\AdminSocialOrderReconciliationPreviewController;
+use App\Http\Controllers\Api\AdminSocialOrderResolutionController;
 use App\Http\Controllers\Api\AdminSocialProviderController;
 use App\Http\Controllers\Api\AdminSocialServiceController;
 use App\Http\Controllers\Api\AdminWalletTopupController;
@@ -26,6 +30,23 @@ use App\Http\Controllers\Api\SocialServiceController;
 use App\Http\Controllers\Api\SocialOrderController;
 use App\Http\Controllers\Api\CustomerProfileController;
 use Illuminate\Support\Facades\Route;
+
+/*
+|--------------------------------------------------------------------------
+| Public Digital Services
+|--------------------------------------------------------------------------
+*/
+
+Route::get(
+    '/digital/services',
+    [\App\Http\Controllers\Api\PublicDigitalServiceController::class, 'index']
+)->middleware('throttle:public-search');
+
+Route::get(
+    '/digital/services/{digitalService}',
+    [\App\Http\Controllers\Api\PublicDigitalServiceController::class, 'show']
+)->whereNumber('digitalService')
+  ->middleware('throttle:public-search');
 
 /*
 |--------------------------------------------------------------------------
@@ -141,6 +162,24 @@ Route::get(
 */
 
 Route::post(
+    '/digital/guest/orders/{orderId}/lookup',
+    [\App\Http\Controllers\Api\GuestDigitalOrderController::class, 'show']
+)->whereNumber('orderId')->middleware('throttle:customer-auth');
+
+Route::post(
+    '/digital/guest/orders',
+    [\App\Http\Controllers\Api\GuestDigitalOrderController::class, 'store']
+)->middleware('throttle:customer-auth');
+
+Route::post(
+    '/digital/guest/orders/{orderId}/quotes/{quoteId}/respond',
+    [\App\Http\Controllers\Api\GuestDigitalOrderController::class, 'respondToQuote']
+)->whereNumber('orderId')
+  ->whereNumber('quoteId')
+  ->middleware('throttle:customer-auth');
+
+
+Route::post(
     '/auth/register',
     [CustomerAuthController::class, 'register']
 )->middleware('throttle:customer-auth');
@@ -204,6 +243,32 @@ Route::middleware([
         '/wallet/topups',
         [WalletController::class, 'createTopup']
     );
+
+    Route::get(
+        '/digital/orders',
+        [\App\Http\Controllers\Api\DigitalOrderController::class, 'index']
+    );
+
+    Route::post(
+        '/digital/orders',
+        [\App\Http\Controllers\Api\DigitalOrderController::class, 'store']
+    );
+
+
+    Route::post(
+        '/digital/orders/{digitalOrder}/quotes/{quote}/respond',
+        [\App\Http\Controllers\Api\DigitalOrderController::class, 'respondToQuote']
+    )->whereNumber('digitalOrder')->whereNumber('quote');
+
+    Route::post(
+        '/digital/orders/{digitalOrder}/pay-wallet',
+        [\App\Http\Controllers\Api\DigitalOrderPaymentController::class, 'payWithWallet']
+    )->whereNumber('digitalOrder');
+
+    Route::get(
+        '/digital/orders/{digitalOrder}',
+        [\App\Http\Controllers\Api\DigitalOrderController::class, 'show']
+    )->whereNumber('digitalOrder');
 
     Route::get(
         '/social/orders',
@@ -469,8 +534,38 @@ Route::prefix('admin')
         );
 
         Route::get(
+            '/social/orders/audit',
+            [AdminSocialOrderController::class, 'audit']
+        );
+
+        Route::get(
             '/social/orders/{order}',
             [AdminSocialOrderController::class, 'show']
+        );
+
+        Route::get(
+            '/social/orders/{order}/audits',
+            [AdminSocialOrderAuditController::class, 'index']
+        );
+
+        Route::post(
+            '/social/orders/{order}/audits',
+            [AdminSocialOrderAuditController::class, 'store']
+        );
+
+        Route::get(
+            '/social/orders/{order}/resolutions',
+            [AdminSocialOrderResolutionController::class, 'index']
+        );
+
+        Route::get(
+            '/social/orders/{order}/reconcile-preview',
+            [AdminSocialOrderReconciliationPreviewController::class, 'show']
+        );
+
+        Route::post(
+            '/social/orders/{order}/reconcile',
+            [AdminSocialOrderReconciliationController::class, 'resolve']
         );
 
         Route::post(
@@ -520,6 +615,66 @@ Route::prefix('admin')
 
         /*
         |--------------------------------------------------------------------------
+        | Digital Services
+        |--------------------------------------------------------------------------
+        */
+
+        Route::get(
+            '/digital/services',
+            [\App\Http\Controllers\Api\AdminDigitalServiceController::class, 'index']
+        );
+
+        Route::post(
+            '/digital/services',
+            [\App\Http\Controllers\Api\AdminDigitalServiceController::class, 'store']
+        );
+
+        Route::put(
+            '/digital/services/{digitalService}',
+            [\App\Http\Controllers\Api\AdminDigitalServiceController::class, 'update']
+        );
+
+        Route::patch(
+            '/digital/services/{digitalService}/status',
+            [\App\Http\Controllers\Api\AdminDigitalServiceController::class, 'status']
+        );
+
+        /*
+        |--------------------------------------------------------------------------
+        | Digital Orders
+        |--------------------------------------------------------------------------
+        */
+
+        Route::get(
+            '/digital/orders',
+            [\App\Http\Controllers\Api\AdminDigitalOrderController::class, 'index']
+        );
+
+        Route::get(
+            '/digital/orders/{digitalOrder}',
+            [\App\Http\Controllers\Api\AdminDigitalOrderController::class, 'show']
+        )->whereNumber('digitalOrder');
+
+
+        Route::post(
+            '/digital/orders/{digitalOrder}/quotes',
+            [\App\Http\Controllers\Api\AdminDigitalOrderController::class, 'createQuote']
+        )->whereNumber('digitalOrder');
+
+        Route::patch(
+            '/digital/orders/{digitalOrder}/status',
+            [\App\Http\Controllers\Api\AdminDigitalOrderController::class, 'updateStatus']
+        )->whereNumber('digitalOrder');
+
+        Route::post(
+            '/digital/orders/{digitalOrder}/confirm-bank-payment',
+            [\App\Http\Controllers\Api\AdminDigitalBankPaymentController::class, 'confirm']
+        )->whereNumber('digitalOrder');
+
+
+
+        /*
+        |--------------------------------------------------------------------------
         | Evidence
         |--------------------------------------------------------------------------
         */
@@ -532,3 +687,72 @@ Route::prefix('admin')
             ]
         );
     });
+
+
+/*
+|--------------------------------------------------------------------------
+| CHAT API ROUTES
+|--------------------------------------------------------------------------
+*/
+
+\Illuminate\Support\Facades\Route::middleware([
+    'auth:sanctum',
+    'throttle:customer-api',
+])->group(function () {
+    \Illuminate\Support\Facades\Route::get(
+        '/chat/messages',
+        [\App\Http\Controllers\Api\ChatController::class, 'customerMessages']
+    );
+
+    \Illuminate\Support\Facades\Route::post(
+        '/chat/messages',
+        [\App\Http\Controllers\Api\ChatController::class, 'customerSend']
+    );
+
+    \Illuminate\Support\Facades\Route::post(
+        '/chat/read',
+        [\App\Http\Controllers\Api\ChatController::class, 'customerRead']
+    );
+});
+
+\Illuminate\Support\Facades\Route::prefix('admin/chat')
+    ->middleware([
+        'auth:sanctum',
+        'moderator',
+        'throttle:admin-api',
+    ])
+    ->group(function () {
+        \Illuminate\Support\Facades\Route::get(
+            '/conversations',
+            [\App\Http\Controllers\Api\ChatController::class, 'adminConversations']
+        );
+
+        \Illuminate\Support\Facades\Route::get(
+            '/conversations/{conversation}/messages',
+            [\App\Http\Controllers\Api\ChatController::class, 'adminMessages']
+        );
+
+        \Illuminate\Support\Facades\Route::post(
+            '/conversations/{conversation}/messages',
+            [\App\Http\Controllers\Api\ChatController::class, 'adminSend']
+        );
+
+        \Illuminate\Support\Facades\Route::post(
+            '/conversations/{conversation}/read',
+            [\App\Http\Controllers\Api\ChatController::class, 'adminRead']
+        );
+    });
+
+
+/*
+|--------------------------------------------------------------------------
+| NOScam private broadcasting authentication
+|--------------------------------------------------------------------------
+*/
+\Illuminate\Support\Facades\Route::post(
+    '/broadcasting/auth',
+    [\Illuminate\Broadcasting\BroadcastController::class, 'authenticate']
+)->middleware([
+    'auth:sanctum',
+    'throttle:customer-api',
+]);

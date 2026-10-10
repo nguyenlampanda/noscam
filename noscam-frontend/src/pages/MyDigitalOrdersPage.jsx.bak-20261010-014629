@@ -1,0 +1,580 @@
+import { useEffect, useRef, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import customerService, {
+  getCustomerToken,
+} from '../services/customerService'
+import apiClient from '../services/apiClient'
+
+const statuses = {
+  pending: 'Chờ xử lý',
+  processing: 'Đang xử lý',
+  in_progress: 'Đang thực hiện',
+  completed: 'Hoàn thành',
+  cancelled: 'Đã hủy',
+  rejected: 'Từ chối',
+  failed: 'Thất bại',
+}
+
+const payments = {
+  unpaid: 'Chưa thanh toán',
+  paid: 'Đã thanh toán',
+  pending: 'Đang chờ thanh toán',
+  refunded: 'Đã hoàn tiền',
+}
+
+function dateTime(value) {
+  if (!value) return '—'
+  const date = new Date(value)
+  return Number.isNaN(date.getTime())
+    ? '—'
+    : date.toLocaleString('vi-VN')
+}
+
+function money(value) {
+  if (value === null || value === undefined) {
+    return 'Chờ báo giá'
+  }
+  return `${Number(value).toLocaleString('vi-VN')} ₫`
+}
+
+export default function MyDigitalOrdersPage() {
+  const navigate = useNavigate()
+  const dialogRef = useRef(null)
+  const detailRequestRef = useRef(0)
+  const [orders, setOrders] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [page, setPage] = useState(1)
+  const [lastPage, setLastPage] = useState(1)
+  const [selected, setSelected] = useState(null)
+  const [detailLoading, setDetailLoading] = useState(false)
+  const [detailError, setDetailError] = useState('')
+  const [quotes, setQuotes] = useState([])
+  const [responding, setResponding] = useState(false)
+  const [quoteError, setQuoteError] = useState('')
+  const [quoteSuccess, setQuoteSuccess] = useState('')
+  const [refreshKey, setRefreshKey] = useState(0)
+
+  useEffect(() => {
+    if (!getCustomerToken()) {
+      navigate('/login', {
+        replace: true,
+        state: { from: '/my-digital-orders' },
+      })
+      return
+    }
+
+    let active = true
+
+    setLoading(true)
+    setError('')
+
+    customerService.digitalOrders(page)
+      .then((response) => {
+        if (!active) return
+        setOrders(Array.isArray(response?.data) ? response.data : [])
+        setLastPage(Math.max(1, Number(response?.last_page) || 1))
+      })
+      .catch((err) => {
+        if (!active) return
+        setError(err?.message || 'Không tải được đơn dịch vụ số.')
+        if (err?.status === 401) {
+          navigate('/login', { replace: true })
+        }
+      })
+      .finally(() => {
+        if (active) setLoading(false)
+      })
+
+    return () => {
+      active = false
+    }
+  }, [navigate, page, refreshKey])
+
+  const dialogOpen = Boolean(selected || detailLoading || detailError)
+
+  function closeDetail() {
+    if (responding) return
+    detailRequestRef.current += 1
+    setSelected(null)
+    setQuotes([])
+    setQuoteError('')
+    setQuoteSuccess('')
+    setDetailError('')
+    setDetailLoading(false)
+  }
+
+  useEffect(() => {
+    if (!dialogOpen) return
+
+    const dialog = dialogRef.current
+    const previousFocus = document.activeElement
+    const previousOverflow = document.body.style.overflow
+
+    document.body.style.overflow = 'hidden'
+    dialog?.focus()
+
+    function handleKeyDown(event) {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        if (!responding) closeDetail()
+        return
+      }
+
+      if (event.key !== 'Tab' || !dialog) return
+
+      const focusable = Array.from(
+        dialog.querySelectorAll(
+          'button:not([disabled]), a[href], input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        )
+      )
+
+      if (focusable.length === 0) {
+        event.preventDefault()
+        dialog.focus()
+        return
+      }
+
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+
+      if (event.shiftKey && (document.activeElement === first || document.activeElement === dialog)) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault()
+        first.focus()
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown)
+      document.body.style.overflow = previousOverflow
+
+      if (previousFocus instanceof HTMLElement && previousFocus.isConnected) {
+        previousFocus.focus()
+      }
+    }
+  }, [dialogOpen, responding])
+
+  async function viewDetail(id) {
+    const requestId = ++detailRequestRef.current
+
+    setSelected(null)
+    setQuotes([])
+    setQuoteError('')
+    setQuoteSuccess('')
+    setDetailError('')
+    setDetailLoading(true)
+
+    try {
+      const response = await customerService.digitalOrder(id)
+
+      if (requestId !== detailRequestRef.current) return
+
+      setSelected(response?.data || null)
+      setQuotes(Array.isArray(response?.quotes) ? response.quotes : [])
+
+      if (!response?.data) {
+        setDetailError('Không tìm thấy thông tin đơn hàng.')
+      }
+    } catch (err) {
+      if (requestId !== detailRequestRef.current) return
+      setDetailError(err?.message || 'Không tải được chi tiết đơn.')
+    } finally {
+      if (requestId === detailRequestRef.current) {
+        setDetailLoading(false)
+      }
+    }
+  }
+
+  async function respondToQuote(quote, action) {
+    if (!selected || responding) return
+
+    const message = action === 'accept'
+      ? `Bạn xác nhận chấp nhận báo giá ${money(quote.amount_vnd)}?`
+      : 'Bạn xác nhận từ chối báo giá này?'
+
+    if (!window.confirm(message)) return
+
+    const orderId = selected.id
+    const requestId = detailRequestRef.current
+
+    setResponding(true)
+    setQuoteError('')
+    setQuoteSuccess('')
+
+    try {
+      await apiClient.post(
+        `/digital/orders/${orderId}/quotes/${quote.id}/respond`,
+        { action },
+        {
+          headers: {
+            Authorization: `Bearer ${getCustomerToken()}`,
+          },
+        },
+      )
+
+      const response = await customerService.digitalOrder(orderId)
+
+      if (requestId !== detailRequestRef.current) return
+
+      setSelected(response?.data || null)
+      setQuotes(Array.isArray(response?.quotes) ? response.quotes : [])
+      setQuoteSuccess(
+        action === 'accept'
+          ? 'Đã chấp nhận báo giá thành công.'
+          : 'Đã từ chối báo giá thành công.',
+      )
+      setRefreshKey((key) => key + 1)
+    } catch (err) {
+      if (requestId === detailRequestRef.current) {
+        setQuoteError(
+          err?.message || 'Không thể phản hồi báo giá. Vui lòng thử lại.',
+        )
+      }
+    } finally {
+      setResponding(false)
+    }
+  }
+
+  return (
+    <main className="min-h-screen bg-slate-50 px-4 py-10">
+      <div className="mx-auto max-w-5xl">
+        <div className="mb-7 flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <p className="text-sm font-bold text-blue-600">NoScam.vn</p>
+            <h1 className="mt-2 text-3xl font-black text-slate-950">
+              Đơn dịch vụ số của tôi
+            </h1>
+            <p className="mt-2 text-sm text-slate-500">
+              Theo dõi các yêu cầu đã gửi và trạng thái xử lý.
+            </p>
+          </div>
+
+          <Link
+            to="/digital-services"
+            className="rounded-xl bg-blue-600 px-5 py-3 text-sm font-bold text-white hover:bg-blue-700"
+          >
+            Xem dịch vụ số
+          </Link>
+        </div>
+
+        {error && (
+          <p role="alert" className="mb-5 rounded-xl bg-red-50 p-4 text-red-700">
+            {error}
+          </p>
+        )}
+
+        {loading ? (
+          <p className="rounded-2xl bg-white p-6">Đang tải đơn hàng...</p>
+        ) : orders.length === 0 && !error ? (
+          <div className="rounded-2xl border bg-white p-8 text-center">
+            Bạn chưa có đơn dịch vụ số nào.
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {orders.map((order) => (
+              <article
+                key={order.id}
+                className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-bold text-blue-600">
+                      Đơn #{order.id}
+                    </p>
+                    <h2 className="mt-1 text-lg font-bold text-slate-900">
+                      {order.service?.name || 'Dịch vụ số'}
+                    </h2>
+                    <p className="mt-2 text-sm text-slate-500">
+                      Ngày tạo: {dateTime(order.created_at)}
+                    </p>
+                    <p className="mt-2 text-sm text-slate-700">
+                      Giá trị: {money(order.amount_vnd)}
+                    </p>
+                    <p className="mt-1 text-sm text-slate-700">
+                      Xử lý: {statuses[order.status] || order.status}
+                    </p>
+                    <p className="mt-1 text-sm text-slate-700">
+                      Thanh toán: {payments[order.payment_status] || order.payment_status}
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => viewDetail(order.id)}
+                    disabled={detailLoading}
+                    className="rounded-xl border border-blue-200 px-4 py-2 text-sm font-bold text-blue-700 hover:bg-blue-50 disabled:opacity-50"
+                  >
+                    Xem chi tiết
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+
+        {!loading && lastPage > 1 && (
+          <div className="mt-6 flex items-center justify-center gap-4">
+            <button
+              type="button"
+              disabled={page <= 1}
+              onClick={() => setPage((p) => p - 1)}
+              className="rounded-xl border bg-white px-4 py-2 disabled:opacity-40"
+            >
+              Trang trước
+            </button>
+            <span className="text-sm text-slate-600">
+              {page} / {lastPage}
+            </span>
+            <button
+              type="button"
+              disabled={page >= lastPage}
+              onClick={() => setPage((p) => p + 1)}
+              className="rounded-xl border bg-white px-4 py-2 disabled:opacity-40"
+            >
+              Trang sau
+            </button>
+          </div>
+        )}
+
+        {dialogOpen && (
+          <div
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm"
+            onMouseDown={(event) => {
+              if (event.target === event.currentTarget) {
+                closeDetail()
+              }
+            }}
+          >
+            <section
+              ref={dialogRef}
+              tabIndex={-1}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="digital-order-dialog-title"
+              className="w-full max-w-xl overflow-hidden rounded-3xl bg-white shadow-2xl"
+            >
+              <div className="flex items-center justify-between border-b border-slate-100 px-6 py-5">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wider text-blue-600">
+                    NoScam.vn
+                  </p>
+                  <h2
+                    id="digital-order-dialog-title"
+                    className="mt-1 text-xl font-black text-slate-950"
+                  >
+                    Chi tiết đơn dịch vụ số
+                  </h2>
+                </div>
+
+                <button
+                  type="button"
+                  aria-label="Đóng popup"
+                  onClick={closeDetail}
+                  disabled={responding}
+                  className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-xl font-bold text-slate-600 hover:bg-slate-200"
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className="max-h-[70vh] overflow-y-auto px-6 py-5">
+                {detailLoading && (
+                  <p className="py-8 text-center text-slate-500">
+                    Đang tải chi tiết đơn hàng...
+                  </p>
+                )}
+
+                {detailError && (
+                  <p role="alert" className="rounded-xl bg-red-50 p-4 text-sm text-red-700">
+                    {detailError}
+                  </p>
+                )}
+
+                {selected && (
+                  <div className="space-y-5">
+                    <div className="rounded-2xl bg-blue-50 p-5">
+                      <p className="text-sm text-blue-700">
+                        Mã đơn hàng
+                      </p>
+                      <p className="mt-1 text-2xl font-black text-blue-900">
+                        #{selected.id}
+                      </p>
+                      <p className="mt-2 font-semibold text-slate-800">
+                        {selected.service?.name || 'Dịch vụ số'}
+                      </p>
+                    </div>
+
+                    <div className="grid gap-4 text-sm sm:grid-cols-2">
+                      <div>
+                        <p className="text-slate-500">Trạng thái xử lý</p>
+                        <p className="mt-1 font-bold text-slate-900">
+                          {statuses[selected.status] || selected.status}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-slate-500">Thanh toán</p>
+                        <p className="mt-1 font-bold text-slate-900">
+                          {payments[selected.payment_status] || selected.payment_status}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-slate-500">Số tiền</p>
+                        <p className="mt-1 font-bold text-slate-900">
+                          {money(selected.amount_vnd)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-slate-500">Ngày tạo</p>
+                        <p className="mt-1 font-bold text-slate-900">
+                          {dateTime(selected.created_at)}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="border-t border-slate-100 pt-5">
+                      <h3 className="mb-3 font-bold text-slate-900">
+                        Thông tin đã gửi
+                      </h3>
+
+                      <div className="space-y-3">
+                        {Object.entries(selected.request_data || {}).map(([key, value]) => (
+                          <div key={key} className="rounded-xl bg-slate-50 p-4 text-sm">
+                            <p className="break-all font-bold text-slate-700">
+                              {key}
+                            </p>
+                            <p className="mt-1 break-words text-slate-600">
+                              {String(value)}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {selected.pricing_type === 'quote' && (
+                      <div className="border-t border-slate-100 pt-5">
+                        <h3 className="mb-3 text-lg font-bold text-slate-900">
+                          Báo giá dịch vụ
+                        </h3>
+
+                        {quoteError && (
+                          <p role="alert" className="mb-3 rounded-xl bg-red-50 p-3 text-sm text-red-700">
+                            {quoteError}
+                          </p>
+                        )}
+
+                        {quoteSuccess && (
+                          <p role="status" className="mb-3 rounded-xl bg-green-50 p-3 text-sm text-green-700">
+                            {quoteSuccess}
+                          </p>
+                        )}
+
+                        {quotes.length === 0 ? (
+                          <p className="rounded-xl bg-slate-50 p-4 text-sm text-slate-600">
+                            Đơn hàng đang chờ Admin gửi báo giá.
+                          </p>
+                        ) : (
+                          <div className="space-y-4">
+                            {quotes.map((quote) => {
+                              const expired = quote.expires_at
+                                ? new Date(quote.expires_at).getTime() <= Date.now()
+                                : false
+
+                              const canRespond =
+                                quote.status === 'pending' &&
+                                !expired &&
+                                selected.status === 'pending' &&
+                                selected.payment_status === 'unpaid' &&
+                                selected.amount_vnd == null
+
+                              const quoteStatus =
+                                quote.status === 'accepted' ? 'Đã chấp nhận'
+                                  : quote.status === 'rejected' ? 'Đã từ chối'
+                                    : expired ? 'Đã hết hạn'
+                                      : 'Chờ phản hồi'
+
+                              return (
+                                <div key={quote.id} className="rounded-2xl border border-slate-200 p-4">
+                                  <p className="text-xl font-black text-blue-700">
+                                    {money(quote.amount_vnd)}
+                                  </p>
+                                  <p className="mt-2 text-sm font-semibold text-slate-700">
+                                    {quoteStatus}
+                                  </p>
+                                  {quote.description && (
+                                    <p className="mt-3 whitespace-pre-wrap break-words text-sm text-slate-600">
+                                      {quote.description}
+                                    </p>
+                                  )}
+                                  <p className="mt-3 text-xs text-slate-500">
+                                    Ngày gửi: {dateTime(quote.created_at)}
+                                  </p>
+                                  {quote.expires_at && (
+                                    <p className="mt-1 text-xs text-slate-500">
+                                      Hạn phản hồi: {dateTime(quote.expires_at)}
+                                    </p>
+                                  )}
+
+                                  {canRespond && (
+                                    <div className="mt-4 flex flex-wrap gap-3">
+                                      <button
+                                        type="button"
+                                        disabled={responding}
+                                        onClick={() => respondToQuote(quote, 'accept')}
+                                        className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-50"
+                                      >
+                                        {responding ? 'Đang xử lý...' : 'Chấp nhận'}
+                                      </button>
+                                      <button
+                                        type="button"
+                                        disabled={responding}
+                                        onClick={() => respondToQuote(quote, 'reject')}
+                                        className="rounded-xl border border-red-200 px-4 py-2 text-sm font-bold text-red-700 hover:bg-red-50 disabled:opacity-50"
+                                      >
+                                        Từ chối
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              )
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {selected.customer_note && (
+                      <div className="rounded-xl bg-slate-50 p-4 text-sm">
+                        <p className="font-bold text-slate-700">
+                          Ghi chú khách hàng
+                        </p>
+                        <p className="mt-2 whitespace-pre-wrap break-words text-slate-600">
+                          {selected.customer_note}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="border-t border-slate-100 px-6 py-4">
+                <button
+                  type="button"
+                  onClick={closeDetail}
+                  disabled={responding}
+                  className="w-full rounded-xl bg-slate-950 px-5 py-3 font-bold text-white hover:bg-slate-800"
+                >
+                  Đóng
+                </button>
+              </div>
+            </section>
+          </div>
+        )}
+      </div>
+    </main>
+  )
+}

@@ -99,6 +99,22 @@ class SocialOrderService
             );
         }
 
+        /*
+         * Kiểm tra lại giá vốn tại thời điểm đặt.
+         * Không cho tạo đơn bán hòa vốn hoặc bán lỗ.
+         * Không tự chuyển sang Provider khác.
+         */
+        $costPer1000 = $providerService->costPriceVnd();
+
+        if (
+            (float) $service->sell_price_per_1000
+            <= $costPer1000
+        ) {
+            throw new RuntimeException(
+                'Dịch vụ hiện chưa thể xử lý. Vui lòng liên hệ Admin để được hỗ trợ.'
+            );
+        }
+
         $sellAmount = round(
             (
                 (float) $service

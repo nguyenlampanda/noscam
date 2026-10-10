@@ -48,8 +48,8 @@ class ProcessSocialOrders extends Command
                 )
                 ->where(
                     'attempts',
-                    '<',
-                    3
+                    '=',
+                    0
                 )
                 ->whereHas(
                     'provider',

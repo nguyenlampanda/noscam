@@ -22,6 +22,17 @@ function money(value) {
   ).toLocaleString('vi-VN')}đ`
 }
 
+function moneyUnit(value) {
+  const amount = Number(value || 0)
+
+  if (!Number.isFinite(amount)) return '0đ'
+
+  return `${amount.toLocaleString('vi-VN', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 6,
+  })}đ`
+}
+
 function createKey() {
   if (
     typeof crypto !== 'undefined' &&
@@ -85,6 +96,8 @@ export default function SocialServicesPage() {
 
   const [target, setTarget] =
     useState('')
+
+  const [comments, setComments] = useState('')
 
   const [quantity, setQuantity] =
     useState('')
@@ -250,8 +263,19 @@ export default function SocialServicesPage() {
     [services, selectedId],
   )
 
-  const numericQuantity =
-    Number(quantity) || 0
+  const requiresComments =
+    String(selected?.category || '')
+      .trim()
+      .toLowerCase() === 'comment'
+
+  const commentLines = comments
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+
+  const numericQuantity = requiresComments
+    ? commentLines.length
+    : Number(quantity) || 0
 
   const total = useMemo(() => {
     if (
@@ -453,6 +477,7 @@ export default function SocialServicesPage() {
     setServiceOpen(false)
     setSelectedId('')
     setTarget('')
+    setComments('')
     setQuantity('')
     setError('')
   }
@@ -463,6 +488,7 @@ export default function SocialServicesPage() {
     setServiceOpen(false)
     setSelectedId('')
     setTarget('')
+    setComments('')
     setQuantity('')
     setError('')
   }
@@ -471,6 +497,7 @@ export default function SocialServicesPage() {
     setSelectedId(value)
     setServiceOpen(false)
     setTarget('')
+    setComments('')
     setError('')
 
     const service =
@@ -513,6 +540,11 @@ export default function SocialServicesPage() {
       return
     }
 
+    if (requiresComments && commentLines.length === 0) {
+      setError('Vui lòng nhập nội dung bình luận.')
+      return
+    }
+
     if (
       numericQuantity <
         Number(
@@ -545,6 +577,13 @@ export default function SocialServicesPage() {
     }
 
     if (insufficient) {
+      return
+    }
+
+    if (requiresComments) {
+      setError(
+        'Chức năng đặt Comment đang chờ kết nối Backend.'
+      )
       return
     }
 
@@ -1081,12 +1120,12 @@ export default function SocialServicesPage() {
                         <div className="shrink-0 text-right">
                           <div className="font-black text-blue-600">
                             {Number(selected.sell_price_per_1000) > 0
-                              ? money(selected.sell_price_per_1000)
+                              ? moneyUnit(Number(selected.sell_price_per_1000) / 1000)
                               : 'Liên hệ Admin'}
                           </div>
 
                           <div className="text-[11px] font-bold text-slate-400">
-                            / 1.000
+                            / lượt
                           </div>
                         </div>
                       </>
@@ -1277,12 +1316,12 @@ export default function SocialServicesPage() {
                                         }`}
                                       >
                                         {Number(item.sell_price_per_1000) > 0
-                                          ? money(item.sell_price_per_1000)
+                                          ? moneyUnit(Number(item.sell_price_per_1000) / 1000)
                                           : 'Liên hệ Admin'}
                                       </div>
 
                                       <div className="text-[10px] font-bold text-slate-400">
-                                        / 1.000
+                                        / lượt
                                       </div>
 
                                       {active && (
@@ -1322,6 +1361,39 @@ export default function SocialServicesPage() {
                         className="w-full rounded-2xl border border-slate-200 px-4 py-4 outline-none transition focus:border-blue-500"
                       />
                     </div>
+                    {requiresComments && (
+                      <div>
+                        <label className="mb-2 block text-sm font-black text-slate-700">
+                          5. Nội dung bình luận
+                        </label>
+
+                        <textarea
+                          value={comments}
+                          onChange={(e) => setComments(e.target.value)}
+                          rows={6}
+                          placeholder={"Mỗi dòng là một bình luận..."}
+                          className="w-full rounded-2xl border border-slate-200 px-4 py-4 outline-none transition focus:border-blue-500"
+                        />
+
+                        <p className="mt-2 text-sm font-semibold text-blue-600">
+                          Đã nhập: {commentLines.length} bình luận
+                        </p>
+                      </div>
+                    )}
+
+
+
+                    {selected?.description?.trim() && (
+                      <div className="rounded-2xl border border-blue-100 bg-blue-50/70 p-4">
+                        <div className="mb-2 text-sm font-black text-blue-800">
+                          Ghi chú dịch vụ
+                        </div>
+
+                        <p className="whitespace-pre-wrap break-words text-sm leading-6 text-slate-700">
+                          {selected.description}
+                        </p>
+                      </div>
+                    )}
 
                     <div>
                       <label className="mb-2 block text-sm font-black text-slate-700">
@@ -1337,7 +1409,12 @@ export default function SocialServicesPage() {
                         max={
                           selected.max_quantity
                         }
-                        value={quantity}
+                        value={
+                            requiresComments
+                              ? numericQuantity
+                              : quantity
+                          }
+                          readOnly={requiresComments}
                         onChange={(e) =>
                           setQuantity(
                             e.target.value,
@@ -1370,12 +1447,12 @@ export default function SocialServicesPage() {
                     <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
                       <div className="flex items-center justify-between gap-4">
                         <span className="font-bold text-slate-500">
-                          Giá / 1.000
+                          Đơn giá / 1 lượt
                         </span>
 
                         <span className="font-black">
                           {Number(selected.sell_price_per_1000) > 0
-                            ? money(selected.sell_price_per_1000)
+                            ? moneyUnit(Number(selected.sell_price_per_1000) / 1000)
                             : 'Liên hệ Admin'}
                         </span>
                       </div>

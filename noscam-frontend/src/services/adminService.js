@@ -477,6 +477,53 @@ export const adminService = {
     )
   },
 
+  async getSocialAuditOrders({ page = 1 } = {}) {
+    return adminRequest(
+      () =>
+        apiClient.get(
+          `/admin/social/orders/audit?page=${encodeURIComponent(page)}`,
+          authOptions(),
+        ),
+    )
+  },
+
+  async getSocialOrderReconciliationPreview(id) {
+    return adminRequest(
+      () => apiClient.get(
+        `/admin/social/orders/${id}/reconcile-preview`,
+        authOptions(),
+      ),
+    )
+  },
+
+  async getSocialOrderResolutions(id, page = 1) {
+    return adminRequest(
+      () => apiClient.get(
+        `/admin/social/orders/${id}/resolutions?page=${page}`,
+        authOptions(),
+      ),
+    )
+  },
+
+  async getSocialOrderAudits(id, page = 1) {
+    return adminRequest(
+      () => apiClient.get(
+        `/admin/social/orders/${id}/audits?page=${page}`,
+        authOptions(),
+      ),
+    )
+  },
+
+  async createSocialOrderAudit(id, data) {
+    return adminRequest(
+      () => apiClient.post(
+        `/admin/social/orders/${id}/audits`,
+        data,
+        authOptions(),
+      ),
+    )
+  },
+
   async getSocialOrders({
     status = '',
     search = '',

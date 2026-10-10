@@ -20,7 +20,7 @@ class SocialOrderProviderService
         SocialOrder $order
     ): SocialOrder {
         $lock = Cache::lock(
-            'social-order-submit-'.$order->id,
+            'social-order-operation-'.$order->id,
             60
         );
 
@@ -66,7 +66,7 @@ class SocialOrderProviderService
             }
 
             if (
-                (int) $order->attempts >= 3
+                (int) $order->attempts >= 1
             ) {
                 throw new RuntimeException(
                     'Đơn đã vượt quá số lần thử gửi API.'
@@ -225,7 +225,7 @@ class SocialOrderProviderService
         SocialOrder $order
     ): SocialOrder {
         $lock = Cache::lock(
-            'social-order-sync-'.$order->id,
+            'social-order-operation-'.$order->id,
             45
         );
 
@@ -441,7 +441,7 @@ class SocialOrderProviderService
         ?int $createdBy = null
     ): SocialOrder {
         $lock = Cache::lock(
-            'social-order-cancel-'.$order->id,
+            'social-order-operation-'.$order->id,
             60
         );
 
@@ -486,6 +486,13 @@ class SocialOrderProviderService
             if (
                 !$order->provider_order_id
             ) {
+                if ((int) $order->attempts >= 1) {
+                    throw new RuntimeException(
+                        'Đơn đã gửi yêu cầu tới Provider nhưng chưa xác định kết quả. '
+                        .'Vui lòng đối soát trước khi hủy hoặc hoàn tiền.'
+                    );
+                }
+
                 $order->status =
                     'cancelled';
 

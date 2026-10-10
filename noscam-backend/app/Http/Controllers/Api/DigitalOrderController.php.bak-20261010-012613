@@ -1,0 +1,279 @@
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use App\Http\Controllers\Controller;
+use App\Models\DigitalOrder;
+use App\Models\DigitalService;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Database\QueryException;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
+
+class DigitalOrderController extends Controller
+{
+    public function index(Request $request): JsonResponse
+    {
+        $orders = DigitalOrder::query()
+            ->where('user_id', $request->user()->id)
+            ->with('service:id,code,name,category,platform')
+            ->latest()
+            ->paginate(30);
+
+        return response()->json($orders);
+    }
+
+    public function show(
+        Request $request,
+        DigitalOrder $digitalOrder
+    ): JsonResponse {
+        abort_unless(
+            (int) $digitalOrder->user_id ===
+            (int) $request->user()->id,
+            404
+        );
+
+        $digitalOrder->load(
+            'service:id,code,name,category,platform'
+        );
+
+        $quotes = $digitalOrder->quotes()
+            ->orderByDesc('id')
+            ->get([
+                'id',
+                'digital_order_id',
+                'amount_vnd',
+                'description',
+                'status',
+                'expires_at',
+                'accepted_at',
+                'created_at',
+            ]);
+
+        return response()->json([
+            'data' => $digitalOrder,
+            'quotes' => $quotes,
+        ]);
+    }
+
+    public function store(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'idempotency_key' => [
+                'required',
+                'string',
+                'max:100',
+                'regex:/^[A-Za-z0-9_-]+$/',
+            ],
+            'service_id' => [
+                'required',
+                'integer',
+                'exists:digital_services,id',
+            ],
+            'request_data' => [
+                'present',
+                'array',
+                'max:50',
+            ],
+            'customer_note' => [
+                'nullable',
+                'string',
+                'max:5000',
+            ],
+        ]);
+
+        $service = DigitalService::query()
+            ->whereKey($data['service_id'])
+            ->where('is_active', true)
+            ->first();
+
+        if (!$service) {
+            throw ValidationException::withMessages([
+                'service_id' => 'Dịch vụ không còn hoạt động.',
+            ]);
+        }
+
+        $requirements = $service->requirements ?? [];
+        $submitted = $data['request_data'];
+
+        $rules = [];
+        $allowedKeys = [];
+
+        foreach ($requirements as $field) {
+            if (
+                !is_array($field) ||
+                !isset($field['key']) ||
+                !is_string($field['key']) ||
+                !preg_match('/^[a-z][a-z0-9_]*$/', $field['key'])
+            ) {
+                throw ValidationException::withMessages([
+                    'service_id' => 'Cấu hình dịch vụ không hợp lệ.',
+                ]);
+            }
+
+            $key = $field['key'];
+
+            if (in_array($key, $allowedKeys, true)) {
+                throw ValidationException::withMessages([
+                    'service_id' => 'Cấu hình dịch vụ bị trùng trường.',
+                ]);
+            }
+
+            $allowedKeys[] = $key;
+
+            $type = $field['type'] ?? 'text';
+
+            if (!in_array(
+                $type,
+                ['text', 'textarea', 'url', 'email'],
+                true
+            )) {
+                throw ValidationException::withMessages([
+                    'service_id' => 'Loại trường dịch vụ không hợp lệ.',
+                ]);
+            }
+
+            $rule = [
+                !empty($field['required']) ? 'required' : 'nullable',
+                'string',
+                'max:' . ($type === 'textarea' ? 5000 : 2000),
+            ];
+
+            if ($type === 'url') {
+                $rule[] = 'url';
+            }
+
+            if ($type === 'email') {
+                $rule[] = 'email';
+            }
+
+            $rules['request_data.' . $key] = $rule;
+        }
+
+        $unknown = array_diff(
+            array_keys($submitted),
+            $allowedKeys
+        );
+
+        if ($unknown) {
+            throw ValidationException::withMessages([
+                'request_data' => 'Có trường thông tin không được phép.',
+            ]);
+        }
+
+        $validated = validator(
+            ['request_data' => $submitted],
+            $rules
+        )->validate();
+
+        $cleanData = [];
+
+        foreach ($allowedKeys as $key) {
+            $value = $validated['request_data'][$key] ?? null;
+
+            if ($value !== null) {
+                $cleanData[$key] = trim($value);
+            }
+        }
+
+        // Tạo dấu vân tay ổn định từ nội dung đã kiểm tra.
+        ksort($cleanData);
+
+        $note = $data['customer_note'] ?? null;
+
+        $requestHash = hash('sha256', json_encode([
+            'service_id' => (int) $service->id,
+            'request_data' => $cleanData,
+            'customer_note' => $note,
+        ], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR));
+
+        $userId = $request->user()->id;
+        $key = $data['idempotency_key'];
+
+        $existing = DigitalOrder::query()
+            ->where('user_id', $userId)
+            ->where('idempotency_key', $key)
+            ->first();
+
+        if ($existing) {
+            return $this->replayedOrder($existing, $requestHash);
+        }
+
+        try {
+            $order = DB::transaction(function () use (
+                $userId,
+                $key,
+                $requestHash,
+                $data,
+                $service,
+                $cleanData,
+                $note
+            ) {
+            $order = new DigitalOrder();
+
+            $order->user_id = $userId;
+            $order->idempotency_key = $key;
+            $order->request_hash = $requestHash;
+            $order->digital_service_id = $service->id;
+            $order->status = 'pending';
+            $order->pricing_type = $service->pricing_type;
+            $order->request_data = $cleanData;
+            $order->customer_note = $note;
+
+            $order->amount_vnd =
+                $service->pricing_type === 'fixed'
+                    ? $service->price_vnd
+                    : null;
+
+            $order->payment_status = 'unpaid';
+            $order->payment_key = null;
+            $order->paid_at = null;
+            $order->completed_at = null;
+
+            $order->save();
+
+                return $order;
+            });
+        } catch (QueryException $exception) {
+            // Chỉ xử lý như gửi trùng khi thực sự tìm thấy
+            // đơn đã lưu với cùng khách hàng và cùng khóa.
+            $existing = DigitalOrder::query()
+                ->where('user_id', $userId)
+                ->where('idempotency_key', $key)
+                ->first();
+
+            if (!$existing) {
+                throw $exception;
+            }
+
+            return $this->replayedOrder($existing, $requestHash);
+        }
+
+        return response()->json([
+            'message' => 'Đã tiếp nhận yêu cầu dịch vụ.',
+            'data' => $order,
+        ], 201);
+    }
+
+    private function replayedOrder(
+        DigitalOrder $order,
+        string $requestHash
+    ): JsonResponse {
+        if (
+            !$order->request_hash ||
+            !hash_equals($order->request_hash, $requestHash)
+        ) {
+            return response()->json([
+                'message' => 'Mã yêu cầu đã được sử dụng với nội dung khác.',
+            ], 409);
+        }
+
+        return response()->json([
+            'message' => 'Yêu cầu đã được tiếp nhận trước đó.',
+            'data' => $order,
+            'replayed' => true,
+        ], 200);
+    }
+}

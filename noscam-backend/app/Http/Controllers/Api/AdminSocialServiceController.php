@@ -288,6 +288,12 @@ class AdminSocialServiceController extends Controller
         Request $request,
         SocialProviderService $providerService
     ): JsonResponse {
+        if ($providerService->social_service_id !== null) {
+            return response()->json([
+                'message' => 'Dịch vụ API này đã được đưa lên bán.',
+            ], 422);
+        }
+
         $data = $request->validate([
             'social_service_id' => [
                 'nullable',
@@ -321,6 +327,12 @@ class AdminSocialServiceController extends Controller
                 'max:100',
             ],
 
+            'description' => [
+                'nullable',
+                'string',
+                'max:5000',
+            ],
+
             'sell_price_per_1000' => [
                 'nullable',
                 'numeric',
@@ -352,30 +364,16 @@ class AdminSocialServiceController extends Controller
             ],
         ]);
 
-        if (
-            empty($data['social_service_id'])
-        ) {
-            $detected = app(
-                SocialServiceClassifier::class
-            )->classify(
-                $providerService
-                    ->provider_service_name
-            );
+        if (empty($data['social_service_id'])) {
+            $cost = $providerService->costPriceVnd();
 
             if (
-                $detected['platform']
-                !== 'other'
+                !isset($data['sell_price_per_1000']) ||
+                (float) $data['sell_price_per_1000'] <= $cost
             ) {
-                $data['platform'] =
-                    $detected['platform'];
-            }
-
-            if (
-                $detected['category']
-                !== 'other'
-            ) {
-                $data['category'] =
-                    $detected['category'];
+                return response()->json([
+                    'message' => 'Giá bán phải cao hơn giá vốn Provider.',
+                ], 422);
             }
         }
 
@@ -459,13 +457,15 @@ class AdminSocialServiceController extends Controller
                             'name' =>
                                 $data['name'],
                             'description' =>
-                                null,
+                                $data['description']
+                                ?? null,
                             'min_quantity' =>
                                 $min,
                             'max_quantity' =>
                                 $max,
                             'sell_price_per_1000' =>
-                                null,
+                                $data['sell_price_per_1000']
+                                ?? null,
                             'is_active' =>
                                 true,
                             'sort_order' =>

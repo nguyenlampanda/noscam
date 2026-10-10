@@ -1,0 +1,188 @@
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use App\Http\Controllers\Controller;
+use App\Models\DigitalService;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
+
+class GuestDigitalOrderController extends Controller
+{
+    public function store(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'idempotency_key' => [
+                'required', 'string', 'max:100',
+                'regex:/^[A-Za-z0-9_-]+$/',
+            ],
+            'service_id' => ['required', 'integer', 'exists:digital_services,id'],
+            'guest_name' => ['required', 'string', 'max:120'],
+            'guest_phone' => ['required', 'string', 'regex:/^[0-9+(). -]{8,25}$/'],
+            'guest_email' => ['nullable', 'email', 'max:255'],
+            'request_data' => ['present', 'array', 'max:50'],
+            'customer_note' => ['nullable', 'string', 'max:5000'],
+        ]);
+
+        $service = DigitalService::query()
+            ->whereKey($data['service_id'])
+            ->where('is_active', true)
+            ->first();
+
+        if (!$service) {
+            throw ValidationException::withMessages([
+                'service_id' => 'Dịch vụ không còn hoạt động.',
+            ]);
+        }
+
+        $requirements = $service->requirements ?? [];
+        $rules = [];
+        $allowedKeys = [];
+
+        foreach ($requirements as $field) {
+            if (
+                !is_array($field) ||
+                !isset($field['key']) ||
+                !is_string($field['key']) ||
+                !preg_match('/^[a-z][a-z0-9_]*$/', $field['key']) ||
+                in_array($field['key'], $allowedKeys, true)
+            ) {
+                throw ValidationException::withMessages([
+                    'service_id' => 'Cấu hình dịch vụ không hợp lệ.',
+                ]);
+            }
+
+            $key = $field['key'];
+            $allowedKeys[] = $key;
+            $type = $field['type'] ?? 'text';
+
+            if (!in_array($type, ['text', 'textarea', 'url', 'email'], true)) {
+                throw ValidationException::withMessages([
+                    'service_id' => 'Loại trường dịch vụ không hợp lệ.',
+                ]);
+            }
+
+            $rule = [
+                !empty($field['required']) ? 'required' : 'nullable',
+                'string',
+                'max:' . ($type === 'textarea' ? 5000 : 2000),
+            ];
+
+            if ($type === 'url') {
+                $rule[] = 'url';
+            }
+
+            if ($type === 'email') {
+                $rule[] = 'email';
+            }
+
+            $rules['request_data.' . $key] = $rule;
+        }
+
+        if (array_diff(array_keys($data['request_data']), $allowedKeys)) {
+            throw ValidationException::withMessages([
+                'request_data' => 'Có trường thông tin không được phép.',
+            ]);
+        }
+
+        $validated = validator(
+            ['request_data' => $data['request_data']],
+            $rules
+        )->validate();
+
+        $cleanData = [];
+
+        foreach ($allowedKeys as $key) {
+            $value = $validated['request_data'][$key] ?? null;
+
+            if ($value !== null) {
+                $cleanData[$key] = trim($value);
+            }
+        }
+
+        $lookupToken = bin2hex(random_bytes(32));
+        $requestKey = $data['idempotency_key'];
+
+        $existing = DB::table('digital_orders')
+            ->whereNull('user_id')
+            ->where('guest_request_key', $requestKey)
+            ->first();
+
+        if ($existing) {
+            return response()->json([
+                'message' => 'Yêu cầu này đã được tiếp nhận.',
+                'data' => [
+                    'id' => $existing->id,
+                    'status' => $existing->status,
+                    'payment_status' => $existing->payment_status,
+                    'amount_vnd' => $existing->amount_vnd,
+                    'pricing_type' => $existing->pricing_type,
+                    'bank_transfer_content' => $existing->bank_transfer_content,
+                ],
+                'replayed' => true,
+            ]);
+        }
+
+        $order = DB::transaction(function () use (
+            $data,
+            $service,
+            $cleanData,
+            $lookupToken
+        ) {
+            $id = DB::table('digital_orders')->insertGetId([
+                'user_id' => null,
+                'digital_service_id' => $service->id,
+                'status' => 'pending',
+                'pricing_type' => $service->pricing_type,
+                'request_data' => json_encode(
+                    $cleanData,
+                    JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
+                ),
+                'customer_note' => $data['customer_note'] ?? null,
+                'guest_name' => trim($data['guest_name']),
+                'guest_phone' => trim($data['guest_phone']),
+                'guest_email' => $data['guest_email'] ?? null,
+                'guest_lookup_hash' => hash('sha256', $lookupToken),
+                'guest_request_key' => $requestKey,
+                'amount_vnd' => $service->pricing_type === 'fixed'
+                    ? $service->price_vnd
+                    : null,
+                'payment_status' => 'unpaid',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            $transferContent = 'NSD'.$id;
+
+            DB::table('digital_orders')
+                ->where('id', $id)
+                ->update([
+                    'bank_transfer_content' => $transferContent,
+                ]);
+
+            return DB::table('digital_orders')->where('id', $id)->first();
+        });
+
+        return response()->json([
+            'message' => 'Đã tạo đơn hàng. Vui lòng lưu mã tra cứu.',
+            'data' => [
+                'id' => $order->id,
+                'status' => $order->status,
+                'payment_status' => $order->payment_status,
+                'amount_vnd' => $order->amount_vnd,
+                'pricing_type' => $order->pricing_type,
+                'lookup_token' => $lookupToken,
+                'bank_transfer_content' => $order->bank_transfer_content,
+                'bank' => $order->amount_vnd !== null ? [
+                    'name' => config('digital_payment.bank.name'),
+                    'bin' => config('digital_payment.bank.bin'),
+                    'account_number' => config('digital_payment.bank.account_number'),
+                    'account_name' => config('digital_payment.bank.account_name'),
+                ] : null,
+            ],
+        ], 201);
+    }
+}

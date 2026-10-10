@@ -1,0 +1,196 @@
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use App\Http\Controllers\Controller;
+use App\Models\DigitalOrder;
+use App\Models\DigitalService;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
+
+class DigitalOrderController extends Controller
+{
+    public function index(Request $request): JsonResponse
+    {
+        $orders = DigitalOrder::query()
+            ->where('user_id', $request->user()->id)
+            ->with('service:id,code,name,category,platform')
+            ->latest()
+            ->paginate(30);
+
+        return response()->json($orders);
+    }
+
+    public function show(
+        Request $request,
+        DigitalOrder $digitalOrder
+    ): JsonResponse {
+        abort_unless(
+            (int) $digitalOrder->user_id ===
+            (int) $request->user()->id,
+            404
+        );
+
+        $digitalOrder->load(
+            'service:id,code,name,category,platform'
+        );
+
+        return response()->json([
+            'data' => $digitalOrder,
+        ]);
+    }
+
+    public function store(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'service_id' => [
+                'required',
+                'integer',
+                'exists:digital_services,id',
+            ],
+            'request_data' => [
+                'present',
+                'array',
+                'max:50',
+            ],
+            'customer_note' => [
+                'nullable',
+                'string',
+                'max:5000',
+            ],
+        ]);
+
+        $service = DigitalService::query()
+            ->whereKey($data['service_id'])
+            ->where('is_active', true)
+            ->first();
+
+        if (!$service) {
+            throw ValidationException::withMessages([
+                'service_id' => 'Dịch vụ không còn hoạt động.',
+            ]);
+        }
+
+        $requirements = $service->requirements ?? [];
+        $submitted = $data['request_data'];
+
+        $rules = [];
+        $allowedKeys = [];
+
+        foreach ($requirements as $field) {
+            if (
+                !is_array($field) ||
+                !isset($field['key']) ||
+                !is_string($field['key']) ||
+                !preg_match('/^[a-z][a-z0-9_]*$/', $field['key'])
+            ) {
+                throw ValidationException::withMessages([
+                    'service_id' => 'Cấu hình dịch vụ không hợp lệ.',
+                ]);
+            }
+
+            $key = $field['key'];
+
+            if (in_array($key, $allowedKeys, true)) {
+                throw ValidationException::withMessages([
+                    'service_id' => 'Cấu hình dịch vụ bị trùng trường.',
+                ]);
+            }
+
+            $allowedKeys[] = $key;
+
+            $type = $field['type'] ?? 'text';
+
+            if (!in_array(
+                $type,
+                ['text', 'textarea', 'url', 'email'],
+                true
+            )) {
+                throw ValidationException::withMessages([
+                    'service_id' => 'Loại trường dịch vụ không hợp lệ.',
+                ]);
+            }
+
+            $rule = [
+                !empty($field['required']) ? 'required' : 'nullable',
+                'string',
+                'max:' . ($type === 'textarea' ? 5000 : 2000),
+            ];
+
+            if ($type === 'url') {
+                $rule[] = 'url';
+            }
+
+            if ($type === 'email') {
+                $rule[] = 'email';
+            }
+
+            $rules['request_data.' . $key] = $rule;
+        }
+
+        $unknown = array_diff(
+            array_keys($submitted),
+            $allowedKeys
+        );
+
+        if ($unknown) {
+            throw ValidationException::withMessages([
+                'request_data' => 'Có trường thông tin không được phép.',
+            ]);
+        }
+
+        $validated = validator(
+            ['request_data' => $submitted],
+            $rules
+        )->validate();
+
+        $cleanData = [];
+
+        foreach ($allowedKeys as $key) {
+            $value = $validated['request_data'][$key] ?? null;
+
+            if ($value !== null) {
+                $cleanData[$key] = trim($value);
+            }
+        }
+
+        $order = DB::transaction(function () use (
+            $request,
+            $data,
+            $service,
+            $cleanData
+        ) {
+            $order = new DigitalOrder();
+
+            $order->user_id = $request->user()->id;
+            $order->digital_service_id = $service->id;
+            $order->status = 'pending';
+            $order->pricing_type = $service->pricing_type;
+            $order->request_data = $cleanData;
+            $order->customer_note =
+                $data['customer_note'] ?? null;
+
+            $order->amount_vnd =
+                $service->pricing_type === 'fixed'
+                    ? $service->price_vnd
+                    : null;
+
+            $order->payment_status = 'unpaid';
+            $order->payment_key = null;
+            $order->paid_at = null;
+            $order->completed_at = null;
+
+            $order->save();
+
+            return $order;
+        });
+
+        return response()->json([
+            'message' => 'Đã tiếp nhận yêu cầu dịch vụ.',
+            'data' => $order,
+        ], 201);
+    }
+}

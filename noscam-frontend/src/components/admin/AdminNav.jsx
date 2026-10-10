@@ -7,6 +7,20 @@ import adminService from '../../services/adminService'
 
 const menu = [
   {
+    to: '/admin/chat',
+    label: 'Tin nhắn',
+  },
+
+  {
+    to: '/admin/digital/services',
+    label: 'Dịch vụ số',
+  },
+  {
+    to: '/admin/digital/orders',
+    label: 'Đơn dịch vụ số',
+  },
+
+  {
     to: '/admin',
     label: 'Tổng quan',
     end: true,

@@ -144,6 +144,22 @@ const SocialServicesPage = lazy(() =>
   import('../pages/SocialServicesPage')
 )
 
+const DigitalServicesPage = lazy(() =>
+  import('../pages/DigitalServicesPage')
+)
+
+const DigitalServiceDetailPage = lazy(() =>
+  import('../pages/DigitalServiceDetailPage')
+)
+
+const MyDigitalOrdersPage = lazy(() =>
+  import('../pages/MyDigitalOrdersPage')
+)
+
+const GuestDigitalOrderLookupPage = lazy(() =>
+  import('../pages/GuestDigitalOrderLookupPage')
+)
+
 const WalletPage = lazy(() =>
   import('../pages/WalletPage')
 )
@@ -154,6 +170,18 @@ const MyOrdersPage = lazy(() =>
 
 const ProfilePage = lazy(() =>
   import('../pages/ProfilePage')
+)
+
+const AdminDigitalServicesPage = lazy(() =>
+  import('../pages/Admin/AdminDigitalServicesPage')
+)
+
+const AdminDigitalOrdersPage = lazy(() =>
+  import('../pages/Admin/AdminDigitalOrdersPage')
+)
+
+const AdminChatPage = lazy(() =>
+  import('../pages/Admin/AdminChatPage')
 )
 
 function AppRoutes() {
@@ -208,6 +236,25 @@ function AppRoutes() {
           <Route
             path="/social-services"
             element={<SocialServicesPage />}
+          />
+
+          <Route
+            path="/digital-services"
+            element={<DigitalServicesPage />}
+          />
+
+          <Route
+            path="/digital-services/:id"
+            element={<DigitalServiceDetailPage />}
+          />
+
+          <Route
+            path="/digital/guest/lookup"
+            element={<GuestDigitalOrderLookupPage />}
+          />
+        <Route
+            path="/my-digital-orders"
+            element={<MyDigitalOrdersPage />}
           />
 
           <Route
@@ -323,6 +370,33 @@ function AppRoutes() {
             </ProtectedAdminRoute>
           }
         />
+        <Route
+          path="/admin/digital/services"
+          element={
+            <ProtectedAdminRoute>
+              <AdminDigitalServicesPage />
+            </ProtectedAdminRoute>
+          }
+        />
+
+        <Route
+          path="/admin/digital/orders"
+          element={
+            <ProtectedAdminRoute>
+              <AdminDigitalOrdersPage />
+            </ProtectedAdminRoute>
+          }
+        />
+
+        <Route
+          path="/admin/chat"
+          element={
+            <ProtectedAdminRoute>
+              <AdminChatPage />
+            </ProtectedAdminRoute>
+          }
+        />
+
       </Routes>
     </Suspense>
   )

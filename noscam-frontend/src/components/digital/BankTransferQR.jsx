@@ -1,0 +1,140 @@
+import { useEffect, useState } from 'react'
+import QRCode from 'qrcode'
+import { createVietQRPayload } from './vietqr'
+
+function money(value) {
+  return Number(value).toLocaleString('vi-VN') + ' ₫'
+}
+
+export default function BankTransferQR({
+  bank,
+  amount,
+  content,
+}) {
+  const [qrResult, setQrResult] = useState(null)
+
+  const qrKey = JSON.stringify([
+    bank?.bin,
+    bank?.account_number,
+    amount,
+    content,
+  ])
+
+  const image = qrResult?.key === qrKey
+    ? qrResult.image
+    : ''
+
+  const error = qrResult?.key === qrKey
+    ? qrResult.error
+    : ''
+
+  useEffect(() => {
+    let active = true
+
+    async function generate() {
+      try {
+        const payload = createVietQRPayload({
+          bankBin: bank?.bin,
+          accountNumber: bank?.account_number,
+          amount,
+          content,
+        })
+
+        const url = await QRCode.toDataURL(payload, {
+          width: 320,
+          margin: 2,
+          errorCorrectionLevel: 'M',
+        })
+
+        if (active) {
+          setQrResult({
+            key: JSON.stringify([
+              bank?.bin,
+              bank?.account_number,
+              amount,
+              content,
+            ]),
+            image: url,
+            error: '',
+          })
+        }
+      } catch (err) {
+        if (active) {
+          setQrResult({
+            key: JSON.stringify([
+              bank?.bin,
+              bank?.account_number,
+              amount,
+              content,
+            ]),
+            image: '',
+            error: err?.message || 'Không tạo được mã QR.',
+          })
+        }
+      }
+    }
+
+    generate()
+
+    return () => {
+      active = false
+    }
+  }, [bank?.bin, bank?.account_number, amount, content])
+
+  if (!bank || amount == null || !content) {
+    return null
+  }
+
+  return (
+    <section className="rounded-2xl border border-blue-200 bg-white p-5">
+      <h3 className="text-lg font-bold text-slate-900">
+        Chuyển khoản ngân hàng
+      </h3>
+
+      {error && (
+        <p role="alert" className="mt-3 text-sm text-red-700">
+          {error}
+        </p>
+      )}
+
+      {image && (
+        <img
+          src={image}
+          alt="Mã VietQR chuyển khoản ngân hàng"
+          width={320}
+          height={320}
+          className="mx-auto mt-4 max-w-full"
+        />
+      )}
+
+      <dl className="mt-4 space-y-2 text-sm">
+        <div>
+          <dt className="font-semibold">Ngân hàng</dt>
+          <dd>{bank.name}</dd>
+        </div>
+        <div>
+          <dt className="font-semibold">Số tài khoản</dt>
+          <dd className="font-bold">{bank.account_number}</dd>
+        </div>
+        <div>
+          <dt className="font-semibold">Chủ tài khoản</dt>
+          <dd>{bank.account_name}</dd>
+        </div>
+        <div>
+          <dt className="font-semibold">Số tiền</dt>
+          <dd className="font-bold">{money(amount)}</dd>
+        </div>
+        <div>
+          <dt className="font-semibold">Nội dung chuyển khoản</dt>
+          <dd className="font-bold">{content}</dd>
+        </div>
+      </dl>
+
+      <p className="mt-4 text-sm text-amber-800">
+        Vui lòng chuyển đúng số tiền và nội dung.
+        Đơn hàng chỉ được xác nhận thanh toán sau khi
+        quản trị viên đối soát giao dịch ngân hàng thực tế.
+      </p>
+    </section>
+  )
+}

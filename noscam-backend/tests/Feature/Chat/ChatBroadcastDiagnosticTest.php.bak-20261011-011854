@@ -1,0 +1,59 @@
+<?php
+
+namespace Tests\Feature\Chat;
+
+use App\Models\ChatConversation;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Broadcast;
+use Laravel\Sanctum\Sanctum;
+use Tests\TestCase;
+
+class ChatBroadcastDiagnosticTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_diagnose_private_channel_authorization(): void
+    {
+        $owner = User::factory()->create(['role' => 'user']);
+        $other = User::factory()->create(['role' => 'user']);
+        $moderator = User::factory()->create(['role' => 'moderator']);
+
+        $conversation = ChatConversation::create([
+            'customer_id' => $owner->id,
+        ]);
+
+        $channels = Broadcast::getChannels();
+        $callback = $channels['chat.{conversationId}'] ?? null;
+
+        $this->assertNotNull($callback, 'Chat channel callback missing');
+
+        foreach ([
+            'owner' => $owner,
+            'other' => $other,
+            'moderator' => $moderator,
+        ] as $label => $user) {
+            $callbackResult = $callback($user, $conversation->id);
+
+            Sanctum::actingAs($user);
+
+            $response = $this->postJson('/api/broadcasting/auth', [
+                'socket_id' => '1234.5678',
+                'channel_name' => 'private-chat.'.$conversation->id,
+            ]);
+
+            fwrite(STDOUT, sprintf(
+                "\n%s: user_id=%d role=%s owner_id=%d callback=%s HTTP=%d response_keys=%s\n",
+                $label,
+                $user->id,
+                $user->role,
+                $owner->id,
+                var_export($callbackResult, true),
+                $response->status(),
+                implode(',', array_keys($response->json() ?? []))
+            ));
+        }
+
+        $this->assertTrue(true);
+    }
+}

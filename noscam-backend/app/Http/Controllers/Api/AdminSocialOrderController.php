@@ -4,11 +4,9 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\SocialOrder;
-use App\Services\Social\SocialOrderService;
 use App\Services\Social\SocialOrderProviderService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
 
 class AdminSocialOrderController extends Controller
 {
@@ -32,35 +30,47 @@ class AdminSocialOrderController extends Controller
 
         if ($request->filled('search')) {
             $search = trim(
-                (string) $request->input(
-                    'search'
-                )
+                (string) $request->input('search')
             );
 
-            $query->where(
-                function ($q) use ($search) {
-                    $q->where(
-                        'code',
-                        'like',
-                        "%{$search}%"
-                    )->orWhere(
-                        'target',
-                        'like',
-                        "%{$search}%"
-                    )->orWhere(
-                        'provider_order_id',
-                        'like',
-                        "%{$search}%"
-                    );
-                }
-            );
+            $query->where(function ($q) use ($search) {
+                $q->where(
+                    'code',
+                    'like',
+                    "%{$search}%"
+                )->orWhere(
+                    'target',
+                    'like',
+                    "%{$search}%"
+                )->orWhere(
+                    'provider_order_id',
+                    'like',
+                    "%{$search}%"
+                );
+            });
         }
 
         return response()->json(
-            $query
-                ->latest()
-                ->paginate(50)
+            $query->latest()->paginate(50)
         );
+    }
+
+
+    public function audit(): JsonResponse
+    {
+        $orders = SocialOrder::query()
+            ->with([
+                'user:id,name,email',
+                'service:id,name,platform',
+                'provider:id,name,slug',
+            ])
+            ->where('status', 'pending')
+            ->whereNull('provider_order_id')
+            ->where('attempts', '>=', 1)
+            ->orderBy('id')
+            ->paginate(50);
+
+        return response()->json($orders);
     }
 
     public function show(
@@ -77,7 +87,6 @@ class AdminSocialOrderController extends Controller
             'data' => $order,
         ]);
     }
-
 
     public function cancel(
         Request $request,
@@ -99,59 +108,13 @@ class AdminSocialOrderController extends Controller
 
     public function updateStatus(
         Request $request,
-        SocialOrder $order,
-        SocialOrderService $orderService
+        SocialOrder $order
     ): JsonResponse {
-        $data = $request->validate([
-            'status' => [
-                'required',
-                Rule::in([
-                    'pending',
-                    'processing',
-                    'in_progress',
-                    'completed',
-                    'partial',
-                    'cancelled',
-                    'failed',
-                ]),
-            ],
-        ]);
-
-        $status = $data['status'];
-
-        $order->status = $status;
-
-        if ($status === 'completed') {
-            $order->remains = 0;
-            $order->completed_at = now();
-        }
-
-        $order->save();
-
-        if (
-            in_array(
-                $status,
-                ['failed', 'cancelled'],
-                true
-            )
-        ) {
-            $order =
-                $orderService->refund(
-                    $order,
-                    $request->user()?->id
-                );
-        }
-
         return response()->json([
             'message' =>
-                'Đã cập nhật trạng thái đơn.',
-            'data' =>
-                $order->fresh()->load([
-                    'user:id,name,email',
-                    'service',
-                    'provider:id,name,slug,status',
-                    'providerService',
-                ]),
-        ]);
+                'Không cho phép đổi trạng thái đơn thủ công. '
+                .'Trạng thái phải được xác nhận qua Provider '
+                .'hoặc quy trình đối soát riêng.',
+        ], 409);
     }
 }

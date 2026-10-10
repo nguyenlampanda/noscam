@@ -25,6 +25,10 @@ const navigation = [
     path: '/',
   },
   {
+    name: 'Kiểm tra lừa đảo',
+    path: '/search',
+  },
+  {
     name: 'Cảnh báo',
     path: '/alerts',
   },
@@ -35,6 +39,10 @@ const navigation = [
   {
     name: 'Tăng tương tác',
     path: '/social-services',
+  },
+  {
+    name: 'Dịch vụ số',
+    path: '/digital-services',
   },
   {
     name: 'Hướng dẫn',
@@ -343,6 +351,18 @@ function Header() {
                       </Link>
 
                       <Link
+                        to="/my-digital-orders"
+                        onClick={() =>
+                          setAccountOpen(
+                            false,
+                          )
+                        }
+                        className="block rounded-xl px-3 py-2.5 text-sm font-bold hover:bg-slate-50"
+                      >
+                        Đơn dịch vụ số
+                      </Link>
+
+                      <Link
                         to="/profile"
                         onClick={() =>
                           setAccountOpen(
@@ -469,6 +489,16 @@ function Header() {
                       className="block rounded-xl px-3 py-3 text-sm font-bold"
                     >
                       Đơn của tôi
+                    </Link>
+
+                    <Link
+                      to="/my-digital-orders"
+                      onClick={
+                        closeMenu
+                      }
+                      className="block rounded-xl px-3 py-3 text-sm font-bold"
+                    >
+                      Đơn dịch vụ số
                     </Link>
 
                     <Link

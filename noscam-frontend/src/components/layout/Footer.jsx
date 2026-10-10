@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom'
 import Container from './Container'
 
 const footerLinks = [
+  { name: 'Kiểm tra lừa đảo', path: '/search' },
+  { name: 'Tăng tương tác', path: '/social-services' },
   { name: 'Cảnh báo', path: '/alerts' },
   { name: 'Hướng dẫn', path: '/guide' },
   { name: 'Giới thiệu', path: '/about' },
@@ -24,8 +26,9 @@ function Footer() {
               </Link>
 
               <p className="mt-3 text-sm leading-6 text-slate-500">
-                Nền tảng hỗ trợ kiểm tra thông tin và đánh giá rủi ro
-                trước khi giao dịch hoặc chuyển tiền.
+                NoScam.vn hỗ trợ tra cứu dấu hiệu lừa đảo, đánh giá
+                rủi ro giao dịch và cung cấp dịch vụ tăng tương tác
+                trên các nền tảng mạng xã hội.
               </p>
             </div>
 

@@ -1,0 +1,446 @@
+import { useCallback, useEffect, useRef, useState } from 'react'
+import AdminNav from '../../components/admin/AdminNav'
+import apiClient from '../../services/apiClient'
+import { getAdminToken } from '../../services/adminService'
+
+const endpoint = '/admin/digital/orders'
+
+const statusOptions = [
+  ['', 'Tất cả trạng thái'],
+  ['pending', 'Chờ xử lý'],
+  ['processing', 'Đang xử lý'],
+  ['in_progress', 'Đang thực hiện'],
+  ['completed', 'Hoàn thành'],
+  ['cancelled', 'Đã hủy'],
+  ['rejected', 'Từ chối'],
+  ['failed', 'Thất bại'],
+]
+
+const paymentOptions = [
+  ['', 'Tất cả thanh toán'],
+  ['unpaid', 'Chưa thanh toán'],
+  ['pending', 'Đang chờ thanh toán'],
+  ['paid', 'Đã thanh toán'],
+  ['refunded', 'Đã hoàn tiền'],
+]
+
+function labelFor(options, value) {
+  return options.find(([key]) => key === value)?.[1] || value || '—'
+}
+
+function money(value) {
+  if (value === null || value === undefined) return 'Chờ báo giá'
+  return `${Number(value).toLocaleString('vi-VN')}đ`
+}
+
+function dateTime(value) {
+  if (!value) return '—'
+  const date = new Date(value)
+  return Number.isNaN(date.getTime())
+    ? '—'
+    : date.toLocaleString('vi-VN')
+}
+
+function auth() {
+  const token = getAdminToken()
+  if (!token) throw new Error('Vui lòng đăng nhập Admin.')
+  return {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  }
+}
+
+function Field({ label, children }) {
+  return (
+    <div className="rounded-xl bg-slate-50 p-3">
+      <div className="mb-1 text-xs font-semibold text-slate-500">
+        {label}
+      </div>
+      <div className="break-words text-sm font-semibold text-slate-800">
+        {children ?? '—'}
+      </div>
+    </div>
+  )
+}
+
+export default function AdminDigitalOrdersPage() {
+  const [items, setItems] = useState([])
+  const [page, setPage] = useState(1)
+  const [lastPage, setLastPage] = useState(1)
+  const [total, setTotal] = useState(0)
+  const [searchInput, setSearchInput] = useState('')
+  const [search, setSearch] = useState('')
+  const [status, setStatus] = useState('')
+  const [payment, setPayment] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [reload, setReload] = useState(0)
+  const [selected, setSelected] = useState(null)
+  const [detailLoading, setDetailLoading] = useState(false)
+  const [detailError, setDetailError] = useState('')
+  const requestRef = useRef(0)
+  const dialogRef = useRef(null)
+  const closeRef = useRef(null)
+  const triggerRef = useRef(null)
+
+  const load = useCallback(async (signal) => {
+    setLoading(true)
+    setError('')
+
+    try {
+      const params = new URLSearchParams()
+      params.set('page', String(page))
+      if (search) params.set('search', search)
+      if (status) params.set('status', status)
+      if (payment) params.set('payment_status', payment)
+
+      const response = await apiClient.get(
+        `${endpoint}?${params.toString()}`,
+        { ...auth(), signal },
+      )
+
+      if (signal.aborted) return
+
+      if (!Array.isArray(response?.data)) {
+        throw new Error('Dữ liệu danh sách không hợp lệ.')
+      }
+
+      setItems(response.data)
+      setLastPage(Number(response.last_page || 1))
+      setTotal(Number(response.total || 0))
+    } catch (err) {
+      if (!signal.aborted) {
+        setError(err?.message || 'Không thể tải danh sách đơn.')
+      }
+    } finally {
+      if (!signal.aborted) setLoading(false)
+    }
+  }, [page, search, status, payment])
+
+  useEffect(() => {
+    const controller = new AbortController()
+    load(controller.signal)
+    return () => controller.abort()
+  }, [load, reload])
+
+  function applySearch(event) {
+    event.preventDefault()
+    setPage(1)
+    setSearch(searchInput.trim())
+  }
+
+  async function openDetail(id) {
+    triggerRef.current = document.activeElement
+    const requestId = ++requestRef.current
+    setSelected({ id })
+    setDetailLoading(true)
+    setDetailError('')
+
+    try {
+      const response = await apiClient.get(
+        `${endpoint}/${id}`,
+        auth(),
+      )
+      if (requestId !== requestRef.current) return
+      if (!response?.data || Array.isArray(response.data)) {
+        throw new Error('Dữ liệu chi tiết đơn không hợp lệ.')
+      }
+      setSelected(response.data)
+    } catch (err) {
+      if (requestId !== requestRef.current) return
+      setDetailError(err?.message || 'Không thể tải chi tiết đơn.')
+    } finally {
+      if (requestId === requestRef.current) {
+        setDetailLoading(false)
+      }
+    }
+  }
+
+  function closeDetail() {
+    requestRef.current += 1
+    setSelected(null)
+    setDetailError('')
+    setDetailLoading(false)
+    triggerRef.current?.focus?.()
+  }
+
+  useEffect(() => {
+    if (!selected) return
+
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    closeRef.current?.focus()
+
+    function onKeyDown(event) {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        closeDetail()
+        return
+      }
+
+      if (event.key !== 'Tab') return
+
+      const focusable = dialogRef.current?.querySelectorAll(
+        'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      )
+      if (!focusable?.length) return
+
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault()
+        first.focus()
+      }
+    }
+
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.body.style.overflow = previousOverflow
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [Boolean(selected)])
+
+  return (
+    <div className="min-h-screen bg-slate-50">
+      <AdminNav />
+
+      <main className="mx-auto max-w-7xl space-y-6 px-5 py-8 lg:px-8">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-black text-slate-950">
+              Đơn dịch vụ số
+            </h1>
+            <p className="mt-1 text-sm text-slate-500">
+              Theo dõi yêu cầu của khách hàng. Chế độ chỉ xem.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setReload(value => value + 1)}
+            className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold hover:bg-blue-50"
+          >
+            Làm mới
+          </button>
+        </div>
+
+        <form onSubmit={applySearch} className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 md:grid-cols-[1fr_auto]">
+          <input
+            value={searchInput}
+            onChange={event => setSearchInput(event.target.value)}
+            placeholder="Tìm mã đơn, tên khách hàng hoặc dịch vụ..."
+            className="min-w-0 rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-blue-500"
+          />
+          <button
+            type="submit"
+            className="rounded-xl bg-blue-600 px-5 py-3 text-sm font-bold text-white hover:bg-blue-700"
+          >
+            Tìm kiếm
+          </button>
+          <select
+            value={status}
+            onChange={event => {
+              setPage(1)
+              setStatus(event.target.value)
+            }}
+            className="rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm"
+          >
+            {statusOptions.map(([value, label]) => (
+              <option key={value} value={value}>{label}</option>
+            ))}
+          </select>
+          <select
+            value={payment}
+            onChange={event => {
+              setPage(1)
+              setPayment(event.target.value)
+            }}
+            className="rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm"
+          >
+            {paymentOptions.map(([value, label]) => (
+              <option key={value} value={value}>{label}</option>
+            ))}
+          </select>
+        </form>
+
+        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+          <div className="border-b border-slate-100 px-5 py-4 text-sm font-bold text-slate-700">
+            Danh sách đơn ({total.toLocaleString('vi-VN')})
+          </div>
+
+          {error && (
+            <p role="alert" className="m-5 rounded-xl bg-red-50 p-4 text-sm text-red-700">
+              {error}
+            </p>
+          )}
+
+          {loading ? (
+            <p className="p-8 text-center text-sm text-slate-500">
+              Đang tải đơn hàng...
+            </p>
+          ) : items.length === 0 ? (
+            <p className="p-8 text-center text-sm text-slate-500">
+              Không có đơn hàng phù hợp.
+            </p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[800px] text-left text-sm">
+                <thead className="bg-slate-50 text-xs text-slate-500">
+                  <tr>
+                    {['Mã đơn', 'Khách hàng', 'Dịch vụ', 'Giá', 'Xử lý', 'Thanh toán', 'Ngày tạo', ''].map(label => (
+                      <th key={label} className="px-4 py-3 font-bold">
+                        {label}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {items.map(item => (
+                    <tr key={item.id} className="hover:bg-slate-50">
+                      <td className="px-4 py-4 font-bold">#{item.id}</td>
+                      <td className="px-4 py-4">{item.user?.username || `#${item.user_id}`}</td>
+                      <td className="px-4 py-4">{item.service?.name || '—'}</td>
+                      <td className="px-4 py-4">{money(item.amount_vnd)}</td>
+                      <td className="px-4 py-4">{labelFor(statusOptions, item.status)}</td>
+                      <td className="px-4 py-4">{labelFor(paymentOptions, item.payment_status)}</td>
+                      <td className="px-4 py-4">{dateTime(item.created_at)}</td>
+                      <td className="px-4 py-4">
+                        <button
+                          type="button"
+                          onClick={() => openDetail(item.id)}
+                          className="whitespace-nowrap font-bold text-blue-600 hover:underline"
+                        >
+                          Xem chi tiết
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+
+        <div className="flex items-center justify-between gap-4">
+          <span className="text-sm text-slate-500">
+            Trang {page}/{lastPage}
+          </span>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              disabled={loading || page <= 1}
+              onClick={() => setPage(value => value - 1)}
+              className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold disabled:opacity-40"
+            >
+              Trước
+            </button>
+            <button
+              type="button"
+              disabled={loading || page >= lastPage}
+              onClick={() => setPage(value => value + 1)}
+              className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold disabled:opacity-40"
+            >
+              Sau
+            </button>
+          </div>
+        </div>
+      </main>
+
+      {selected && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/60 p-4"
+          onMouseDown={event => {
+            if (event.target === event.currentTarget) closeDetail()
+          }}
+        >
+          <div
+            ref={dialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="digital-order-dialog-title"
+            className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl sm:p-7"
+          >
+            <div className="mb-5 flex items-start justify-between gap-3">
+              <div>
+                <h2
+                  id="digital-order-dialog-title"
+                  className="text-xl font-black text-slate-950"
+                >
+                  Chi tiết đơn #{selected.id}
+                </h2>
+                <p className="mt-1 text-xs text-slate-500">
+                  Thông tin yêu cầu dịch vụ số
+                </p>
+              </div>
+              <button
+                ref={closeRef}
+                type="button"
+                onClick={closeDetail}
+                aria-label="Đóng chi tiết"
+                className="rounded-xl bg-slate-100 px-3 py-2 text-sm font-bold hover:bg-slate-200"
+              >
+                Đóng
+              </button>
+            </div>
+
+            {detailLoading ? (
+              <p className="py-8 text-center text-sm text-slate-500">
+                Đang tải chi tiết...
+              </p>
+            ) : detailError ? (
+              <p role="alert" className="rounded-xl bg-red-50 p-4 text-sm text-red-700">
+                {detailError}
+              </p>
+            ) : (
+              <div className="space-y-5">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Field label="Khách hàng">
+                    {selected.user?.username || `#${selected.user_id}`}
+                  </Field>
+                  <Field label="Dịch vụ">{selected.service?.name}</Field>
+                  <Field label="Trạng thái xử lý">
+                    {labelFor(statusOptions, selected.status)}
+                  </Field>
+                  <Field label="Thanh toán">
+                    {labelFor(paymentOptions, selected.payment_status)}
+                  </Field>
+                  <Field label="Giá">{money(selected.amount_vnd)}</Field>
+                  <Field label="Ngày tạo">{dateTime(selected.created_at)}</Field>
+                </div>
+
+                <div>
+                  <h3 className="mb-3 font-black text-slate-900">
+                    Thông tin khách gửi
+                  </h3>
+                  <div className="grid gap-3">
+                    {Object.entries(selected.request_data || {}).length ? (
+                      Object.entries(selected.request_data).map(([key, value]) => (
+                        <Field key={key} label={key}>
+                          {typeof value === 'object'
+                            ? JSON.stringify(value)
+                            : String(value ?? '—')}
+                        </Field>
+                      ))
+                    ) : (
+                      <p className="text-sm text-slate-500">
+                        Không có thông tin bổ sung.
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <Field label="Ghi chú khách hàng">
+                  {selected.customer_note || 'Không có'}
+                </Field>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}

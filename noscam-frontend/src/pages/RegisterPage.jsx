@@ -2,12 +2,20 @@ import { useState } from 'react'
 import {
   Link,
   useNavigate,
+  useLocation,
 } from 'react-router-dom'
 import { motion } from 'motion/react'
 import customerService from '../services/customerService'
 
 export default function RegisterPage() {
   const navigate = useNavigate()
+  const location = useLocation()
+  const returnTo = location.state?.from
+  const safeReturnTo =
+    typeof returnTo === 'string' &&
+    /^\/digital-services\/\d+$/.test(returnTo)
+      ? returnTo
+      : '/social-services'
 
   const [form, setForm] = useState({
     username: '',
@@ -38,7 +46,7 @@ export default function RegisterPage() {
         form,
       )
 
-      navigate('/social-services')
+      navigate(safeReturnTo, { replace: true })
     } catch (err) {
       setError(
         err?.message ||
@@ -159,6 +167,7 @@ export default function RegisterPage() {
           Đã có tài khoản?{' '}
           <Link
             to="/login"
+            state={location.state}
             className="font-black text-blue-600"
           >
             Đăng nhập

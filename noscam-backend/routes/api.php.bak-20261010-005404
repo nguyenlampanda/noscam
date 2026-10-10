@@ -1,0 +1,626 @@
+<?php
+
+use App\Http\Controllers\Api\AdminAuthController;
+use App\Http\Controllers\Api\AdminDashboardController;
+use App\Http\Controllers\Api\AdminEvidenceController;
+use App\Http\Controllers\Api\AdminMediatorController;
+use App\Http\Controllers\Api\AdminReportController;
+use App\Http\Controllers\Api\AlertController;
+use App\Http\Controllers\Api\CommunityFeedbackController;
+use App\Http\Controllers\Api\MediatorController;
+use App\Http\Controllers\Api\MediatorBankController;
+use App\Http\Controllers\Api\MediatorTagController;
+use App\Http\Controllers\Api\PublicStatsController;
+use App\Http\Controllers\Api\ReportController;
+use App\Http\Controllers\Api\ReportModerationController;
+use App\Http\Controllers\Api\SearchController;
+use App\Http\Controllers\Api\AdminSocialCustomerController;
+use App\Http\Controllers\Api\AdminSocialDashboardController;
+use App\Http\Controllers\Api\AdminSocialOrderController;
+use App\Http\Controllers\Api\AdminSocialOrderAuditController;
+use App\Http\Controllers\Api\AdminSocialOrderReconciliationController;
+use App\Http\Controllers\Api\AdminSocialOrderReconciliationPreviewController;
+use App\Http\Controllers\Api\AdminSocialOrderResolutionController;
+use App\Http\Controllers\Api\AdminSocialProviderController;
+use App\Http\Controllers\Api\AdminSocialServiceController;
+use App\Http\Controllers\Api\AdminWalletTopupController;
+use App\Http\Controllers\Api\CustomerAuthController;
+use App\Http\Controllers\Api\WalletController;
+use App\Http\Controllers\Api\SocialServiceController;
+use App\Http\Controllers\Api\SocialOrderController;
+use App\Http\Controllers\Api\CustomerProfileController;
+use Illuminate\Support\Facades\Route;
+
+/*
+|--------------------------------------------------------------------------
+| Public Digital Services
+|--------------------------------------------------------------------------
+*/
+
+Route::get(
+    '/digital/services',
+    [\App\Http\Controllers\Api\PublicDigitalServiceController::class, 'index']
+)->middleware('throttle:public-search');
+
+Route::get(
+    '/digital/services/{digitalService}',
+    [\App\Http\Controllers\Api\PublicDigitalServiceController::class, 'show']
+)->whereNumber('digitalService')
+  ->middleware('throttle:public-search');
+
+/*
+|--------------------------------------------------------------------------
+| Public API
+|--------------------------------------------------------------------------
+*/
+
+Route::get(
+    '/stats',
+    [PublicStatsController::class, 'index']
+)->middleware(
+    'throttle:public-search'
+);
+
+Route::get(
+    '/search',
+    [SearchController::class, 'index']
+)->middleware(
+    'throttle:public-search'
+);
+
+Route::get(
+    '/alerts',
+    [AlertController::class, 'index']
+)->middleware(
+    'throttle:public-search'
+);
+
+Route::get(
+    '/community-feedback',
+    [CommunityFeedbackController::class, 'index']
+)->middleware(
+    'throttle:public-search'
+);
+
+Route::post(
+    '/community-feedback',
+    [CommunityFeedbackController::class, 'store']
+)->middleware(
+    'throttle:public-report'
+);
+
+Route::post(
+    '/reports',
+    [ReportController::class, 'store']
+)->middleware(
+    'throttle:public-report'
+);
+
+/*
+|--------------------------------------------------------------------------
+| Mediator Public API
+|--------------------------------------------------------------------------
+*/
+
+Route::get(
+    '/mediator-tags',
+    [MediatorTagController::class, 'index']
+)->middleware(
+    'throttle:public-search'
+);
+
+
+Route::get(
+    '/mediator-banks',
+    [MediatorBankController::class, 'index']
+)->middleware(
+    'throttle:public-search'
+);
+
+Route::get(
+    '/mediators',
+    [MediatorController::class, 'index']
+)->middleware(
+    'throttle:public-search'
+);
+
+Route::get(
+    '/mediators/lookup',
+    [MediatorController::class, 'lookup']
+)->middleware(
+    'throttle:public-search'
+);
+
+Route::get(
+    '/mediators/{code}',
+    [MediatorController::class, 'show']
+)->middleware(
+    'throttle:public-search'
+);
+
+
+/*
+|--------------------------------------------------------------------------
+| Social Services Public API
+|--------------------------------------------------------------------------
+*/
+
+Route::get(
+    '/social/services',
+    [SocialServiceController::class, 'index']
+)->middleware('throttle:public-search');
+
+Route::get(
+    '/social/services/{service}',
+    [SocialServiceController::class, 'show']
+)->middleware('throttle:public-search');
+
+/*
+|--------------------------------------------------------------------------
+| Customer Auth
+|--------------------------------------------------------------------------
+*/
+
+Route::post(
+    '/auth/register',
+    [CustomerAuthController::class, 'register']
+)->middleware('throttle:customer-auth');
+
+Route::post(
+    '/auth/login',
+    [CustomerAuthController::class, 'login']
+)->middleware('throttle:customer-auth');
+
+/*
+|--------------------------------------------------------------------------
+| Customer Protected API
+|--------------------------------------------------------------------------
+*/
+
+Route::middleware([
+    'auth:sanctum',
+    'throttle:customer-api',
+])->group(function () {
+    Route::get(
+        '/auth/me',
+        [CustomerAuthController::class, 'me']
+    );
+
+    Route::post(
+        '/auth/logout',
+        [CustomerAuthController::class, 'logout']
+    );
+
+    Route::get(
+        '/profile',
+        [CustomerProfileController::class, 'show']
+    );
+
+    Route::put(
+        '/profile',
+        [CustomerProfileController::class, 'update']
+    );
+
+    Route::put(
+        '/profile/password',
+        [CustomerProfileController::class, 'changePassword']
+    );
+
+    Route::get(
+        '/wallet',
+        [WalletController::class, 'show']
+    );
+
+    Route::get(
+        '/wallet/transactions',
+        [WalletController::class, 'transactions']
+    );
+
+    Route::get(
+        '/wallet/topups',
+        [WalletController::class, 'topups']
+    );
+
+    Route::post(
+        '/wallet/topups',
+        [WalletController::class, 'createTopup']
+    );
+
+    Route::get(
+        '/digital/orders',
+        [\App\Http\Controllers\Api\DigitalOrderController::class, 'index']
+    );
+
+    Route::post(
+        '/digital/orders',
+        [\App\Http\Controllers\Api\DigitalOrderController::class, 'store']
+    );
+
+    Route::get(
+        '/digital/orders/{digitalOrder}',
+        [\App\Http\Controllers\Api\DigitalOrderController::class, 'show']
+    )->whereNumber('digitalOrder');
+
+    Route::get(
+        '/social/orders',
+        [SocialOrderController::class, 'index']
+    );
+
+    Route::post(
+        '/social/orders',
+        [SocialOrderController::class, 'store']
+    );
+
+    Route::get(
+        '/social/orders/{order}',
+        [SocialOrderController::class, 'show']
+    );
+});
+
+/*
+|--------------------------------------------------------------------------
+| Admin Login
+|--------------------------------------------------------------------------
+*/
+
+Route::post(
+    '/admin/login',
+    [AdminAuthController::class, 'login']
+)->middleware(
+    'throttle:admin-login'
+);
+
+/*
+|--------------------------------------------------------------------------
+| Protected Admin API
+|--------------------------------------------------------------------------
+*/
+
+Route::prefix('admin')
+    ->middleware([
+        'auth:sanctum',
+        'moderator',
+        'throttle:admin-api',
+    ])
+    ->group(function () {
+        Route::post(
+            '/logout',
+            [
+                AdminAuthController::class,
+                'logout',
+            ]
+        );
+
+        Route::get(
+            '/me',
+            [
+                AdminAuthController::class,
+                'me',
+            ]
+        );
+
+        Route::get(
+            '/dashboard',
+            [
+                AdminDashboardController::class,
+                'index',
+            ]
+        );
+
+        /*
+        |--------------------------------------------------------------------------
+        | Reports
+        |--------------------------------------------------------------------------
+        */
+
+        Route::get(
+            '/reports',
+            [
+                AdminReportController::class,
+                'index',
+            ]
+        );
+
+        Route::get(
+            '/reports/{report}',
+            [
+                AdminReportController::class,
+                'show',
+            ]
+        );
+
+        Route::patch(
+            '/reports/{report}/status',
+            [
+                ReportModerationController::class,
+                'update',
+            ]
+        );
+
+        /*
+        |--------------------------------------------------------------------------
+        | Mediator Tags
+        |--------------------------------------------------------------------------
+        */
+
+        Route::post(
+            '/mediator-tags',
+            [
+                MediatorTagController::class,
+                'store',
+            ]
+        );
+
+        Route::put(
+            '/mediator-tags/{mediatorTag}',
+            [
+                MediatorTagController::class,
+                'update',
+            ]
+        );
+
+        /*
+        |--------------------------------------------------------------------------
+        | Mediators
+        |--------------------------------------------------------------------------
+        */
+
+
+        Route::post(
+            '/mediator-banks',
+            [
+                MediatorBankController::class,
+                'store',
+            ]
+        );
+
+        Route::put(
+            '/mediator-banks/{mediatorBank}',
+            [
+                MediatorBankController::class,
+                'update',
+            ]
+        );
+
+        Route::get(
+            '/mediators',
+            [
+                AdminMediatorController::class,
+                'index',
+            ]
+        );
+
+        Route::post(
+            '/mediators',
+            [
+                AdminMediatorController::class,
+                'store',
+            ]
+        );
+
+        Route::get(
+            '/mediators/{mediator}',
+            [
+                AdminMediatorController::class,
+                'show',
+            ]
+        );
+
+        Route::put(
+            '/mediators/{mediator}',
+            [
+                AdminMediatorController::class,
+                'update',
+            ]
+        );
+
+        Route::post(
+            '/mediators/{mediator}/deposits',
+            [
+                AdminMediatorController::class,
+                'addDeposit',
+            ]
+        );
+
+        /*
+        |--------------------------------------------------------------------------
+        | Social Services
+        |--------------------------------------------------------------------------
+        */
+
+        Route::get(
+            '/social/dashboard',
+            [AdminSocialDashboardController::class, 'index']
+        );
+
+        Route::get(
+            '/social/providers',
+            [AdminSocialProviderController::class, 'index']
+        );
+
+        Route::get(
+            '/social/providers/{provider}',
+            [AdminSocialProviderController::class, 'show']
+        );
+
+        Route::put(
+            '/social/providers/{provider}',
+            [AdminSocialProviderController::class, 'update']
+        );
+
+        Route::post(
+            '/social/providers/{provider}/test',
+            [AdminSocialProviderController::class, 'test']
+        );
+
+        Route::post(
+            '/social/providers/{provider}/sync',
+            [AdminSocialProviderController::class, 'sync']
+        );
+
+        /*
+        |--------------------------------------------------------------------------
+        | Social Services
+        |--------------------------------------------------------------------------
+        */
+
+        Route::get(
+            '/social/services',
+            [AdminSocialServiceController::class, 'index']
+        );
+
+        Route::get(
+            '/social/provider-services',
+            [AdminSocialServiceController::class, 'providerServices']
+        );
+
+        Route::patch(
+            '/social/provider-services/{providerService}',
+            [AdminSocialServiceController::class, 'updateProviderService']
+        );
+
+        Route::post(
+            '/social/provider-services/{providerService}/map',
+            [AdminSocialServiceController::class, 'mapProviderService']
+        );
+
+        Route::delete(
+            '/social/provider-services/{providerService}/map',
+            [AdminSocialServiceController::class, 'unmapProviderService']
+        );
+
+        Route::post(
+            '/social/services',
+            [AdminSocialServiceController::class, 'store']
+        );
+
+        Route::put(
+            '/social/services/{service}',
+            [AdminSocialServiceController::class, 'update']
+        );
+
+        Route::get(
+            '/social/orders',
+            [AdminSocialOrderController::class, 'index']
+        );
+
+        Route::get(
+            '/social/orders/audit',
+            [AdminSocialOrderController::class, 'audit']
+        );
+
+        Route::get(
+            '/social/orders/{order}',
+            [AdminSocialOrderController::class, 'show']
+        );
+
+        Route::get(
+            '/social/orders/{order}/audits',
+            [AdminSocialOrderAuditController::class, 'index']
+        );
+
+        Route::post(
+            '/social/orders/{order}/audits',
+            [AdminSocialOrderAuditController::class, 'store']
+        );
+
+        Route::get(
+            '/social/orders/{order}/resolutions',
+            [AdminSocialOrderResolutionController::class, 'index']
+        );
+
+        Route::get(
+            '/social/orders/{order}/reconcile-preview',
+            [AdminSocialOrderReconciliationPreviewController::class, 'show']
+        );
+
+        Route::post(
+            '/social/orders/{order}/reconcile',
+            [AdminSocialOrderReconciliationController::class, 'resolve']
+        );
+
+        Route::post(
+            '/social/orders/{order}/cancel',
+            [AdminSocialOrderController::class, 'cancel']
+        );
+
+        Route::patch(
+            '/social/orders/{order}/status',
+            [AdminSocialOrderController::class, 'updateStatus']
+        );
+
+        Route::get(
+            '/social/customers',
+            [AdminSocialCustomerController::class, 'index']
+        );
+
+        Route::get(
+            '/social/customers/{user}',
+            [AdminSocialCustomerController::class, 'show']
+        );
+
+        Route::post(
+            '/social/customers/{user}/wallet',
+            [AdminSocialCustomerController::class, 'adjustWallet']
+        );
+
+        Route::get(
+            '/social/topups',
+            [AdminWalletTopupController::class, 'index']
+        );
+
+        Route::post(
+            '/social/topups',
+            [AdminWalletTopupController::class, 'store']
+        );
+
+        Route::post(
+            '/social/topups/{topup}/approve',
+            [AdminWalletTopupController::class, 'approve']
+        );
+
+        Route::post(
+            '/social/topups/{topup}/reject',
+            [AdminWalletTopupController::class, 'reject']
+        );
+
+        /*
+        |--------------------------------------------------------------------------
+        | Digital Services
+        |--------------------------------------------------------------------------
+        */
+
+        Route::get(
+            '/digital/services',
+            [\App\Http\Controllers\Api\AdminDigitalServiceController::class, 'index']
+        );
+
+        Route::post(
+            '/digital/services',
+            [\App\Http\Controllers\Api\AdminDigitalServiceController::class, 'store']
+        );
+
+        Route::put(
+            '/digital/services/{digitalService}',
+            [\App\Http\Controllers\Api\AdminDigitalServiceController::class, 'update']
+        );
+
+        Route::patch(
+            '/digital/services/{digitalService}/status',
+            [\App\Http\Controllers\Api\AdminDigitalServiceController::class, 'status']
+        );
+
+        /*
+        |--------------------------------------------------------------------------
+        | Evidence
+        |--------------------------------------------------------------------------
+        */
+
+        Route::get(
+            '/evidences/{evidence}',
+            [
+                AdminEvidenceController::class,
+                'show',
+            ]
+        );
+    });

@@ -204,6 +204,55 @@ const customerService = {
     )
   },
 
+  async digitalOrders(page = 1) {
+    return customerRequest(() =>
+      apiClient.get(
+        `/digital/orders?page=${encodeURIComponent(page)}`,
+        authOptions(),
+      ),
+    )
+  },
+
+  async digitalOrder(id) {
+    return customerRequest(() =>
+      apiClient.get(
+        `/digital/orders/${encodeURIComponent(id)}`,
+        authOptions(),
+      ),
+    )
+  },
+
+  async createDigitalOrder(data) {
+    return customerRequest(() =>
+      apiClient.post(
+        '/digital/orders',
+        data,
+        authOptions(),
+      ),
+    )
+  },
+
+  async createGuestDigitalOrder(data) {
+    return apiClient.post(
+      '/digital/guest/orders',
+      data,
+    )
+  },
+
+  async respondGuestDigitalQuote(orderId, quoteId, lookupToken, action) {
+    return apiClient.post(
+      `/digital/guest/orders/${encodeURIComponent(orderId)}/quotes/${encodeURIComponent(quoteId)}/respond`,
+      { lookup_token: lookupToken, action },
+    )
+  },
+
+  async lookupGuestDigitalOrder(orderId, lookupToken) {
+    return apiClient.post(
+      `/digital/guest/orders/${encodeURIComponent(orderId)}/lookup`,
+      { lookup_token: lookupToken },
+    )
+  },
+
   async createOrder(data) {
     return customerRequest(() =>
       apiClient.post(
