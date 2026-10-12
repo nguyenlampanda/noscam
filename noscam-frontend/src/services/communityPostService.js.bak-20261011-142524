@@ -1,0 +1,18 @@
+import apiClient from './apiClient'
+
+export async function getCommunityPosts(page = 1, options = {}) {
+  const params = new URLSearchParams({
+    page: String(page),
+    per_page: '6',
+  })
+
+  const response = await apiClient.get(
+    `/community/posts?${params}`,
+    { signal: options.signal },
+  )
+
+  return {
+    posts: Array.isArray(response?.data) ? response.data : [],
+    pagination: response?.meta ?? {},
+  }
+}

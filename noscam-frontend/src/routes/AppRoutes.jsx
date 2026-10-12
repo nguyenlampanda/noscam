@@ -10,6 +10,14 @@ import {
 import ProtectedAdminRoute from '../components/admin/ProtectedAdminRoute'
 import AppLayout from '../layouts/AppLayout'
 
+const CommunityPage = lazy(() =>
+  import('../pages/Community/CommunityPage')
+)
+
+const AdminCommunityPage = lazy(() =>
+  import('../pages/Admin/AdminCommunityPage')
+)
+
 const HomePage = lazy(() =>
   import(
     '../pages/Home/HomePage'
@@ -204,6 +212,11 @@ function AppRoutes() {
           />
 
           <Route
+            path="/community"
+            element={<CommunityPage />}
+          />
+
+          <Route
             path="/report"
             element={<ReportPage />}
           />
@@ -349,6 +362,15 @@ function AppRoutes() {
           element={
             <ProtectedAdminRoute>
               <AdminSocialTopupsPage />
+            </ProtectedAdminRoute>
+          }
+        />
+
+        <Route
+          path="/admin/community"
+          element={
+            <ProtectedAdminRoute>
+              <AdminCommunityPage />
             </ProtectedAdminRoute>
           }
         />

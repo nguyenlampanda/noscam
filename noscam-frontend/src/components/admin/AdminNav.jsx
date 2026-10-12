@@ -30,6 +30,10 @@ const menu = [
     label: 'Báo cáo',
   },
   {
+    to: '/admin/community',
+    label: 'Cộng đồng',
+  },
+  {
     to: '/admin/mediators',
     label: 'Trung gian',
   },

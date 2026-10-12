@@ -98,6 +98,103 @@ Route::post(
 
 /*
 |--------------------------------------------------------------------------
+| Community Comment Moderation
+|--------------------------------------------------------------------------
+*/
+
+Route::middleware([
+    'auth:sanctum',
+    'throttle:customer-api',
+])->group(function () {
+    Route::get(
+        '/community/moderation/comments',
+        [\App\Http\Controllers\Api\CommunityCommentModerationController::class, 'index']
+    );
+
+    Route::patch(
+        '/community/moderation/comments/{comment}',
+        [\App\Http\Controllers\Api\CommunityCommentModerationController::class, 'update']
+    )->whereNumber('comment');
+});
+
+/*
+|--------------------------------------------------------------------------
+| Community Moderation
+|--------------------------------------------------------------------------
+*/
+
+Route::middleware([
+    'auth:sanctum',
+    'throttle:customer-api',
+])->group(function () {
+    Route::get(
+        '/community/moderation/posts',
+        [\App\Http\Controllers\Api\CommunityModerationController::class, 'index']
+    );
+
+    Route::patch(
+        '/community/moderation/posts/{post}',
+        [\App\Http\Controllers\Api\CommunityModerationController::class, 'update']
+    )->whereNumber('post');
+});
+
+/*
+|--------------------------------------------------------------------------
+| Community Comments
+|--------------------------------------------------------------------------
+*/
+
+Route::get(
+    '/community/posts/{post}/comments',
+    [\App\Http\Controllers\Api\CommunityCommentController::class, 'index']
+)->whereNumber('post')
+  ->middleware('throttle:public-search');
+
+Route::post(
+    '/community/posts/{post}/comments',
+    [\App\Http\Controllers\Api\CommunityCommentController::class, 'store']
+)->whereNumber('post')
+  ->middleware(['auth:sanctum', 'throttle:customer-api']);
+
+/*
+|--------------------------------------------------------------------------
+| Community Reactions
+|--------------------------------------------------------------------------
+*/
+
+Route::middleware([
+    'auth:sanctum',
+    'throttle:customer-api',
+])->group(function () {
+    Route::post(
+        '/community/posts/{post}/like',
+        [\App\Http\Controllers\Api\CommunityReactionController::class, 'store']
+    )->whereNumber('post');
+
+    Route::delete(
+        '/community/posts/{post}/like',
+        [\App\Http\Controllers\Api\CommunityReactionController::class, 'destroy']
+    )->whereNumber('post');
+});
+
+/*
+|--------------------------------------------------------------------------
+| Community Posts
+|--------------------------------------------------------------------------
+*/
+
+Route::get(
+    '/community/posts',
+    [\App\Http\Controllers\Api\CommunityPostController::class, 'index']
+)->middleware('throttle:public-search');
+
+Route::post(
+    '/community/posts',
+    [\App\Http\Controllers\Api\CommunityPostController::class, 'store']
+)->middleware(['auth:sanctum', 'throttle:customer-api']);
+
+/*
+|--------------------------------------------------------------------------
 | Mediator Public API
 |--------------------------------------------------------------------------
 */

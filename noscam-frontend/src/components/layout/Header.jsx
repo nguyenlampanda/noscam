@@ -33,6 +33,10 @@ const navigation = [
     path: '/alerts',
   },
   {
+    name: 'Cộng đồng',
+    path: '/community',
+  },
+  {
     name: 'Trung gian',
     path: '/mediators',
   },

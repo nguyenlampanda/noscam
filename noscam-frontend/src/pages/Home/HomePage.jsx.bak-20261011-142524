@@ -1,0 +1,25 @@
+import HeroSearch from '../../components/search/HeroSearch'
+import SystemStats from '../../components/common/SystemStats'
+import CommunityFeed from '../../components/home/CommunityFeed'
+import RecentAlerts from '../../components/risk/RecentAlerts'
+import ScamAwareness from '../../components/home/ScamAwareness'
+import CheckTypes from '../../components/search/CheckTypes'
+import HowItWorks from '../../components/common/HowItWorks'
+import ReportCTA from '../../components/report/ReportCTA'
+
+function HomePage() {
+  return (
+    <>
+      <HeroSearch />
+      <SystemStats />
+      <CommunityFeed />
+      <RecentAlerts />
+      <ScamAwareness />
+      <CheckTypes />
+      <HowItWorks />
+      <ReportCTA />
+    </>
+  )
+}
+
+export default HomePage
