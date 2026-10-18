@@ -1,3 +1,224 @@
+
+
+function getProviderDescriptionForSale(item) {
+  const descriptionKeys = [
+    'description',
+    'service_description',
+    'channel_description',
+    'desc',
+    'service_desc',
+    'details',
+    'detail',
+    'note',
+    'notes',
+    'content',
+    'info',
+    'information',
+    'instructions',
+    'instruction',
+  ]
+  function parseJSON(value) {
+    if (typeof value !== 'string') return value
+
+    const text = value.trim()
+
+    if (!text.startsWith('{') && !text.startsWith('[')) {
+      return value
+    }
+
+    try {
+      return JSON.parse(text)
+    } catch {
+      return value
+    }
+  }
+
+  function findDescription(root) {
+    const queue = [root]
+    const visited = new Set()
+    let inspected = 0
+
+    while (queue.length && inspected < 100) {
+      inspected += 1
+      const current = parseJSON(queue.shift())
+
+      if (!current || typeof current !== 'object') continue
+      if (visited.has(current)) continue
+
+      visited.add(current)
+
+      for (const key of descriptionKeys) {
+        const value = current[key]
+
+        if (typeof value === 'string' && value.trim()) {
+          return value.trim()
+        }
+      }
+
+      for (const [key, value] of Object.entries(current)) {
+        if (/key|token|secret|password|credential|authorization/i.test(key)) {
+          continue
+        }
+
+        if (value && typeof value === 'object') {
+          queue.push(value)
+        } else if (
+          typeof value === 'string' &&
+          /^[\s]*[\[{]/.test(value)
+        ) {
+          queue.push(parseJSON(value))
+        }
+      }
+    }
+
+    return ''
+  }
+
+  const description = findDescription({
+    provider_description: item?.provider_description,
+    provider_data: item?.provider_data,
+  })
+
+  function formatDescription(value) {
+    if (typeof value !== 'string') return ''
+
+    const withBreaks = value
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/(?:p|div|li)>/gi, '\n')
+      .replace(/<li\b[^>]*>/gi, '- ')
+      .replace(/<[^>]*>/g, '')
+
+    const textarea = document.createElement('textarea')
+    textarea.innerHTML = withBreaks
+
+    return textarea.value
+      .replace(/\n{3,}/g, '\n\n')
+      .trim()
+  }
+
+  return formatDescription(description).slice(0, 5000)
+}
+
+function ProviderDescription({ item }) {
+  const descriptionKeys = [
+    'description',
+    'service_description',
+    'channel_description',
+    'desc',
+    'service_desc',
+    'details',
+    'detail',
+    'note',
+    'notes',
+    'content',
+    'info',
+    'information',
+    'instructions',
+    'instruction',
+  ]
+
+  function parseJSON(value) {
+    if (typeof value !== 'string') return value
+
+    const text = value.trim()
+
+    if (!text.startsWith('{') && !text.startsWith('[')) {
+      return value
+    }
+
+    try {
+      return JSON.parse(text)
+    } catch {
+      return value
+    }
+  }
+
+  function findDescription(root) {
+    const queue = [root]
+    const visited = new Set()
+    let inspected = 0
+
+    while (queue.length && inspected < 100) {
+      inspected += 1
+      const current = parseJSON(queue.shift())
+
+      if (!current || typeof current !== 'object') continue
+      if (visited.has(current)) continue
+
+      visited.add(current)
+
+      for (const key of descriptionKeys) {
+        const value = current[key]
+
+        if (typeof value === 'string' && value.trim()) {
+          return value.trim()
+        }
+      }
+
+      for (const [key, value] of Object.entries(current)) {
+        if (/key|token|secret|password|credential|authorization/i.test(key)) {
+          continue
+        }
+
+        if (value && typeof value === 'object') {
+          queue.push(value)
+        } else if (
+          typeof value === 'string' &&
+          /^[\s]*[\[{]/.test(value)
+        ) {
+          queue.push(parseJSON(value))
+        }
+      }
+    }
+
+    return ''
+  }
+
+  const description = findDescription({
+    provider_description: item.provider_description,
+    provider_data: item.provider_data,
+  })
+
+
+  function formatDescription(value) {
+    if (typeof value !== 'string') return ''
+
+    const withBreaks = value
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/(?:p|div|li)>/gi, '\n')
+      .replace(/<li\b[^>]*>/gi, '- ')
+      .replace(/<[^>]*>/g, '')
+
+    const textarea = document.createElement('textarea')
+    textarea.innerHTML = withBreaks
+
+    return textarea.value
+      .replace(/\n{3,}/g, '\n\n')
+      .trim()
+  }
+
+  const readableDescription = formatDescription(description)
+
+  if (!description) {
+    return (
+      <div className="text-xs leading-5 text-slate-400">
+        Chưa có mô tả
+      </div>
+    )
+  }
+
+  return (
+    
+    <div className="w-full whitespace-pre-wrap break-words text-xs leading-5 text-slate-700">
+      {readableDescription}
+    </div>
+
+  )
+}
+
+
+import NoScamSelect from '../../components/ui/NoScamSelect'
+import { useNoScamUI } from '../../components/ui/NoScamUI'
 import {
   useCallback,
   useEffect,
@@ -107,8 +328,15 @@ function MapModal({ item, onClose, onDone }) {
   const [platform, setPlatform] = useState(detectedPlatform)
   const [category, setCategory] = useState(detectedCategory)
   const [name, setName] = useState(sourceName)
-  const [description, setDescription] = useState('')
+  const [description, setDescription] = useState(() => getProviderDescriptionForSale(item))
   const [price, setPrice] = useState('')
+
+  const [noscamManualLimitMin, setNoscamManualLimitMin] = useState(
+    String(item.min_quantity ?? '')
+  )
+  const [noscamManualLimitMax, setNoscamManualLimitMax] = useState(
+    String(item.max_quantity ?? '')
+  )
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
@@ -153,15 +381,18 @@ function MapModal({ item, onClose, onDone }) {
       return
     }
 
-    const min = Number(item.min_quantity || 1)
-    const max = Number(item.max_quantity || 1000000)
+    const min = Number(noscamManualLimitMin)
+    const max = Number(noscamManualLimitMax)
 
     if (
-      !Number.isInteger(min) ||
-      !Number.isInteger(max) ||
+      noscamManualLimitMin.trim() === '' ||
+      noscamManualLimitMax.trim() === '' ||
+      !Number.isSafeInteger(min) ||
+      !Number.isSafeInteger(max) ||
+      min < 1 ||
       max < min
     ) {
-      setError('Số lượng Min/Max không hợp lệ.')
+      setError('Vui lòng nhập Min và Max hợp lệ (Min ≥ 1, Max ≥ Min).')
       return
     }
 
@@ -244,7 +475,7 @@ function MapModal({ item, onClose, onDone }) {
         <div className="mt-5 grid gap-4 sm:grid-cols-2">
           <label className="grid gap-2">
             <span className="text-sm font-bold">Nền tảng</span>
-            <select
+            <NoScamSelect
               value={platform}
               onChange={(e) => setPlatform(e.target.value)}
               className={fieldClass}
@@ -253,12 +484,12 @@ function MapModal({ item, onClose, onDone }) {
               <option value="facebook">Facebook</option>
               <option value="instagram">Instagram</option>
               <option value="tiktok">TikTok</option>
-            </select>
+            </NoScamSelect>
           </label>
 
           <label className="grid gap-2">
             <span className="text-sm font-bold">Loại dịch vụ</span>
-            <select
+            <NoScamSelect
               value={category}
               onChange={(e) => setCategory(e.target.value)}
               className={fieldClass}
@@ -272,7 +503,7 @@ function MapModal({ item, onClose, onDone }) {
               <option value="reaction">Reaction</option>
               <option value="member">Member</option>
               <option value="save">Save</option>
-            </select>
+            </NoScamSelect>
           </label>
         </div>
 
@@ -313,6 +544,37 @@ function MapModal({ item, onClose, onDone }) {
             </div>
           </div>
         </div>
+
+        <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <label className="grid gap-2">
+            <span className="text-sm font-bold">Min bán cho khách</span>
+            <input
+              type="number"
+              min="1"
+              step="1"
+              value={noscamManualLimitMin}
+              onChange={(e) => setNoscamManualLimitMin(e.target.value)}
+              placeholder="Nhập Min"
+              className={fieldClass}
+            />
+          </label>
+          <label className="grid gap-2">
+            <span className="text-sm font-bold">Max bán cho khách</span>
+            <input
+              type="number"
+              min="1"
+              step="1"
+              value={noscamManualLimitMax}
+              onChange={(e) => setNoscamManualLimitMax(e.target.value)}
+              placeholder="Nhập Max"
+              className={fieldClass}
+            />
+          </label>
+        </div>
+        <p className="mt-2 text-xs text-amber-700">
+          Nếu API không cung cấp Min/Max, hãy xác minh với
+          nhà cung cấp trước khi nhập giới hạn bán.
+        </p>
 
         <label className="mt-5 grid gap-2">
           <span className="text-sm font-bold">
@@ -532,7 +794,7 @@ function PriceModal({ item, onClose, onDone }) {
 
           <label className="space-y-1">
             <span className="text-sm font-bold">Nền tảng</span>
-            <select
+            <NoScamSelect
               className={field}
               value={platform}
               onChange={(e) => setPlatform(e.target.value)}
@@ -541,12 +803,12 @@ function PriceModal({ item, onClose, onDone }) {
               <option value="instagram">Instagram</option>
               <option value="tiktok">TikTok</option>
               <option value="other">Khác</option>
-            </select>
+            </NoScamSelect>
           </label>
 
           <label className="space-y-1">
             <span className="text-sm font-bold">Loại dịch vụ</span>
-            <select
+            <NoScamSelect
               className={field}
               value={category}
               onChange={(e) => setCategory(e.target.value)}
@@ -566,7 +828,7 @@ function PriceModal({ item, onClose, onDone }) {
               <option value="member">Member</option>
               <option value="save">Save</option>
               <option value="other">Khác</option>
-            </select>
+            </NoScamSelect>
           </label>
 
           <label className="space-y-1">
@@ -588,14 +850,14 @@ function PriceModal({ item, onClose, onDone }) {
 
           <label className="space-y-1">
             <span className="text-sm font-bold">Trạng thái</span>
-            <select
+            <NoScamSelect
               className={field}
               value={active ? '1' : '0'}
               onChange={(e) => setActive(e.target.value === '1')}
             >
               <option value="1">Đang bán</option>
               <option value="0">Tạm ngừng bán</option>
-            </select>
+            </NoScamSelect>
           </label>
 
           <label className="space-y-1">
@@ -655,6 +917,7 @@ function PriceModal({ item, onClose, onDone }) {
 }
 
 export default function AdminSocialServicesPage() {
+  const { confirm } = useNoScamUI()
   const [items, setItems] =
     useState([])
 
@@ -688,6 +951,9 @@ export default function AdminSocialServicesPage() {
   const [mapped, setMapped] =
     useState('')
 
+  const [availability, setAvailability] =
+    useState('')
+
   const [page, setPage] =
     useState(1)
 
@@ -706,6 +972,7 @@ export default function AdminSocialServicesPage() {
             .getSocialProviderServices({
               providerId,
               mapped,
+              providerAvailability: availability,
               search,
               page,
               perPage: 50,
@@ -788,6 +1055,7 @@ export default function AdminSocialServicesPage() {
       page,
       providerId,
       search,
+      availability,
     ],
   )
 
@@ -822,7 +1090,7 @@ export default function AdminSocialServicesPage() {
 
   async function unmap(item) {
     if (
-      !window.confirm(
+      !await confirm(
         'Bỏ dịch vụ nguồn này khỏi dịch vụ đang bán?',
       )
     ) {
@@ -881,7 +1149,7 @@ export default function AdminSocialServicesPage() {
             className="rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-blue-400"
           />
 
-          <select
+          <NoScamSelect
             value={providerId}
             onChange={(e) => {
               setProviderId(
@@ -905,9 +1173,9 @@ export default function AdminSocialServicesPage() {
                 </option>
               ),
             )}
-          </select>
+          </NoScamSelect>
 
-          <select
+          <NoScamSelect
             value={mapped}
             onChange={(e) => {
               setMapped(
@@ -926,7 +1194,21 @@ export default function AdminSocialServicesPage() {
             <option value="true">
               Đã map
             </option>
-          </select>
+          </NoScamSelect>
+
+          <NoScamSelect
+            value={availability}
+            onChange={(e) => {
+              setAvailability(e.target.value)
+              setPage(1)
+            }}
+            className="rounded-2xl border border-slate-200 bg-white px-4 py-3"
+          >
+            <option value="">Tất cả trạng thái API</option>
+            <option value="available">Đang cung cấp</option>
+            <option value="unavailable">Ngưng cung cấp</option>
+            <option value="unknown">Chưa xác minh</option>
+          </NoScamSelect>
         </div>
 
         <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
@@ -953,34 +1235,20 @@ export default function AdminSocialServicesPage() {
 
         <div className="mt-5 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1200px] text-left">
+            <table className="w-full table-fixed text-left text-xs lg:text-sm">
               <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-400">
                 <tr>
-                  <th className="px-5 py-4">
-                    Dịch vụ nguồn
-                  </th>
-                  <th className="px-5 py-4">
-                    Provider
-                  </th>
-                  <th className="px-5 py-4">
-                    Giá API
-                  </th>
+                  <th className="px-2 py-4 w-[9%] ">Provider</th>
+                  <th className="px-2 py-4 w-[19%] ">Dịch vụ nguồn</th>
+                  <th className="px-2 py-4 w-[15%] ">Mô tả</th>
+                  <th className="px-2 py-4 w-[8%] ">Giá API</th>
 
-                  <th className="px-5 py-4">
-                    Giá vốn VND
-                  </th>
-                  <th className="px-5 py-4">
-                    Min / Max
-                  </th>
-                  <th className="px-5 py-4">
-                    Map
-                  </th>
-                  <th className="px-5 py-4">
-                    Trạng thái
-                  </th>
-                  <th className="px-5 py-4 text-right">
-                    Thao tác
-                  </th>
+                  <th className="px-2 py-4 w-[9%] ">Giá vốn VND</th>
+                  <th className="px-2 py-4 w-[11%] ">Min / Max</th>
+                  <th className="px-2 py-4 w-[6%] ">Map</th>
+                  <th className="px-2 py-4 w-[8%] ">Admin bật/tắt</th>
+                  <th className="px-2 py-4 w-[8%] ">Trạng thái API</th>
+                  <th className="px-2 py-4 w-[7%] text-right">Thao tác</th>
                 </tr>
               </thead>
 
@@ -988,7 +1256,7 @@ export default function AdminSocialServicesPage() {
                 {loading ? (
                   <tr>
                     <td
-                      colSpan="8"
+                      colSpan="10"
                       className="px-5 py-16 text-center font-semibold text-slate-400"
                     >
                       Đang tải...
@@ -997,7 +1265,7 @@ export default function AdminSocialServicesPage() {
                 ) : items.length === 0 ? (
                   <tr>
                     <td
-                      colSpan="8"
+                      colSpan="10"
                       className="px-5 py-16 text-center font-semibold text-slate-400"
                     >
                       Không có dịch vụ.
@@ -1009,7 +1277,13 @@ export default function AdminSocialServicesPage() {
                       key={item.id}
                       className="hover:bg-slate-50/70"
                     >
-                      <td className="px-5 py-4">
+                      <td className="px-2 py-4 align-middle break-words">
+                        <ProviderBadge
+                          provider={item.provider}
+                        />
+                      </td>
+
+                      <td className="px-2 py-4 align-middle break-words">
                         <div className="max-w-sm font-bold text-slate-900">
                           {item.provider_service_name}
                         </div>
@@ -1017,15 +1291,16 @@ export default function AdminSocialServicesPage() {
                         <div className="mt-1 text-xs font-semibold text-slate-400">
                           ID {item.provider_service_id}
                         </div>
+
+                        
                       </td>
 
-                      <td className="px-5 py-4">
-                        <ProviderBadge
-                          provider={item.provider}
-                        />
+                      
+                      <td className="px-2 py-4 align-middle break-words">
+                        <div className="min-w-0 break-words"><ProviderDescription item={item} /></div>
                       </td>
 
-                      <td className="px-5 py-4">
+                      <td className="px-2 py-4 align-middle break-words">
                         <div className="font-black text-slate-900">
                           {money(
                             item.cost_price_per_1000,
@@ -1050,7 +1325,7 @@ export default function AdminSocialServicesPage() {
                         )}
                       </td>
 
-                      <td className="px-5 py-4">
+                      <td className="px-2 py-4 align-middle break-words">
                         <div className="font-black text-blue-700">
                           {vnd(
                             item.cost_price_vnd ??
@@ -1076,7 +1351,7 @@ export default function AdminSocialServicesPage() {
                         {money(item.max_quantity)}
                       </td>
 
-                      <td className="px-5 py-4">
+                      <td className="px-2 py-4 align-middle break-words">
                         {item.is_mapped ? (
                           <div>
                             <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700">
@@ -1094,7 +1369,7 @@ export default function AdminSocialServicesPage() {
                         )}
                       </td>
 
-                      <td className="px-5 py-4">
+                      <td className="px-2 py-4 align-middle break-words">
                         <button
                           type="button"
                           onClick={() =>
@@ -1112,7 +1387,30 @@ export default function AdminSocialServicesPage() {
                         </button>
                       </td>
 
-                      <td className="px-5 py-4">
+                      <td className="px-2 py-4 align-middle break-words">
+                        <span
+                          className={`rounded-full px-3 py-1.5 text-xs font-bold ${
+                            item.provider_availability === 'available'
+                              ? 'bg-emerald-50 text-emerald-700'
+                              : item.provider_availability === 'unavailable'
+                                ? 'bg-red-50 text-red-600'
+                                : 'bg-slate-100 text-slate-600'
+                          }`}
+                        >
+                          {item.provider_availability === 'available'
+                            ? 'Đang cung cấp'
+                            : item.provider_availability === 'unavailable'
+                              ? 'Ngưng cung cấp'
+                              : 'Chưa xác minh'}
+                        </span>
+                        <div className="mt-2 text-xs text-slate-400">
+                          {item.last_synced_at
+                            ? new Date(item.last_synced_at).toLocaleString('vi-VN')
+                            : 'Chưa đồng bộ'}
+                        </div>
+                      </td>
+
+                      <td className="px-2 py-4 align-middle break-words">
                         <div className="flex justify-end gap-2">
                           {!item.is_mapped && (
                             <button

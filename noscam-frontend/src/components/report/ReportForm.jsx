@@ -1,3 +1,4 @@
+import NoScamSelect from '../ui/NoScamSelect'
 import { useMemo, useState } from 'react'
 import {
   AnimatePresence,
@@ -455,7 +456,7 @@ function ReportForm() {
             Loại sự việc
           </label>
 
-          <select
+          <NoScamSelect
             id="scamType"
             name="scamType"
             value={
@@ -478,7 +479,7 @@ function ReportForm() {
                 </option>
               ),
             )}
-          </select>
+          </NoScamSelect>
         </FormSection>
 
         <FormSection
@@ -535,7 +536,7 @@ function ReportForm() {
               label="Ngân hàng"
               htmlFor="bank"
             >
-              <select
+              <NoScamSelect
                 id="bank"
                 name="bank"
                 value={
@@ -562,7 +563,7 @@ function ReportForm() {
                     </option>
                   ),
                 )}
-              </select>
+              </NoScamSelect>
             </Field>
 
             <Field

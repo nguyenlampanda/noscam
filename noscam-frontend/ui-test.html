@@ -1,0 +1,796 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NoScam.vn - UI Test Lab</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#f5f7fb;color:#152033;font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+button,input,textarea,select{font:inherit}
+button{cursor:pointer}
+header{background:white;border-bottom:1px solid #e5eaf2;padding:22px max(20px,calc((100% - 1100px)/2))}
+.logo{font-size:22px;font-weight:850;color:#175cff}
+.logo span{color:#172033}
+main{max-width:1100px;margin:auto;padding:32px 20px 70px}
+h1{font-size:29px;margin:0 0 8px}
+.sub{color:#718096;margin-bottom:30px}
+h2{font-size:18px;margin:0 0 18px}
+.panel{background:white;border:1px solid #e7ecf3;border-radius:20px;padding:24px;margin-bottom:22px}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.demo{border:1px solid #e7ecf3;border-radius:14px;padding:18px;display:flex;flex-direction:column;gap:10px}
+.demo strong{font-size:15px}
+.demo p{font-size:13px;color:#718096;margin:0;min-height:38px;line-height:1.6}
+.btn{border:0;border-radius:11px;padding:11px 17px;background:#175cff;color:white;font-weight:650}
+.btn:hover{filter:brightness(.95)}
+.btn.secondary{background:#edf2f8;color:#34445b}
+.btn.danger{background:#dc3545}
+.btn.amber{background:#e78a0a}
+.btn.green{background:#059669}
+.btn.outline{background:white;color:#34445b;border:1px solid #dce4ee}
+.filters{display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:12px}
+.field{width:100%;border:1px solid #dfe6ef;background:#f8fafc;padding:12px;border-radius:11px;outline:none}
+.field:focus{border-color:#175cff;background:white}
+label{display:block;font-size:13px;font-weight:650;margin-bottom:7px}
+.overlay{position:fixed;inset:0;background:rgba(9,17,34,.62);display:none;align-items:center;justify-content:center;padding:18px;z-index:100}
+.overlay.show{display:flex}
+.modal{width:100%;max-width:480px;background:white;border-radius:20px;box-shadow:0 30px 90px #0004;overflow:hidden;animation:pop .16s ease}
+@keyframes pop{from{opacity:0;transform:translateY(9px) scale(.98)}to{opacity:1;transform:none}}
+.modal-head{padding:22px 24px 15px;display:flex;justify-content:space-between;gap:12px}
+.modal h3{font-size:20px;margin:0}
+.close{background:#f0f3f8;border:0;border-radius:9px;width:33px;height:33px;font-size:20px}
+.modal-body{padding:0 24px 22px;color:#526078;font-size:14px;line-height:1.65;max-height:65vh;overflow:auto}
+.modal-foot{border-top:1px solid #e8edf4;padding:16px 24px;display:flex;justify-content:flex-end;gap:10px}
+.icon{width:46px;height:46px;border-radius:13px;display:grid;place-items:center;font-size:24px;margin-bottom:14px}
+.success{background:#dcfce7;color:#047857}
+.error{background:#fee2e2;color:#b91c1c}
+.warning{background:#fef3c7;color:#b45309}
+.info{background:#dbeafe;color:#1d4ed8}
+.box{background:#f4f7fb;border-radius:12px;padding:13px;margin:12px 0}
+.box b{font-size:20px;color:#175cff}
+textarea{resize:vertical}
+.toast-area{position:fixed;right:22px;top:20px;z-index:200;display:grid;gap:10px}
+.toast{background:white;border:1px solid #e2e8f0;border-left:4px solid #175cff;box-shadow:0 10px 35px #0002;border-radius:12px;padding:14px 18px;min-width:280px;font-size:14px}
+.toast.ok{border-left-color:#059669}
+.toast.bad{border-left-color:#dc3545}
+.pill{display:inline-block;padding:5px 10px;border-radius:99px;background:#e9f0ff;color:#175cff;font-size:12px;font-weight:700}
+.results{display:flex;gap:9px;flex-wrap:wrap;margin-top:14px}
+.result{padding:10px 13px;border-radius:10px;background:#f2f6fc;font-size:13px}
+@media(max-width:800px){.grid{grid-template-columns:repeat(2,1fr)}.filters{grid-template-columns:1fr}}
+@media(max-width:550px){.grid{grid-template-columns:1fr}.panel{padding:17px}.modal-head,.modal-body,.modal-foot{padding-left:18px;padding-right:18px}}
+</style>
+
+<style>
+.popup-brand{
+  display:flex;
+  align-items:center;
+  gap:9px;
+  margin-bottom:16px;
+  font-size:17px;
+  font-weight:850;
+  color:#175cff;
+}
+.popup-brand-icon{
+  display:grid;
+  place-items:center;
+  width:35px;
+  height:35px;
+  border-radius:11px;
+  background:linear-gradient(135deg,#175cff,#06b6d4);
+  color:white;
+  font-size:21px;
+  box-shadow:0 5px 14px #175cff25;
+}
+.popup-brand-domain{color:#152033}
+</style>
+
+
+<style>
+.custom-select{position:relative;width:100%}
+.select-trigger{
+  width:100%;min-height:44px;padding:11px 14px;
+  border:1px solid #dfe6ef;border-radius:12px;
+  background:#f8fafc;color:#172033;
+  display:flex;align-items:center;justify-content:space-between;
+  gap:12px;text-align:left;font-size:14px;
+  transition:.18s ease;
+}
+.select-trigger:hover{background:white;border-color:#a9bff9}
+.custom-select.open .select-trigger{
+  background:white;border-color:#175cff;
+  box-shadow:0 0 0 3px #175cff15;
+}
+.select-arrow{
+  font-size:21px;line-height:15px;color:#718096;
+  transition:transform .2s ease;
+}
+.custom-select.open .select-arrow{transform:rotate(180deg)}
+.select-menu{
+  display:none;position:absolute;top:calc(100% + 7px);
+  left:0;right:0;z-index:60;padding:6px;
+  background:white;border:1px solid #e4eaf3;
+  border-radius:14px;
+  box-shadow:0 15px 45px #162c521f;
+  max-height:250px;overflow:auto;
+}
+.custom-select.open .select-menu{display:block}
+.select-option{
+  width:100%;border:0;background:transparent;
+  border-radius:9px;padding:11px 12px;
+  display:flex;align-items:center;justify-content:space-between;
+  text-align:left;color:#34445b;font-size:14px;
+  transition:background .15s ease;
+}
+.select-option:hover{background:#f1f5ff;color:#175cff}
+.select-option.selected{
+  background:#eaf0ff;color:#175cff;font-weight:700;
+}
+.select-option .check{display:none}
+.select-option.selected .check{display:inline}
+</style>
+
+
+<style>
+.loading-demo-grid{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:16px;
+}
+.loading-demo-card{
+  min-width:0;
+  border:1px solid #e7ecf3;
+  border-radius:16px;
+  padding:20px;
+  background:#fff;
+}
+.loading-demo-card h3{
+  font-size:16px;
+  margin:0 0 8px;
+}
+.loading-demo-card p{
+  color:#718096;
+  font-size:13px;
+  line-height:1.6;
+  min-height:42px;
+}
+.ns-spinner{
+  display:inline-block;
+  width:19px;
+  height:19px;
+  border:3px solid #ffffff70;
+  border-top-color:white;
+  border-radius:50%;
+  animation:ns-spin .75s linear infinite;
+  vertical-align:middle;
+}
+.ns-spinner.blue{
+  width:42px;
+  height:42px;
+  border:4px solid #dce8ff;
+  border-top-color:#175cff;
+}
+@keyframes ns-spin{
+  to{transform:rotate(360deg)}
+}
+.ns-loading-btn{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:10px;
+  min-width:180px;
+}
+.ns-skeleton{
+  position:relative;
+  overflow:hidden;
+  background:#e9eef6;
+  border-radius:9px;
+}
+.ns-skeleton::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  transform:translateX(-100%);
+  background:linear-gradient(
+    90deg,
+    transparent,
+    #ffffffb8,
+    transparent
+  );
+  animation:ns-shimmer 1.5s infinite;
+}
+@keyframes ns-shimmer{
+  100%{transform:translateX(100%)}
+}
+.ns-skeleton-row{
+  display:flex;
+  align-items:center;
+  gap:13px;
+  padding:12px;
+  border:1px solid #edf1f7;
+  border-radius:13px;
+  margin-top:10px;
+}
+.ns-skeleton-lines{
+  flex:1;
+  display:grid;
+  gap:9px;
+}
+.ns-loading-overlay{
+  position:fixed;
+  inset:0;
+  z-index:300;
+  background:#0b1736a8;
+  display:none;
+  align-items:center;
+  justify-content:center;
+  padding:20px;
+}
+.ns-loading-overlay.show{
+  display:flex;
+}
+.ns-loading-window{
+  width:100%;
+  max-width:400px;
+  padding:35px 26px;
+  background:white;
+  border-radius:22px;
+  text-align:center;
+  box-shadow:0 25px 90px #0003;
+}
+.ns-loading-brand{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:10px;
+  font-size:23px;
+  font-weight:850;
+  margin-bottom:20px;
+}
+.ns-loading-logo{
+  display:grid;
+  place-items:center;
+  width:44px;
+  height:44px;
+  border-radius:13px;
+  background:linear-gradient(135deg,#175cff,#06b6d4);
+  color:white;
+  font-size:25px;
+}
+.ns-loading-brand .domain{
+  color:#175cff;
+}
+.ns-loading-title{
+  font-size:19px;
+  font-weight:800;
+  margin:18px 0 8px;
+}
+.ns-loading-desc{
+  color:#718096;
+  font-size:14px;
+  line-height:1.6;
+}
+.ns-loading-progress{
+  height:6px;
+  background:#e9eef7;
+  border-radius:99px;
+  overflow:hidden;
+  margin-top:24px;
+}
+.ns-loading-progress::after{
+  content:"";
+  display:block;
+  height:100%;
+  width:35%;
+  background:linear-gradient(90deg,#175cff,#06b6d4);
+  border-radius:99px;
+  animation:ns-progress 1.4s ease-in-out infinite alternate;
+}
+@keyframes ns-progress{
+  from{transform:translateX(-100%)}
+  to{transform:translateX(290%)}
+}
+.ns-loading-stop{
+  margin-top:20px;
+  border:1px solid #dfe6ef;
+  background:white;
+  border-radius:10px;
+  padding:9px 18px;
+  color:#34445b;
+  font-weight:650;
+}
+@media(max-width:650px){
+  .loading-demo-grid{grid-template-columns:1fr}
+}
+@media(prefers-reduced-motion:reduce){
+  .ns-spinner,.ns-skeleton::after,
+  .ns-loading-progress::after{animation-duration:3s}
+}
+</style>
+
+</head>
+<body>
+<header><div class="logo" style="display:flex;align-items:center;gap:11px"><img src="/favicon.svg" alt="Biểu tượng NoScam.vn" style="width:42px;height:42px;object-fit:contain;border-radius:10px"><span>NoScam<span>.vn</span></span><span class="pill">UI TEST LAB</span></div></header>
+<main>
+<h1>Thử nghiệm giao diện</h1>
+<p class="sub">Xem trước các popup, thông báo và bộ lọc trước khi áp dụng cho website chính. Không kết nối API thật.</p>
+
+<section class="panel">
+<h2>1. Popup và thông báo</h2>
+<div class="grid">
+<div class="demo"><strong>✓ Thành công</strong><p>Hiển thị sau khi tạo, lưu hoặc cập nhật dữ liệu.</p><button class="btn green" onclick="openModal('success')">Xem popup</button></div>
+<div class="demo"><strong>✕ Thất bại</strong><p>Thông báo lỗi xử lý hoặc yêu cầu không hợp lệ.</p><button class="btn danger" onclick="openModal('error')">Xem popup</button></div>
+<div class="demo"><strong>! Cảnh báo</strong><p>Nhắc người dùng trước một thao tác quan trọng.</p><button class="btn amber" onclick="openModal('warning')">Xem popup</button></div>
+<div class="demo"><strong>Xác nhận xóa</strong><p>Hộp thoại xác nhận với nút hủy và xóa.</p><button class="btn danger" onclick="openModal('delete')">Xem popup</button></div>
+<div class="demo"><strong>Hủy và hoàn xu</strong><p>Hiển thị ngân sách, điều kiện và xác nhận.</p><button class="btn" onclick="openModal('refund')">Xem popup</button></div>
+<div class="demo"><strong>Nhập lý do</strong><p>Nhập lý do tạm dừng, từ chối hoặc xử lý.</p><button class="btn" onclick="openModal('reason')">Xem popup</button></div>
+<div class="demo"><strong>Khiếu nại</strong><p>Biểu mẫu khiếu nại nằm trong popup riêng.</p><button class="btn amber" onclick="openModal('appeal')">Xem popup</button></div>
+<div class="demo"><strong>Toast thành công</strong><p>Thông báo nhỏ ở góc màn hình, tự biến mất.</p><button class="btn green" onclick="showToast('Đã lưu thay đổi thành công!',true)">Xem Toast</button></div>
+<div class="demo"><strong>Toast thất bại</strong><p>Thông báo lỗi nhanh, không che nội dung trang.</p><button class="btn danger" onclick="showToast('Không thể thực hiện thao tác.',false)">Xem Toast</button></div>
+</div>
+</section>
+
+<section class="panel">
+<h2>2. Bộ lọc tùy chỉnh</h2>
+<div class="filters">
+<div><label>Tìm kiếm</label><input class="field" id="search" placeholder="Nhập ID hoặc tên chiến dịch..." oninput="updateFilters()"></div>
+<div><label>Nền tảng</label>
+<div class="custom-select" id="platform-dropdown">
+  <input type="hidden" id="platform" value="">
+  <button type="button" class="select-trigger"
+    aria-haspopup="listbox" aria-expanded="false"
+    onclick="toggleDropdown('platform')">
+    <span class="select-value">Tất cả nền tảng</span>
+    <span class="select-arrow">⌄</span>
+  </button>
+  <div class="select-menu" role="listbox">
+    <button type="button" class="select-option selected"
+      role="option" aria-selected="true"
+      onclick="chooseOption('platform', '', this)">
+      <span>Tất cả nền tảng</span><span class="check">✓</span>
+    </button>
+
+    <button type="button" class="select-option"
+      role="option" aria-selected="false"
+      onclick="chooseOption('platform', 'Instagram', this)">
+      <span>Instagram</span><span class="check">✓</span>
+    </button>
+
+    <button type="button" class="select-option"
+      role="option" aria-selected="false"
+      onclick="chooseOption('platform', 'TikTok', this)">
+      <span>TikTok</span><span class="check">✓</span>
+    </button>
+
+    <button type="button" class="select-option"
+      role="option" aria-selected="false"
+      onclick="chooseOption('platform', 'Facebook', this)">
+      <span>Facebook</span><span class="check">✓</span>
+    </button>
+  </div>
+</div></div>
+<div><label>Trạng thái</label>
+<div class="custom-select" id="status-dropdown">
+  <input type="hidden" id="status" value="">
+  <button type="button" class="select-trigger"
+    aria-haspopup="listbox" aria-expanded="false"
+    onclick="toggleDropdown('status')">
+    <span class="select-value">Tất cả trạng thái</span>
+    <span class="select-arrow">⌄</span>
+  </button>
+  <div class="select-menu" role="listbox">
+    <button type="button" class="select-option selected"
+      role="option" aria-selected="true"
+      onclick="chooseOption('status', '', this)">
+      <span>Tất cả trạng thái</span><span class="check">✓</span>
+    </button>
+
+    <button type="button" class="select-option"
+      role="option" aria-selected="false"
+      onclick="chooseOption('status', 'Đang chạy', this)">
+      <span>Đang chạy</span><span class="check">✓</span>
+    </button>
+
+    <button type="button" class="select-option"
+      role="option" aria-selected="false"
+      onclick="chooseOption('status', 'Tạm dừng', this)">
+      <span>Tạm dừng</span><span class="check">✓</span>
+    </button>
+
+    <button type="button" class="select-option"
+      role="option" aria-selected="false"
+      onclick="chooseOption('status', 'Đã hủy', this)">
+      <span>Đã hủy</span><span class="check">✓</span>
+    </button>
+  </div>
+</div></div>
+</div>
+<div class="results" id="results"></div>
+<div style="margin-top:16px"><button class="btn secondary" onclick="resetFilters()">Đặt lại bộ lọc</button></div>
+</section>
+
+<section class="panel">
+<h2>4. Quy tắc giao diện</h2>
+<p class="sub" style="margin:0;line-height:1.8">Popup được căn giữa màn hình, hỗ trợ điện thoại và máy tính. Thông báo thành công dùng xanh lá, cảnh báo dùng cam, lỗi dùng đỏ. Các thao tác quan trọng cần xác nhận rõ ràng. Trong trang thử nghiệm, mọi nút chỉ mô phỏng và không thay đổi dữ liệu.</p>
+</section>
+
+<section class="panel" id="loading-test-section">
+  <h2>3. Loading - Giao diện đang xử lý</h2>
+
+  <p class="sub" style="margin-bottom:22px">
+    Thử các trạng thái Loading dùng chung cho NoScam.vn.
+    Tất cả đều là mô phỏng, không gọi API thật.
+  </p>
+
+  <div class="loading-demo-grid">
+
+    <div class="loading-demo-card">
+      <h3>1. Button Loading</h3>
+      <p>
+        Nút hiển thị vòng xoay và tạm khóa
+        để tránh gửi yêu cầu nhiều lần.
+      </p>
+
+      <button
+        type="button"
+        id="ns-button-loading"
+        class="btn ns-loading-btn"
+        onclick="testButtonLoading()"
+      >
+        Tạo chiến dịch
+      </button>
+    </div>
+
+    <div class="loading-demo-card">
+      <h3>2. Skeleton Loading</h3>
+      <p>
+        Hiệu ứng tải danh sách nhiệm vụ,
+        chiến dịch và báo cáo.
+      </p>
+
+      <button
+        type="button"
+        class="btn secondary"
+        onclick="testSkeletonLoading()"
+      >
+        Xem Skeleton
+      </button>
+
+      <div id="ns-skeleton-result"></div>
+    </div>
+
+    <div class="loading-demo-card">
+      <h3>3. Page Loading</h3>
+      <p>
+        Màn hình tải có nhận diện NoScam.vn
+        khi chờ dữ liệu trang.
+      </p>
+
+      <button
+        type="button"
+        class="btn"
+        onclick="openLoadingDemo('page')"
+      >
+        Xem Page Loading
+      </button>
+    </div>
+
+    <div class="loading-demo-card">
+      <h3>4. Processing Popup</h3>
+      <p>
+        Dùng khi đang hủy chiến dịch,
+        gửi khiếu nại hoặc xử lý hoàn xu.
+      </p>
+
+      <div style="display:flex;gap:9px;flex-wrap:wrap">
+        <button
+          type="button"
+          class="btn green"
+          onclick="setProcessingResult('success');openLoadingDemo('processing')"
+        >
+          Thử thành công
+        </button>
+        <button
+          type="button"
+          class="btn danger"
+          onclick="setProcessingResult('error');openLoadingDemo('processing')"
+        >
+          Thử thất bại
+        </button>
+      </div>
+    </div>
+
+  </div>
+
+  <p style="margin-top:18px;color:#718096;font-size:13px">
+    Trong website chính, Loading phải phụ thuộc vào kết quả API.
+    Thời gian mô phỏng ở trang test không được dùng làm điều kiện
+    xác nhận thao tác thành công.
+  </p>
+</section>
+
+<div
+  id="ns-loading-overlay"
+  class="ns-loading-overlay"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="ns-loading-title"
+  aria-hidden="true"
+>
+  <div class="ns-loading-window">
+
+    <div class="ns-loading-brand">
+      <span class="ns-loading-logo">N</span>
+      <span>NoScam<span class="domain">.vn</span></span>
+    </div>
+
+    <span class="ns-spinner blue"></span>
+
+    <div
+      class="ns-loading-title"
+      id="ns-loading-title"
+    >
+      Đang tải dữ liệu
+    </div>
+
+    <div
+      class="ns-loading-desc"
+      id="ns-loading-description"
+    >
+      Vui lòng chờ trong giây lát...
+    </div>
+
+    <div class="ns-loading-progress"></div>
+
+    <button
+      type="button"
+      class="ns-loading-stop"
+      onclick="closeLoadingDemo()"
+    >
+      Đóng bản xem thử
+    </button>
+
+  </div>
+</div>
+
+</main>
+
+<div class="overlay" id="overlay" onclick="if(event.target===this)closeModal()">
+<div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+<div class="modal-head"><div><div class="popup-brand"><span class="popup-brand-icon">N</span><span>NoScam<span class="popup-brand-domain">.vn</span></span></div><h3 id="modalTitle"></h3></div><button class="close" onclick="closeModal()" aria-label="Đóng">×</button></div>
+<div class="modal-body" id="modalBody"></div>
+<div class="modal-foot" id="modalFoot"></div>
+</div>
+</div>
+<div class="toast-area" id="toastArea" aria-live="polite"></div>
+
+<script>
+const $=id=>document.getElementById(id);
+let previousFocus=null;
+const data=[
+{id:1,name:'Instagram · Theo dõi',platform:'Instagram',status:'Đang chạy'},
+{id:2,name:'TikTok · Theo dõi',platform:'TikTok',status:'Đang chạy'},
+{id:3,name:'Facebook · Thích',platform:'Facebook',status:'Tạm dừng'},
+{id:4,name:'Instagram · Thích',platform:'Instagram',status:'Đã hủy'}
+];
+function updateFilters(){
+const q=$('search').value.toLowerCase().trim(),p=$('platform').value,s=$('status').value;
+const matches=data.filter(x=>(!q||String(x.id).includes(q)||x.name.toLowerCase().includes(q))&&(!p||x.platform===p)&&(!s||x.status===s));
+$('results').replaceChildren();
+if(!matches.length){const el=document.createElement('span');el.className='result';el.textContent='Không có kết quả phù hợp';$('results').append(el)}
+matches.forEach(x=>{const el=document.createElement('span');el.className='result';el.textContent='#'+x.id+' · '+x.name+' · '+x.status;$('results').append(el)});
+}
+function resetFilters(){$('search').value='';$('platform').value='';$('status').value='';
+['platform','status'].forEach(id=>{
+  const root=document.getElementById(id+'-dropdown');
+  root.querySelectorAll('.select-option').forEach((el,i)=>{
+    el.classList.toggle('selected',i===0);
+    el.setAttribute('aria-selected',String(i===0));
+  });
+  root.querySelector('.select-value').textContent=
+    root.querySelector('.select-option span').textContent;
+});
+closeDropdowns();updateFilters()}
+function showToast(message,ok=true){
+const el=document.createElement('div');el.className='toast '+(ok?'ok':'bad');el.textContent=(ok?'✓ ':'✕ ')+message;$('toastArea').append(el);
+setTimeout(()=>el.remove(),3200)
+}
+const btn=(label,kind,fn)=>{const b=document.createElement('button');b.className='btn '+kind;b.textContent=label;b.onclick=fn;return b};
+function closeModal(){$('overlay').classList.remove('show');document.body.style.overflow='';previousFocus?.focus()}
+function openModal(type){
+previousFocus=document.activeElement;
+const titles={success:'Thao tác thành công',error:'Không thể thực hiện',warning:'Cảnh báo',delete:'Xác nhận xóa',refund:'Hủy chiến dịch và hoàn xu',reason:'Nhập lý do xử lý',appeal:'Khiếu nại nhiệm vụ'};
+$('modalTitle').textContent=titles[type];
+const body=$('modalBody'),foot=$('modalFoot');body.replaceChildren();foot.replaceChildren();
+const content=document.createElement('div');
+const templates={
+success:'<div class="icon success">✓</div><p>Chiến dịch đã được tạo thành công. Bạn có thể tiếp tục quản lý chiến dịch trong tài khoản.</p>',
+error:'<div class="icon error">✕</div><p>Yêu cầu không thể xử lý. Vui lòng kiểm tra thông tin và thử lại.</p>',
+warning:'<div class="icon warning">!</div><p>Thao tác này có thể ảnh hưởng đến trạng thái chiến dịch. Hãy kiểm tra trước khi tiếp tục.</p>',
+delete:'<div class="icon error">!</div><p>Bạn có chắc chắn muốn xóa mục này? Thao tác có thể không thể hoàn tác.</p>',
+refund:'<div class="icon warning">!</div><p>Bạn muốn hủy chiến dịch #2?</p><div class="box">Ngân sách đang giữ (minh họa)<br><b>18.000 xu</b></div><p>Hệ thống phải kiểm tra nhiệm vụ chưa quyết toán trước khi hoàn xu. Popup không tự thực hiện hoàn tiền.</p>',
+reason:'<p>Nhập lý do để quản trị viên và hệ thống lưu lại thông tin xử lý.</p><label for="reasonInput">Lý do</label><textarea id="reasonInput" class="field" rows="4" maxlength="500" placeholder="Nhập lý do..."></textarea>',
+appeal:'<div class="box"><strong>Nhiệm vụ #4 · TikTok</strong><br>Lý do từ chối: Chưa xác minh được kết quả.</div><label for="reasonInput">Lý do khiếu nại</label><textarea id="reasonInput" class="field" rows="5" maxlength="500" placeholder="Giải thích vì sao bạn cho rằng nhiệm vụ đã hoàn thành..."></textarea><p>Không gửi mật khẩu hoặc thông tin nhạy cảm.</p>'
+};
+content.innerHTML=templates[type];body.append(content);
+foot.append(btn('Đóng','outline',closeModal));
+if(['warning','delete','refund','reason','appeal'].includes(type)){
+const labels={warning:'Tiếp tục',delete:'Xác nhận xóa',refund:'Xác nhận hủy',reason:'Lưu lý do',appeal:'Gửi khiếu nại'};
+foot.append(btn(labels[type],type==='delete'?'danger':type==='appeal'?'amber':'',()=>{
+if(['reason','appeal'].includes(type)&&!$('reasonInput').value.trim()){showToast('Vui lòng nhập nội dung.',false);return}
+closeModal();showToast('Đã mô phỏng thao tác. Không có dữ liệu thật bị thay đổi.',true)
+}));
+}
+$('overlay').classList.add('show');document.body.style.overflow='hidden';$('overlay').querySelector('.close').focus()
+}
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('overlay').classList.contains('show'))closeModal()});
+updateFilters();
+</script>
+
+<script>
+function closeDropdowns(){
+  document.querySelectorAll('.custom-select.open').forEach(el=>{
+    el.classList.remove('open');
+    el.querySelector('.select-trigger').setAttribute('aria-expanded','false');
+  });
+}
+function toggleDropdown(id){
+  const el=document.getElementById(id+'-dropdown');
+  const wasOpen=el.classList.contains('open');
+  closeDropdowns();
+  if(!wasOpen){
+    el.classList.add('open');
+    el.querySelector('.select-trigger').setAttribute('aria-expanded','true');
+  }
+}
+function chooseOption(id,value,button){
+  const root=document.getElementById(id+'-dropdown');
+  document.getElementById(id).value=value;
+  root.querySelector('.select-value').textContent=
+    button.querySelector('span').textContent;
+  root.querySelectorAll('.select-option').forEach(el=>{
+    const selected=el===button;
+    el.classList.toggle('selected',selected);
+    el.setAttribute('aria-selected',String(selected));
+  });
+  closeDropdowns();
+  updateFilters();
+}
+document.addEventListener('click',e=>{
+  if(!e.target.closest('.custom-select'))closeDropdowns();
+});
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape')closeDropdowns();
+});
+</script>
+
+
+<script>
+let nsButtonTimer = null;
+let nsSkeletonTimer = null;
+let nsLoadingPreviousFocus = null;
+
+function testButtonLoading(){
+  const button=document.getElementById('ns-button-loading');
+
+  if(button.disabled)return;
+
+  button.disabled=true;
+  button.style.opacity='.75';
+  button.replaceChildren();
+
+  const spinner=document.createElement('span');
+  spinner.className='ns-spinner';
+
+  const text=document.createElement('span');
+  text.textContent='Đang tạo...';
+
+  button.append(spinner,text);
+
+  clearTimeout(nsButtonTimer);
+
+  nsButtonTimer=setTimeout(()=>{
+    button.disabled=false;
+    button.style.opacity='';
+    button.textContent='Tạo chiến dịch';
+
+    if(typeof showToast==='function'){
+      showToast('Đã hoàn thành mô phỏng Loading.',true);
+    }
+  },2500);
+}
+
+function testSkeletonLoading(){
+  const area=document.getElementById('ns-skeleton-result');
+
+  clearTimeout(nsSkeletonTimer);
+
+  area.innerHTML=Array.from({length:3},()=>`
+    <div class="ns-skeleton-row">
+      <div class="ns-skeleton"
+        style="width:43px;height:43px;flex-shrink:0"></div>
+      <div class="ns-skeleton-lines">
+        <div class="ns-skeleton"
+          style="width:75%;height:13px"></div>
+        <div class="ns-skeleton"
+          style="width:48%;height:10px"></div>
+      </div>
+    </div>
+  `).join('');
+
+  nsSkeletonTimer=setTimeout(()=>{
+    area.innerHTML=`
+      <div class="box" style="margin-top:14px">
+        ✓ Đã tải xong danh sách mô phỏng.
+      </div>
+    `;
+  },3000);
+}
+
+let nsProcessingTimer=null;
+let nsProcessingResult='success';
+
+function setProcessingResult(value){
+  nsProcessingResult=value;
+}
+
+function openLoadingDemo(type){
+  const overlay=document.getElementById('ns-loading-overlay');
+
+  nsLoadingPreviousFocus=document.activeElement;
+
+  const title=document.getElementById('ns-loading-title');
+  const desc=document.getElementById('ns-loading-description');
+
+  if(type==='processing'){
+    title.textContent='Đang xử lý yêu cầu';
+    desc.textContent=
+      'Hệ thống đang kiểm tra và xử lý thao tác. '+
+      'Vui lòng không gửi yêu cầu nhiều lần.';
+  }else{
+    title.textContent='Đang tải dữ liệu';
+    desc.textContent=
+      'NoScam.vn đang chuẩn bị nội dung. '+
+      'Vui lòng chờ trong giây lát...';
+  }
+
+  overlay.classList.add('show');
+  overlay.setAttribute('aria-hidden','false');
+  document.body.style.overflow='hidden';
+  overlay.querySelector('button').focus();
+
+  clearTimeout(nsProcessingTimer);
+
+  if(type==='processing'){
+    nsProcessingTimer=setTimeout(()=>{
+      nsProcessingTimer=null;
+      closeLoadingDemo();
+
+      if(typeof openModal==='function'){
+        openModal(
+          nsProcessingResult==='success'
+            ? 'success'
+            : 'error'
+        );
+      }
+    },2500);
+  }
+}
+
+function closeLoadingDemo(){
+  clearTimeout(nsProcessingTimer);
+  nsProcessingTimer=null;
+  const overlay=document.getElementById('ns-loading-overlay');
+
+  overlay.classList.remove('show');
+  overlay.setAttribute('aria-hidden','true');
+
+  document.body.style.overflow='';
+
+  if(nsLoadingPreviousFocus){
+    nsLoadingPreviousFocus.focus();
+  }
+}
+</script>
+
+</body>
+</html>

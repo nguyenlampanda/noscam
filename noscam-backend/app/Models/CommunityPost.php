@@ -16,6 +16,7 @@ class CommunityPost extends Model
         'is_anonymous',
         'status',
         'published_at',
+        'images',
     ];
 
     protected $hidden = [
@@ -27,6 +28,7 @@ class CommunityPost extends Model
         return [
             'is_anonymous' => 'boolean',
             'published_at' => 'datetime',
+            'images' => 'array',
         ];
     }
 

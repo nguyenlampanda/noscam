@@ -1,3 +1,4 @@
+import { useNoScamUI } from '../../components/ui/NoScamUI'
 import { useCallback, useEffect, useState } from 'react'
 import AdminNav from '../../components/admin/AdminNav'
 import adminCommunityService from '../../services/adminCommunityService'
@@ -9,6 +10,7 @@ const filters = [
 ]
 
 function AdminCommunityPage() {
+  const { confirm } = useNoScamUI()
   const [type, setType] = useState('posts')
   const [status, setStatus] = useState('pending')
   const [page, setPage] = useState(1)
@@ -19,6 +21,8 @@ function AdminCommunityPage() {
   const [busyId, setBusyId] = useState(null)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const [viewerImages, setViewerImages] = useState(null)
+  const [viewerIndex, setViewerIndex] = useState(0)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -57,7 +61,7 @@ function AdminCommunityPage() {
   async function moderate(item, nextStatus) {
     const action = nextStatus === 'approved' ? 'duyệt' : 'từ chối'
 
-    if (!window.confirm(`Xác nhận ${action} nội dung #${item.id}?`)) {
+    if (!await confirm(`Xác nhận ${action} nội dung #${item.id}?`)) {
       return
     }
 
@@ -75,6 +79,47 @@ function AdminCommunityPage() {
       setBusyId(null)
     }
   }
+
+  function openImageViewer(images, index) {
+    setViewerImages(images)
+    setViewerIndex(index)
+  }
+
+  function previousImage() {
+    setViewerIndex(index =>
+      (index - 1 + viewerImages.length) % viewerImages.length
+    )
+  }
+
+  function nextImage() {
+    setViewerIndex(index =>
+      (index + 1) % viewerImages.length
+    )
+  }
+
+  useEffect(() => {
+    if (!viewerImages) return
+
+    function handleKeyDown(event) {
+      if (event.key === 'Escape') {
+        setViewerImages(null)
+      } else if (event.key === 'ArrowLeft') {
+        setViewerIndex(index =>
+          (index - 1 + viewerImages.length) % viewerImages.length
+        )
+      } else if (event.key === 'ArrowRight') {
+        setViewerIndex(index =>
+          (index + 1) % viewerImages.length
+        )
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [viewerImages])
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -173,7 +218,19 @@ function AdminCommunityPage() {
               >
                 <div className="flex flex-wrap gap-3 text-sm text-slate-500">
                   <span className="font-bold">#{item.id}</span>
-                  <span>{item.is_anonymous ? 'Ẩn danh' : 'Công khai'}</span>
+                  <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${
+                    item.is_anonymous
+                      ? 'bg-amber-50 text-amber-700'
+                      : 'bg-blue-50 text-blue-700'
+                  }`}>
+                    {item.is_anonymous ? 'Đăng ẩn danh' : 'Đăng công khai'}
+                  </span>
+
+                  {type === 'posts' && (
+                    <span className="font-medium text-slate-700">
+                      Username: {item.author?.username || item.author?.name || 'Không xác định'}
+                    </span>
+                  )}
                   {item.created_at && (
                     <span>{new Date(item.created_at).toLocaleString('vi-VN')}</span>
                   )}
@@ -198,6 +255,38 @@ function AdminCommunityPage() {
                 <p className="mt-4 whitespace-pre-wrap break-words text-sm leading-7 text-slate-700">
                   {item.content}
                 </p>
+
+                {type === 'posts' &&
+                  Array.isArray(item.images) &&
+                  item.images.length > 0 && (
+                    <div className="mt-5">
+                      <p className="mb-3 text-sm font-semibold text-slate-700">
+                        Hình ảnh đính kèm ({item.images.length})
+                      </p>
+
+                      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+                        {item.images.map((image, index) => (
+                          <button
+                            key={`${item.id}-${index}`}
+                            type="button"
+                            onClick={() => openImageViewer(item.images, index)}
+                            className="group relative overflow-hidden rounded-xl border border-slate-200 bg-slate-100"
+                            aria-label={`Xem ảnh ${index + 1}`}
+                          >
+                            <img
+                              src={image}
+                              alt={`Ảnh đính kèm ${index + 1}`}
+                              loading="lazy"
+                              className="h-32 w-full object-cover transition duration-200 group-hover:scale-105"
+                            />
+                            <span className="absolute bottom-2 right-2 rounded-md bg-slate-950/70 px-2 py-1 text-xs text-white">
+                              {index + 1}/{item.images.length}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                 <div className="mt-5 flex flex-wrap gap-3 border-t border-slate-100 pt-4">
                   {item.status !== 'approved' && (
@@ -253,6 +342,65 @@ function AdminCommunityPage() {
           </div>
         )}
       </main>
+
+      {viewerImages && (
+        <div
+          id="admin-community-image-viewer"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Xem hình ảnh bài viết"
+          className="fixed inset-0 z-[2147483645] flex items-center justify-center bg-slate-950/95 p-4"
+          onClick={() => setViewerImages(null)}
+        >
+          <button
+            type="button"
+            onClick={() => setViewerImages(null)}
+            aria-label="Đóng trình xem ảnh"
+            className="absolute right-5 top-5 rounded-full bg-white/15 px-4 py-2 text-xl text-white hover:bg-white/25"
+          >
+            ✕
+          </button>
+
+          {viewerImages.length > 1 && (
+            <button
+              type="button"
+              aria-label="Ảnh trước"
+              onClick={event => {
+                event.stopPropagation()
+                previousImage()
+              }}
+              className="absolute left-3 z-10 rounded-full bg-white/15 px-4 py-3 text-white hover:bg-white/25"
+            >
+              ❮
+            </button>
+          )}
+
+          <img
+            src={viewerImages[viewerIndex]}
+            alt={`Ảnh ${viewerIndex + 1}`}
+            onClick={event => event.stopPropagation()}
+            className="max-h-[85vh] max-w-[85vw] object-contain"
+          />
+
+          {viewerImages.length > 1 && (
+            <button
+              type="button"
+              aria-label="Ảnh tiếp theo"
+              onClick={event => {
+                event.stopPropagation()
+                nextImage()
+              }}
+              className="absolute right-3 z-10 rounded-full bg-white/15 px-4 py-3 text-white hover:bg-white/25"
+            >
+              ❯
+            </button>
+          )}
+
+          <div className="absolute bottom-5 rounded-full bg-white/15 px-4 py-2 text-sm font-medium text-white">
+            {viewerIndex + 1} / {viewerImages.length}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

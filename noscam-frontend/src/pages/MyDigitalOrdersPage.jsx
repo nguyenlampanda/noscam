@@ -1,3 +1,4 @@
+import { useNoScamUI } from '../components/ui/NoScamUI'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import customerService, {
@@ -39,6 +40,7 @@ function money(value) {
 }
 
 export default function MyDigitalOrdersPage() {
+  const { confirm } = useNoScamUI()
   const navigate = useNavigate()
   const [renderTime] = useState(() => Date.now())
   const dialogRef = useRef(null)
@@ -229,7 +231,7 @@ export default function MyDigitalOrdersPage() {
       )
     ) return
 
-    if (!window.confirm(
+    if (!await confirm(
       `Bạn xác nhận thanh toán ${money(amount)} bằng ví NoScam?`
     )) return
 
@@ -284,7 +286,7 @@ export default function MyDigitalOrdersPage() {
       ? `Bạn xác nhận chấp nhận báo giá ${money(quote.amount_vnd)}?`
       : 'Bạn xác nhận từ chối báo giá này?'
 
-    if (!window.confirm(message)) return
+    if (!await confirm(message)) return
 
     const orderId = selected.id
     const requestId = detailRequestRef.current

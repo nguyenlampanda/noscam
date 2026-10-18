@@ -41,6 +41,10 @@ const menu = [
     to: '/admin/social',
     label: 'Tăng tương tác',
   },
+  {
+    to: '/admin/exchange',
+    label: 'Kiếm xu',
+  }
 ]
 
 export default function AdminNav() {

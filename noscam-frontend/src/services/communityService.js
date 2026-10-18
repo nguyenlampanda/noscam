@@ -11,10 +11,17 @@ function authOptions() {
 
 const communityService = {
   posts: (page = 1) =>
-    apiClient.get(`/community/posts?page=${page}`),
+    apiClient.get(`/community/posts?page=${page}`, authOptions()),
 
-  createPost: (data) =>
-    apiClient.post('/community/posts', data, authOptions()),
+  createPost: (data) => {
+    const body = new FormData()
+    body.append('title', data.title || '')
+    body.append('content', data.content || '')
+    body.append('category', data.category)
+    body.append('is_anonymous', data.is_anonymous ? '1' : '0')
+    for (const image of data.images || []) body.append('images[]', image)
+    return apiClient.post('/community/posts', body, authOptions())
+  },
 
   comments: (postId) =>
     apiClient.get(`/community/posts/${postId}/comments`),
@@ -23,6 +30,12 @@ const communityService = {
     apiClient.post(
       `/community/posts/${postId}/comments`,
       data,
+      authOptions()
+    ),
+
+  unlike: (postId) =>
+    apiClient.delete(
+      `/community/posts/${postId}/like`,
       authOptions()
     ),
 

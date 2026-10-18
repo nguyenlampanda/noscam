@@ -1,3 +1,4 @@
+import NoScamSelect from '../../components/ui/NoScamSelect'
 import {
   useCallback,
   useEffect,
@@ -631,7 +632,7 @@ function ProviderCard({
                   Trạng thái
                 </span>
 
-                <select
+                <NoScamSelect
                   value={
                     form.status
                   }
@@ -656,7 +657,7 @@ function ProviderCard({
                   <option value="error">
                     Lỗi
                   </option>
-                </select>
+                </NoScamSelect>
               </label>
 
               <label className="flex items-center gap-3 rounded-xl border border-slate-200 px-4 py-3">

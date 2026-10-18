@@ -1,3 +1,5 @@
+import NoScamSelect from '../../components/ui/NoScamSelect'
+import { useNoScamUI } from '../../components/ui/NoScamUI'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import AdminNav from '../../components/admin/AdminNav'
 import apiClient from '../../services/apiClient'
@@ -65,6 +67,7 @@ function Field({ label, children }) {
 }
 
 export default function AdminDigitalOrdersPage() {
+  const { confirm } = useNoScamUI()
   const [items, setItems] = useState([])
   const [page, setPage] = useState(1)
   const [lastPage, setLastPage] = useState(1)
@@ -262,7 +265,7 @@ export default function AdminDigitalOrdersPage() {
       return
     }
 
-    if (!window.confirm(
+    if (!await confirm(
       `Bạn đã kiểm tra sao kê và xác nhận nhận đủ ${money(selected.amount_vnd)} cho đơn #${selected.id}?`
     )) return
 
@@ -416,7 +419,7 @@ export default function AdminDigitalOrdersPage() {
           >
             Tìm kiếm
           </button>
-          <select
+          <NoScamSelect
             value={status}
             onChange={event => {
               setLoading(true)
@@ -429,8 +432,8 @@ export default function AdminDigitalOrdersPage() {
             {statusOptions.map(([value, label]) => (
               <option key={value} value={value}>{label}</option>
             ))}
-          </select>
-          <select
+          </NoScamSelect>
+          <NoScamSelect
             value={payment}
             onChange={event => {
               setLoading(true)
@@ -443,7 +446,7 @@ export default function AdminDigitalOrdersPage() {
             {paymentOptions.map(([value, label]) => (
               <option key={value} value={value}>{label}</option>
             ))}
-          </select>
+          </NoScamSelect>
         </form>
 
         <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
@@ -734,7 +737,7 @@ export default function AdminDigitalOrdersPage() {
                     <form onSubmit={updateOrderStatus} className="space-y-3">
                       <label className="block text-sm font-semibold text-slate-700">
                         Trạng thái mới
-                        <select
+                        <NoScamSelect
                           value={nextStatus}
                           onChange={event => setNextStatus(event.target.value)}
                           disabled={savingStatus}
@@ -750,7 +753,7 @@ export default function AdminDigitalOrdersPage() {
                               <option value="completed">Hoàn thành</option>
                             )}
                           <option value="cancelled">Đã hủy</option>
-                        </select>
+                        </NoScamSelect>
                       </label>
 
                       <label className="block text-sm font-semibold text-slate-700">

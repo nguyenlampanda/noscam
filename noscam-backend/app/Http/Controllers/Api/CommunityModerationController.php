@@ -44,6 +44,7 @@ class CommunityModerationController extends Controller
                     'id' => $post->id,
                     'title' => $post->title,
                     'content' => $post->content,
+                    'images' => collect($post->images ?? [])->map(fn ($path) => url('storage/'.$path))->values(),
                     'category' => $post->category,
                     'status' => $post->status,
                     'is_anonymous' => $post->is_anonymous,

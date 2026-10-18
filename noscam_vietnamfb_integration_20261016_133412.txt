@@ -1,0 +1,1110 @@
+
+======================================================================
+FILE: noscam-backend/app/Services/Social/Providers/VietnamFbProvider.php
+======================================================================
+<?php
+
+namespace App\Services\Social\Providers;
+
+use App\Services\Social\SocialProviderInterface;
+use Illuminate\Support\Facades\Http;
+use RuntimeException;
+
+class VietnamFbProvider implements SocialProviderInterface
+{
+    public function __construct(
+        protected string $apiUrl,
+        protected string $apiKey,
+        protected ?string $username = null
+    ) {
+    }
+
+    protected function endpoint(): string
+    {
+        $url = rtrim($this->apiUrl, '/');
+
+        if (!str_ends_with($url, '/api')) {
+            $url .= '/api';
+        }
+
+        return $url;
+    }
+
+    protected function get(
+        string $mc,
+        string $site,
+        array $params = []
+    ): array {
+        $response = Http::acceptJson()
+            ->timeout(30)
+            ->retry(2, 500)
+            ->get(
+                $this->endpoint(),
+                array_merge([
+                    'mc' => $mc,
+                    'site' => $site,
+                    'api_key' => $this->apiKey,
+                ], $params)
+            );
+
+        return $this->parseResponse($response);
+    }
+
+    protected function post(
+        string $mc,
+        string $site,
+        array $data = []
+    ): array {
+        $response = Http::asForm()
+            ->acceptJson()
+            ->timeout(30)
+            ->post(
+                $this->endpoint().'?'.http_build_query([
+                    'mc' => $mc,
+                    'site' => $site,
+                    'api_key' => $this->apiKey,
+                ]),
+                $data
+            );
+
+        return $this->parseResponse($response);
+    }
+
+    protected function parseResponse($response): array
+    {
+        if (!$response->successful()) {
+            throw new RuntimeException(
+                'VietnamFB HTTP error: '.$response->status()
+            );
+        }
+
+        $body = trim($response->body());
+        $lower = strtolower($body);
+
+        if (
+            str_contains($lower, '<html') ||
+            str_contains($lower, '<script')
+        ) {
+            throw new RuntimeException(
+                'VietnamFB trả về HTML/login page.'
+            );
+        }
+
+        $json = $response->json();
+
+        if (!is_array($json)) {
+            throw new RuntimeException(
+                'VietnamFB response không hợp lệ.'
+            );
+        }
+
+        if (
+            isset($json['success']) &&
+            (int) $json['success'] === 0
+        ) {
+            throw new RuntimeException(
+                (string) (
+                    $json['message']
+                    ?? 'VietnamFB API báo lỗi.'
+                )
+            );
+        }
+
+        return $json;
+    }
+
+    public function balance(): array
+    {
+        return $this->get(
+            'user',
+            'get_user_balance'
+        );
+    }
+
+    public function services(): array
+    {
+        $username = trim(
+            (string) $this->username
+        );
+
+        if ($username === '') {
+            throw new RuntimeException(
+                'VietnamFB chưa cấu hình username.'
+            );
+        }
+
+        $result = $this->get(
+            'channel',
+            'get_channel_info',
+            [
+                'username' => $username,
+            ]
+        );
+
+        $services = [];
+
+        foreach ($result as $group => $channels) {
+            if (!is_array($channels)) {
+                continue;
+            }
+
+            foreach ($channels as $channel) {
+                if (!is_array($channel)) {
+                    continue;
+                }
+
+                $channelNumber =
+                    $channel['channel']
+                    ?? $channel['id']
+                    ?? null;
+
+                if ($channelNumber === null) {
+                    continue;
+                }
+
+                $groupName = strtoupper(
+                    (string) $group
+                );
+
+                $channelId = (string) $channelNumber;
+
+                $statusText = (string) (
+                    $channel['status_text']
+                    ?? ''
+                );
+
+                $services[] = [
+                    'service' =>
+                        $groupName.':'.$channelId,
+
+                    'name' =>
+                        $this->serviceName(
+                            $groupName,
+                            $channelId
+                        ),
+
+                    'rate' =>
+                        is_numeric(
+                            $channel['price'] ?? null
+                        )
+                            ? (float) $channel['price']
+                            : 0,
+
+                    'min' =>
+                        is_numeric($channel['min'] ?? null)
+                        && (int) $channel['min'] > 0
+                            ? (int) $channel['min']
+                            : 1,
+
+                    'max' =>
+                        is_numeric($channel['max'] ?? null)
+                        && (int) $channel['max'] > 0
+                            ? (int) $channel['max']
+                            : 1000000,
+
+                    'min_verified' =>
+                        is_numeric($channel['min'] ?? null)
+                        && (int) $channel['min'] > 0,
+
+                    'max_verified' =>
+                        is_numeric($channel['max'] ?? null)
+                        && (int) $channel['max'] > 0,
+
+                    'group' => $groupName,
+
+                    'channel' => $channelId,
+
+                    'status_text' => $statusText,
+
+                    'provider_active' =>
+                        $this->isChannelActive(
+                            $channel
+                        ),
+
+                    'provider_data' => $channel,
+                ];
+            }
+        }
+
+        return $services;
+    }
+
+    protected function serviceName(
+        string $group,
+        string $channel
+    ): string {
+        $label = str_replace(
+            '_',
+            ' ',
+            $group
+        );
+
+        return trim(
+            $label.' - Kênh '.$channel
+        );
+    }
+
+    protected function isChannelActive(
+        array $channel
+    ): bool {
+        $status = strtolower(
+            trim(
+                (string) (
+                    $channel['status_text']
+                    ?? $channel['status']
+                    ?? ''
+                )
+            )
+        );
+
+        if ($status === '') {
+            return true;
+        }
+
+        foreach ([
+            'tắt',
+            'tat',
+            'ngưng',
+            'ngung',
+            'bảo trì',
+            'bao tri',
+            'off',
+            'inactive',
+            'disabled',
+        ] as $word) {
+            if (str_contains($status, $word)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    public function createOrder(
+        string $serviceId,
+        string $target,
+        int $quantity,
+        array $options = []
+    ): array {
+        return $this->post(
+            $options['mc'] ?? 'buff',
+            'create',
+            array_merge([
+                'id' => $target,
+                'amount' => $quantity,
+            ], $options['payload'] ?? [])
+        );
+    }
+
+    public function orderStatus(
+        string $orderId
+    ): array {
+        throw new RuntimeException(
+            'VietnamFB chưa cấu hình lấy trạng thái đơn.'
+        );
+    }
+
+    public function refill(
+        string $orderId
+    ): array {
+        throw new RuntimeException(
+            'VietnamFB chưa cấu hình refill.'
+        );
+    }
+
+    public function cancel(
+        string $orderId
+    ): array {
+        throw new RuntimeException(
+            'VietnamFB chưa cấu hình cancel.'
+        );
+    }
+}
+
+
+======================================================================
+FILE: noscam-backend/app/Services/Social/SocialOrderProviderService.php
+======================================================================
+<?php
+
+namespace App\Services\Social;
+
+use App\Models\SocialOrder;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
+use RuntimeException;
+use Throwable;
+
+class SocialOrderProviderService
+{
+    public function __construct(
+        private SocialProviderManager $providers,
+        private SocialOrderService $orders
+    ) {
+    }
+
+    public function submit(
+        SocialOrder $order
+    ): SocialOrder {
+        $lock = Cache::lock(
+            'social-order-operation-'.$order->id,
+            60
+        );
+
+        if (!$lock->get()) {
+            throw new RuntimeException(
+                'Đơn đang được tiến trình khác xử lý.'
+            );
+        }
+
+        try {
+            /*
+             * Luôn đọc lại DB sau khi có lock.
+             */
+            $order = SocialOrder::query()
+                ->with([
+                    'provider',
+                    'providerService',
+                ])
+                ->findOrFail(
+                    $order->id
+                );
+
+            if ($order->provider_order_id) {
+                return $order;
+            }
+
+            if ($order->status !== 'pending') {
+                throw new RuntimeException(
+                    'Đơn không còn ở trạng thái chờ xử lý.'
+                );
+            }
+
+            if (!$order->provider) {
+                throw new RuntimeException(
+                    'Đơn chưa có nhà cung cấp.'
+                );
+            }
+
+            if (!$order->providerService) {
+                throw new RuntimeException(
+                    'Đơn chưa có dịch vụ API.'
+                );
+            }
+
+            if (
+                (int) $order->attempts >= 1
+            ) {
+                throw new RuntimeException(
+                    'Đơn đã vượt quá số lần thử gửi API.'
+                );
+            }
+
+            if (
+                $order->provider->driver ===
+                'vietnamfb'
+            ) {
+                throw new RuntimeException(
+                    'VietnamFB chưa bật gửi đơn tự động.'
+                );
+            }
+
+            if (
+                !in_array(
+                    $order->provider->driver,
+                    [
+                        'nganhangsub',
+                        'hacklike17',
+                    ],
+                    true
+                )
+            ) {
+                throw new RuntimeException(
+                    'Provider chưa hỗ trợ gửi đơn tự động.'
+                );
+            }
+
+            /*
+             * Đánh dấu attempt TRƯỚC khi gọi provider.
+             */
+            $order->attempts =
+                (int) $order->attempts + 1;
+
+            $order->provider_error = null;
+            $order->save();
+
+            try {
+                $api =
+                    $this->providers->make(
+                        $order->provider
+                    );
+
+                $response =
+                    $api->createOrder(
+                        (string)
+                            $order
+                                ->providerService
+                                ->provider_service_id,
+                        (string)
+                            $order->target,
+                        (int)
+                            $order->quantity
+                    );
+
+                $providerOrderId =
+                    $response['order']
+                    ?? $response['order_id']
+                    ?? $response['id']
+                    ?? null;
+
+                if (
+                    $providerOrderId === null ||
+                    $providerOrderId === ''
+                ) {
+                    throw new RuntimeException(
+                        'Provider không trả về mã đơn.'
+                    );
+                }
+
+                DB::transaction(
+                    function () use (
+                        $order,
+                        $response,
+                        $providerOrderId
+                    ) {
+                        $locked =
+                            SocialOrder::query()
+                                ->lockForUpdate()
+                                ->findOrFail(
+                                    $order->id
+                                );
+
+                        if (
+                            $locked
+                                ->provider_order_id
+                        ) {
+                            return;
+                        }
+
+                        $locked
+                            ->provider_order_id =
+                            (string)
+                                $providerOrderId;
+
+                        $locked->provider_response =
+                            $response;
+
+                        $locked->provider_error =
+                            null;
+
+                        $locked->submitted_at =
+                            now();
+
+                        $locked->last_synced_at =
+                            null;
+
+                        $locked->status =
+                            'processing';
+
+                        $locked->save();
+                    },
+                    3
+                );
+            } catch (Throwable $e) {
+                $failed =
+                    SocialOrder::query()
+                        ->find(
+                            $order->id
+                        );
+
+                if (
+                    $failed &&
+                    !$failed->provider_order_id
+                ) {
+                    $failed->provider_error =
+                        mb_substr(
+                            $e->getMessage(),
+                            0,
+                            2000
+                        );
+
+                    $failed->save();
+                }
+
+                throw $e;
+            }
+
+            return SocialOrder::query()
+                ->with([
+                    'service',
+                    'provider',
+                    'providerService',
+                ])
+                ->findOrFail(
+                    $order->id
+                );
+        } finally {
+            $lock->release();
+        }
+    }
+
+    public function sync(
+        SocialOrder $order
+    ): SocialOrder {
+        $lock = Cache::lock(
+            'social-order-operation-'.$order->id,
+            45
+        );
+
+        if (!$lock->get()) {
+            return $order->fresh();
+        }
+
+        try {
+            $order =
+                SocialOrder::query()
+                    ->with([
+                        'provider',
+                        'providerService',
+                    ])
+                    ->findOrFail(
+                        $order->id
+                    );
+
+            if (
+                !$order->provider ||
+                !$order->provider_order_id
+            ) {
+                return $order;
+            }
+
+            if (
+                !in_array(
+                    $order->status,
+                    [
+                        'processing',
+                        'in_progress',
+                    ],
+                    true
+                )
+            ) {
+                return $order;
+            }
+
+            if (
+                $order->provider->driver ===
+                'vietnamfb'
+            ) {
+                return $order;
+            }
+
+            $api =
+                $this->providers->make(
+                    $order->provider
+                );
+
+            $response =
+                $api->orderStatus(
+                    (string)
+                        $order
+                            ->provider_order_id
+                );
+
+            $providerStatus =
+                strtolower(
+                    trim(
+                        (string) (
+                            $response['status']
+                            ?? ''
+                        )
+                    )
+                );
+
+            $status =
+                $this->mapStatus(
+                    $providerStatus
+                );
+
+            $remains =
+                isset(
+                    $response['remains']
+                )
+                    ? max(
+                        0,
+                        (int)
+                            $response[
+                                'remains'
+                            ]
+                    )
+                    : null;
+
+            $startCount =
+                isset(
+                    $response['start_count']
+                )
+                    ? max(
+                        0,
+                        (int)
+                            $response[
+                                'start_count'
+                            ]
+                    )
+                    : null;
+
+            $order =
+                DB::transaction(
+                    function () use (
+                        $order,
+                        $response,
+                        $status,
+                        $remains,
+                        $startCount
+                    ) {
+                        $locked =
+                            SocialOrder::query()
+                                ->lockForUpdate()
+                                ->findOrFail(
+                                    $order->id
+                                );
+
+                        $locked
+                            ->provider_response =
+                            $response;
+
+                        $locked
+                            ->provider_error =
+                            null;
+
+                        $locked
+                            ->last_synced_at =
+                            now();
+
+                        if ($status) {
+                            $locked->status =
+                                $status;
+                        }
+
+                        if (
+                            $remains !== null
+                        ) {
+                            $locked->remains =
+                                min(
+                                    (int)
+                                        $locked
+                                            ->quantity,
+                                    $remains
+                                );
+                        }
+
+                        if (
+                            $startCount !==
+                            null
+                        ) {
+                            $locked->start_count =
+                                $startCount;
+                        }
+
+                        if (
+                            $status ===
+                            'completed'
+                        ) {
+                            $locked->remains = 0;
+
+                            $locked
+                                ->completed_at =
+                                $locked
+                                    ->completed_at
+                                ?? now();
+                        }
+
+                        $locked->save();
+
+                        return $locked->fresh();
+                    },
+                    3
+                );
+
+            if (
+                in_array(
+                    $order->status,
+                    [
+                        'failed',
+                        'cancelled',
+                    ],
+                    true
+                )
+            ) {
+                $order =
+                    $this->orders->refund(
+                        $order
+                    );
+            }
+
+            if (
+                $order->status ===
+                'partial'
+            ) {
+                $order =
+                    $this->orders
+                        ->refundPartial(
+                            $order
+                        );
+            }
+
+            return $order
+                ->fresh()
+                ->load([
+                    'service',
+                    'provider',
+                    'providerService',
+                ]);
+        } finally {
+            $lock->release();
+        }
+    }
+
+    public function cancel(
+        SocialOrder $order,
+        ?int $createdBy = null
+    ): SocialOrder {
+        $lock = Cache::lock(
+            'social-order-operation-'.$order->id,
+            60
+        );
+
+        if (!$lock->get()) {
+            throw new RuntimeException(
+                'Đơn đang được xử lý.'
+            );
+        }
+
+        try {
+            $order =
+                SocialOrder::query()
+                    ->with([
+                        'provider',
+                        'providerService',
+                    ])
+                    ->findOrFail(
+                        $order->id
+                    );
+
+            if (
+                in_array(
+                    $order->status,
+                    [
+                        'completed',
+                        'partial',
+                        'cancelled',
+                        'failed',
+                    ],
+                    true
+                )
+            ) {
+                throw new RuntimeException(
+                    'Đơn này không thể hủy.'
+                );
+            }
+
+            /*
+             * Chưa gửi provider:
+             * hủy + hoàn tiền ngay.
+             */
+            if (
+                !$order->provider_order_id
+            ) {
+                if ((int) $order->attempts >= 1) {
+                    throw new RuntimeException(
+                        'Đơn đã gửi yêu cầu tới Provider nhưng chưa xác định kết quả. '
+                        .'Vui lòng đối soát trước khi hủy hoặc hoàn tiền.'
+                    );
+                }
+
+                $order->status =
+                    'cancelled';
+
+                $order->save();
+
+                return $this->orders
+                    ->refund(
+                        $order,
+                        $createdBy
+                    );
+            }
+
+            if (!$order->provider) {
+                throw new RuntimeException(
+                    'Không tìm thấy provider.'
+                );
+            }
+
+            if (
+                $order->provider->driver ===
+                'vietnamfb'
+            ) {
+                throw new RuntimeException(
+                    'VietnamFB chưa hỗ trợ hủy tự động.'
+                );
+            }
+
+            /*
+             * Đơn đã gửi:
+             * chỉ yêu cầu provider hủy.
+             * KHÔNG hoàn tiền ngay.
+             */
+            $api =
+                $this->providers->make(
+                    $order->provider
+                );
+
+            $response =
+                $api->cancel(
+                    (string)
+                        $order
+                            ->provider_order_id
+                );
+
+            $order->provider_response =
+                $response;
+
+            $order->provider_error = null;
+
+            /*
+             * Giữ processing/in_progress.
+             * Scheduler sẽ sync và chỉ hoàn tiền
+             * khi provider xác nhận cancelled.
+             */
+            $order->last_synced_at =
+                now();
+
+            $order->save();
+
+            return $order->fresh();
+        } finally {
+            $lock->release();
+        }
+    }
+
+    private function mapStatus(
+        string $status
+    ): ?string {
+        return match ($status) {
+            'pending',
+            'awaiting',
+            'waiting' =>
+                'processing',
+
+            'processing',
+            'in progress',
+            'in_progress',
+            'progress' =>
+                'in_progress',
+
+            'completed',
+            'complete',
+            'done',
+            'success',
+            'successful' =>
+                'completed',
+
+            'partial',
+            'partially completed' =>
+                'partial',
+
+            'canceled',
+            'cancelled' =>
+                'cancelled',
+
+            'failed',
+            'error' =>
+                'failed',
+
+            default => null,
+        };
+    }
+}
+
+
+======================================================================
+FILE: noscam-backend/app/Console/Commands/ProcessSocialOrders.php
+======================================================================
+<?php
+
+namespace App\Console\Commands;
+
+use App\Models\SocialOrder;
+use App\Services\Social\SocialOrderProviderService;
+use Illuminate\Console\Command;
+use Throwable;
+
+class ProcessSocialOrders extends Command
+{
+    protected $signature =
+        'social:process-orders
+        {--limit=50 : Số đơn tối đa mỗi lượt}';
+
+    protected $description =
+        'Gửi đơn social và đồng bộ trạng thái provider';
+
+    public function handle(
+        SocialOrderProviderService $providerService
+    ): int {
+        $limit = max(
+            1,
+            min(
+                200,
+                (int) $this->option('limit')
+            )
+        );
+
+        /*
+         * SUBMIT
+         *
+         * Chỉ retry tối đa 3 lần.
+         * Chỉ provider đã xác nhận chuẩn SMM V2.
+         */
+        $pendingOrders =
+            SocialOrder::query()
+                ->with([
+                    'provider',
+                    'providerService',
+                ])
+                ->where(
+                    'status',
+                    'pending'
+                )
+                ->whereNull(
+                    'provider_order_id'
+                )
+                ->where(
+                    'attempts',
+                    '=',
+                    0
+                )
+                ->whereHas(
+                    'provider',
+                    function ($query) {
+                        $query
+                            ->where(
+                                'status',
+                                'active'
+                            )
+                            ->whereIn(
+                                'driver',
+                                [
+                                    'nganhangsub',
+                                    'hacklike17',
+                                ]
+                            );
+                    }
+                )
+                ->orderBy('id')
+                ->limit($limit)
+                ->get();
+
+        foreach ($pendingOrders as $order) {
+            try {
+                $result =
+                    $providerService->submit(
+                        $order
+                    );
+
+                $this->info(
+                    $result->code
+                    .' -> submitted'
+                    .' -> '
+                    .$result->provider_order_id
+                );
+            } catch (Throwable $e) {
+                $this->error(
+                    $order->code
+                    .' -> submit error: '
+                    .$e->getMessage()
+                );
+            }
+        }
+
+        /*
+         * SYNC
+         *
+         * Chỉ sync đơn đang chạy.
+         * Không đụng completed/partial/
+         * cancelled/failed.
+         */
+        $syncOrders =
+            SocialOrder::query()
+                ->with([
+                    'provider',
+                    'providerService',
+                ])
+                ->whereNotNull(
+                    'provider_order_id'
+                )
+                ->whereIn(
+                    'status',
+                    [
+                        'processing',
+                        'in_progress',
+                    ]
+                )
+                ->where(
+                    function ($query) {
+                        $query
+                            ->whereNull(
+                                'last_synced_at'
+                            )
+                            ->orWhere(
+                                'last_synced_at',
+                                '<=',
+                                now()->subSeconds(45)
+                            );
+                    }
+                )
+                ->whereHas(
+                    'provider',
+                    function ($query) {
+                        $query
+                            ->where(
+                                'status',
+                                'active'
+                            )
+                            ->whereIn(
+                                'driver',
+                                [
+                                    'nganhangsub',
+                                    'hacklike17',
+                                ]
+                            );
+                    }
+                )
+                ->orderByRaw(
+                    'COALESCE(last_synced_at, created_at) ASC'
+                )
+                ->limit($limit)
+                ->get();
+
+        foreach ($syncOrders as $order) {
+            try {
+                $result =
+                    $providerService->sync(
+                        $order
+                    );
+
+                $this->line(
+                    $result->code
+                    .' -> '
+                    .$result->status
+                );
+            } catch (Throwable $e) {
+                $this->error(
+                    $order->code
+                    .' -> sync error: '
+                    .$e->getMessage()
+                );
+            }
+        }
+
+        return self::SUCCESS;
+    }
+}
+

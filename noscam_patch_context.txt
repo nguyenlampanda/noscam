@@ -1,0 +1,826 @@
+
+===========================================================================
+noscam-backend/app/Http/Controllers/Api/SocialOrderController.php
+===========================================================================
+...
+2: 
+3: namespace App\Http\Controllers\Api;
+4: 
+5: use App\Http\Controllers\Controller;
+6: use App\Models\SocialOrder;
+7: use App\Models\SocialService;
+8: use App\Services\Social\SocialOrderService;
+9: use Illuminate\Http\JsonResponse;
+10: use Illuminate\Http\Request;
+11: 
+12: class SocialOrderController extends Controller
+13: {
+14:     public function index(
+15:         Request $request
+16:     ): JsonResponse {
+17:         $orders = SocialOrder::query()
+18:             ->where(
+19:                 'user_id',
+20:                 $request->user()->id
+21:             )
+22:             ->with([
+23:                 'service:id,code,name,platform,category',
+24:             ])
+25:             ->latest()
+26:             ->paginate(30);
+27: 
+28:         return response()->json($orders);
+29:     }
+30: 
+31:     public function show(
+32:         Request $request,
+33:         SocialOrder $order
+34:     ): JsonResponse {
+35:         abort_unless(
+36:             (int) $order->user_id ===
+37:             (int) $request->user()->id,
+38:             404
+39:         );
+40: 
+41:         $order->load([
+42:             'service:id,code,name,platform,category',
+43:         ]);
+44: 
+45:         return response()->json([
+46:             'data' => $order,
+47:         ]);
+48:     }
+49: 
+50:     public function store(
+51:         Request $request,
+52:         SocialOrderService $orderService
+53:     ): JsonResponse {
+54:         $data = $request->validate([
+55:             'service_id' => [
+56:                 'required',
+57:                 'integer',
+58:                 'exists:social_services,id',
+59:             ],
+60:             'target' => [
+61:                 'required',
+62:                 'string',
+63:                 'max:2000',
+64:             ],
+65:             'quantity' => [
+66:                 'required',
+67:                 'integer',
+68:                 'min:1',
+69:                 'max:100000000',
+70:             ],
+71:             'idempotency_key' => [
+72:                 'required',
+73:                 'string',
+74:                 'min:16',
+75:                 'max:100',
+76:             ],
+77:         ]);
+78: 
+79:         $service =
+80:             SocialService::findOrFail(
+81:                 $data['service_id']
+82:             );
+83: 
+84:         $order = $orderService->create(
+85:             user: $request->user(),
+86:             service: $service,
+87:             target: $data['target'],
+88:             quantity: (int) $data['quantity'],
+89:             idempotencyKey:
+90:                 $data['idempotency_key']
+91:         );
+92: 
+93:         return response()->json([
+94:             'message' =>
+95:                 'Đặt đơn thành công.',
+96:             'data' =>
+97:                 $order,
+98:         ], 201);
+99:     }
+100: }
+
+===========================================================================
+noscam-backend/app/Services/Social/SocialOrderProviderService.php
+===========================================================================
+...
+427:             return $order
+428:                 ->fresh()
+429:                 ->load([
+430:                     'service',
+431:                     'provider',
+432:                     'providerService',
+433:                 ]);
+434:         } finally {
+435:             $lock->release();
+436:         }
+437:     }
+438: 
+439:     public function cancel(
+440:         SocialOrder $order,
+441:         ?int $createdBy = null
+442:     ): SocialOrder {
+443:         $lock = Cache::lock(
+444:             'social-order-operation-'.$order->id,
+445:             60
+446:         );
+447: 
+448:         if (!$lock->get()) {
+449:             throw new RuntimeException(
+450:                 'Đơn đang được xử lý.'
+451:             );
+452:         }
+453: 
+454:         try {
+455:             $order =
+456:                 SocialOrder::query()
+457:                     ->with([
+458:                         'provider',
+459:                         'providerService',
+460:                     ])
+461:                     ->findOrFail(
+462:                         $order->id
+463:                     );
+464: 
+465:             if (
+466:                 in_array(
+467:                     $order->status,
+468:                     [
+469:                         'completed',
+470:                         'partial',
+471:                         'cancelled',
+472:                         'failed',
+473:                     ],
+474:                     true
+475:                 )
+476:             ) {
+477:                 throw new RuntimeException(
+478:                     'Đơn này không thể hủy.'
+479:                 );
+480:             }
+481: 
+482:             /*
+483:              * Chưa gửi provider:
+484:              * hủy + hoàn tiền ngay.
+485:              */
+486:             if (
+487:                 !$order->provider_order_id
+488:             ) {
+489:                 if ((int) $order->attempts >= 1) {
+490:                     throw new RuntimeException(
+491:                         'Đơn đã gửi yêu cầu tới Provider nhưng chưa xác định kết quả. '
+492:                         .'Vui lòng đối soát trước khi hủy hoặc hoàn tiền.'
+493:                     );
+494:                 }
+495: 
+496:                 $order->status =
+497:                     'cancelled';
+498: 
+499:                 $order->save();
+500: 
+501:                 return $this->orders
+502:                     ->refund(
+503:                         $order,
+
+===========================================================================
+noscam-backend/app/Services/Social/Providers/VietnamFbProvider.php
+===========================================================================
+...
+109: 
+110:         return $json;
+111:     }
+112: 
+113:     public function balance(): array
+114:     {
+115:         return $this->get(
+116:             'user',
+117:             'get_user_balance'
+118:         );
+119:     }
+120: 
+121:     public function services(): array
+122:     {
+123:         $username = trim(
+124:             (string) $this->username
+125:         );
+126: 
+127:         if ($username === '') {
+128:             throw new RuntimeException(
+129:                 'VietnamFB chưa cấu hình username.'
+130:             );
+131:         }
+132: 
+133:         $result = $this->get(
+134:             'channel',
+135:             'get_channel_info',
+136:             [
+137:                 'username' => $username,
+138:             ]
+139:         );
+140: 
+141:         $services = [];
+142: 
+143:         foreach ($result as $group => $channels) {
+144:             if (!is_array($channels)) {
+145:                 continue;
+146:             }
+147: 
+148:             foreach ($channels as $channel) {
+149:                 if (!is_array($channel)) {
+150:                     continue;
+151:                 }
+152: 
+153:                 $channelNumber =
+154:                     $channel['channel']
+155:                     ?? $channel['id']
+156:                     ?? null;
+157: 
+158:                 if ($channelNumber === null) {
+159:                     continue;
+160:                 }
+161: 
+162:                 $groupName = strtoupper(
+163:                     (string) $group
+164:                 );
+165: 
+166:                 $channelId = (string) $channelNumber;
+167: 
+168:                 $statusText = (string) (
+169:                     $channel['status_text']
+170:                     ?? ''
+171:                 );
+172: 
+173:                 $services[] = [
+174:                     'service' =>
+175:                         $groupName.':'.$channelId,
+176: 
+177:                     'name' =>
+178:                         $this->serviceName(
+179:                             $groupName,
+180:                             $channelId
+181:                         ),
+182: 
+183:                     'rate' =>
+184:                         is_numeric(
+185:                             $channel['price'] ?? null
+...
+294:             'VietnamFB chưa cấu hình lấy trạng thái đơn.'
+295:         );
+296:     }
+297: 
+298:     public function refill(
+299:         string $orderId
+300:     ): array {
+301:         throw new RuntimeException(
+302:             'VietnamFB chưa cấu hình refill.'
+303:         );
+304:     }
+305: 
+306:     public function cancel(
+307:         string $orderId
+308:     ): array {
+309:         throw new RuntimeException(
+310:             'VietnamFB chưa cấu hình cancel.'
+311:         );
+312:     }
+313: }
+
+===========================================================================
+noscam-backend/app/Services/Social/Providers/StandardSmmProvider.php
+===========================================================================
+...
+131:         ]);
+132:     }
+133: 
+134:     public function refill(
+135:         string $orderId
+136:     ): array {
+137:         return $this->request([
+138:             'action' => 'refill',
+139:             'order' => $orderId,
+140:         ]);
+141:     }
+142: 
+143:     public function cancel(
+144:         string $orderId
+145:     ): array {
+146:         return $this->request([
+147:             'action' => 'cancel',
+148:             'order' => $orderId,
+149:         ]);
+150:     }
+151: 
+152:     public function numericFacebookUid(
+153:         string $link
+154:     ): array {
+155:         return $this->request([
+156:             'action' => 'get_numeric_uid',
+157:             'link' => $link,
+158:         ]);
+159:     }
+160: 
+161:     public function createVipOrder(
+162:         string $serviceId,
+163:         string $target,
+164:         int $quantity,
+165:         int $days,
+166:         array $options = []
+167:     ): array {
+168:         return $this->request(
+169:             array_merge(
+170:                 [
+171:                     'action' => 'add_vip',
+172:                     'service' => $serviceId,
+173:                     'link' => $target,
+174:                     'quantity' => $quantity,
+175:                     'days' => $days,
+176:                 ],
+177:                 $options
+178:             )
+179:         );
+180:     }
+181: }
+
+===========================================================================
+noscam-backend/app/Http/Controllers/Api/AdminSocialProviderController.php
+===========================================================================
+...
+254:             ]);
+255: 
+256:             return response()->json([
+257:                 'message' =>
+258:                     'Không thể kết nối API.',
+259: 
+260:                 'error' =>
+261:                     $e->getMessage(),
+262:             ], 422);
+263:         }
+264:     }
+265: 
+266:     public function sync(
+267:         SocialProvider $provider,
+268:         SocialProviderManager $manager
+269:     ): JsonResponse {
+270:         if (empty($provider->api_key)) {
+271:             return response()->json([
+272:                 'message' =>
+273:                     'Nhà cung cấp chưa có API key.',
+274:             ], 422);
+275:         }
+276: 
+277:         try {
+278:             $result =
+279:                 $manager
+280:                     ->make($provider)
+281:                     ->services();
+282: 
+283:             $services =
+284:                 $this->normalizeServices(
+285:                     $result
+286:                 );
+287: 
+288:             if (empty($services)) {
+289:                 throw new \RuntimeException(
+290:                     'API không trả về danh sách dịch vụ.'
+291:                 );
+292:             }
+293: 
+294:             $syncedIds = [];
+295: 
+296:             DB::transaction(
+297:                 function () use (
+298:                     $provider,
+299:                     $services,
+300:                     &$syncedIds
+301:                 ) {
+302:                     foreach (
+303:                         $services as $item
+304:                     ) {
+305:                         $providerServiceId =
+306:                             (string) (
+307:                                 $item['service']
+308:                                 ?? $item['id']
+309:                                 ?? ''
+310:                             );
+311: 
+312:                         if (
+313:                             $providerServiceId === ''
+314:                         ) {
+315:                             continue;
+316:                         }
+317: 
+318:                         $name =
+319:                             (string) (
+320:                                 $item['name']
+321:                                 ?? $item[
+322:                                     'service_name'
+323:                                 ]
+324:                                 ?? (
+325:                                     'Service '
+326:                                     .$providerServiceId
+327:                                 )
+328:                             );
+329: 
+330:                         $rate =
+
+===========================================================================
+noscam-frontend/src/pages/MyOrdersPage.jsx
+===========================================================================
+...
+3:   useMemo,
+4:   useState,
+5: } from 'react'
+6: import {
+7:   Link,
+8:   useLocation,
+9: } from 'react-router-dom'
+10: import {
+11:   AnimatePresence,
+12:   motion,
+13: } from 'motion/react'
+14: import PlatformIcon from '../components/social/PlatformIcon'
+15: import customerService from '../services/customerService'
+16: 
+17: function money(value) {
+18:   return `${Math.round(
+19:     Number(value || 0),
+20:   ).toLocaleString('vi-VN')}đ`
+21: }
+22: 
+23: function number(value) {
+24:   return Number(
+25:     value || 0,
+26:   ).toLocaleString('vi-VN')
+27: }
+28: 
+29: function dateTime(value) {
+30:   if (!value) return '—'
+31: 
+32:   const date = new Date(value)
+33: 
+34:   if (
+35:     Number.isNaN(
+36:       date.getTime(),
+37:     )
+38:   ) {
+39:     return '—'
+40:   }
+41: 
+42:   return date.toLocaleString(
+43:     'vi-VN',
+44:     {
+45:       hour: '2-digit',
+46:       minute: '2-digit',
+47:       day: '2-digit',
+48:       month: '2-digit',
+49:       year: 'numeric',
+50:     },
+51:   )
+52: }
+53: 
+54: const statusMeta = {
+55:   pending: {
+56:     label: 'Chờ xử lý',
+57:     badge:
+58:       'bg-amber-50 text-amber-600 border-amber-100',
+59:     dot: 'bg-amber-500',
+60:     bar: 'bg-amber-500',
+61:   },
+62: 
+63:   processing: {
+64:     label: 'Đang xử lý',
+65:     badge:
+66:       'bg-blue-50 text-blue-600 border-blue-100',
+67:     dot: 'bg-blue-500',
+68:     bar: 'bg-blue-500',
+69:   },
+70: 
+71:   in_progress: {
+72:     label: 'Đang chạy',
+73:     badge:
+74:       'bg-violet-50 text-violet-600 border-violet-100',
+75:     dot: 'bg-violet-500',
+76:     bar: 'bg-violet-500',
+77:   },
+78: 
+79:   completed: {
+...
+83:     dot: 'bg-emerald-500',
+84:     bar: 'bg-emerald-500',
+85:   },
+86: 
+87:   partial: {
+88:     label: 'Một phần',
+89:     badge:
+90:       'bg-orange-50 text-orange-600 border-orange-100',
+91:     dot: 'bg-orange-500',
+92:     bar: 'bg-orange-500',
+93:   },
+94: 
+95:   cancelled: {
+96:     label: 'Đã hủy',
+97:     badge:
+98:       'bg-slate-100 text-slate-600 border-slate-200',
+99:     dot: 'bg-slate-500',
+100:     bar: 'bg-slate-400',
+101:   },
+102: 
+103:   failed: {
+104:     label: 'Thất bại',
+105:     badge:
+106:       'bg-red-50 text-red-600 border-red-100',
+107:     dot: 'bg-red-500',
+108:     bar: 'bg-red-500',
+109:   },
+110: }
+111: 
+112: function getStatus(status) {
+113:   return (
+114:     statusMeta[status] || {
+115:       label: status || 'Không rõ',
+116:       badge:
+117:         'bg-slate-100 text-slate-600 border-slate-200',
+118:       dot: 'bg-slate-400',
+119:       bar: 'bg-slate-400',
+120:     }
+121:   )
+122: }
+123: 
+124: function progressOf(order) {
+125:   if (
+126:     order.status ===
+127:     'completed'
+128:   ) {
+129:     return 100
+130:   }
+131: 
+132:   if (
+133:     order.status ===
+134:       'cancelled' ||
+135:     order.status ===
+136:       'failed'
+137:   ) {
+138:     return 0
+139:   }
+140: 
+141:   const quantity =
+142:     Number(order.quantity) || 0
+143: 
+144:   const remains =
+145:     Number(order.remains)
+146: 
+147:   if (
+148:     quantity > 0 &&
+149:     Number.isFinite(remains) &&
+150:     remains >= 0
+151:   ) {
+152:     return Math.max(
+153:       0,
+154:       Math.min(
+155:         100,
+156:         Math.round(
+157:           ((quantity - remains) /
+158:             quantity) *
+159:             100,
+160:         ),
+161:       ),
+162:     )
+163:   }
+164: 
+165:   if (
+166:     order.status ===
+167:     'in_progress'
+168:   ) {
+169:     return 50
+170:   }
+171: 
+172:   if (
+173:     order.status ===
+174:     'processing'
+175:   ) {
+176:     return 20
+177:   }
+178: 
+179:   return 0
+180: }
+181: 
+182: export default function MyOrdersPage() {
+183:   const location =
+184:     useLocation()
+185: 
+186:   const [orders, setOrders] =
+187:     useState([])
+188: 
+189:   const [loading, setLoading] =
+190:     useState(true)
+191: 
+192:   const [error, setError] =
+193:     useState('')
+194: 
+195:   const [status, setStatus] =
+196:     useState('all')
+197: 
+198:   const [search, setSearch] =
+199:     useState('')
+200: 
+201:   const [createdNotice, setCreatedNotice] =
+202:     useState(
+203:       Boolean(
+204:         location.state
+205:           ?.orderCreated,
+206:       ),
+207:     )
+208: 
+209:   useEffect(() => {
+210:     let active = true
+211: 
+212:     customerService
+213:       .orders()
+214:       .then((response) => {
+215:         if (!active) return
+216: 
+217:         setOrders(
+218:           response?.data || [],
+219:         )
+220:       })
+221:       .catch((err) => {
+222:         if (!active) return
+223: 
+224:         setError(
+225:           err?.message ||
+226:             'Không tải được đơn hàng.',
+227:         )
+228:       })
+229:       .finally(() => {
+230:         if (active) {
+231:           setLoading(false)
+232:         }
+233:       })
+234: 
+235:     return () => {
+236:       active = false
+237:     }
+238:   }, [])
+239: 
+240:   useEffect(() => {
+241:     if (!createdNotice) {
+242:       return undefined
+243:     }
+244: 
+245:     const timer = setTimeout(
+246:       () => {
+247:         setCreatedNotice(false)
+248:       },
+249:       4500,
+250:     )
+251: 
+252:     return () =>
+253:       clearTimeout(timer)
+254:   }, [createdNotice])
+255: 
+256:   const counts = useMemo(
+257:     () => ({
+258:       all: orders.length,
+259: 
+260:       active: orders.filter(
+261:         (item) =>
+262:           [
+263:             'pending',
+264:             'processing',
+265:             'in_progress',
+266:           ].includes(
+267:             item.status,
+268:           ),
+269:       ).length,
+270: 
+271:       completed:
+272:         orders.filter(
+273:           (item) =>
+274:             item.status ===
+275:             'completed',
+276:         ).length,
+277: 
+278:       problem:
+279:         orders.filter(
+280:           (item) =>
+281:             [
+282:               'partial',
+283:               'cancelled',
+284:               'failed',
+285:             ].includes(
+286:               item.status,
+287:             ),
+288:         ).length,
+289:     }),
+290:     [orders],
+291:   )
+292: 
+293:   const filteredOrders =
+294:     useMemo(() => {
+295:       const keyword =
+296:         search
+297:           .trim()
+298:           .toLowerCase()
+299: 
+300:       return orders.filter(
+301:         (item) => {
+302:           let statusMatch =
+303:             true
+304: 
+305:           if (
+306:             status ===
+307:             'active'
+308:           ) {
+309:             statusMatch = [
+310:               'pending',
+311:               'processing',
+312:               'in_progress',
+313:             ].includes(
+314:               item.status,
+315:             )
+316:           } else if (
+317:             status ===
+318:             'completed'
+319:           ) {
+320:             statusMatch =
+321:               item.status ===
+322:               'completed'
+323:           } else if (
+324:             status ===
+325:             'problem'
+326:           ) {
+327:             statusMatch = [
+328:               'partial',
+329:               'cancelled',
+330:               'failed',
+331:             ].includes(
+332:               item.status,
+333:             )
+334:           }
+335: 
+336:           if (!statusMatch) {
+337:             return false
+338:           }
+339: 
+340:           if (!keyword) {
+341:             return true
+342:           }
+343: 
+344:           const haystack = [
+345:             item.code,
+346:             item.target,
+347:             item.service?.name,
+348:             item.service
+349:               ?.platform,
+350:           ]
+351:             .filter(Boolean)
+352:             .join(' ')
+353:             .toLowerCase()
+354: 
+355:           return haystack.includes(
+356:             keyword,
+357:           )
+358:         },
+359:       )
+360:     }, [
+361:       orders,
+362:       status,
+363:       search,
+364:     ])
+365: 
+366:   const tabs = [
+367:     {
+368:       value: 'all',
+369:       label: 'Tất cả',
+370:       count: counts.all,
+371:     },
+372:     {
+373:       value: 'active',
+374:       label: 'Đang chạy',
+375:       count: counts.active,
+376:     },
+377:     {
+378:       value: 'completed',
+379:       label: 'Hoàn thành',
+380:       count:
+381:         counts.completed,
+382:     },
+383:     {
+384:       value: 'problem',
+385:       label: 'Khác',
+386:       count: counts.problem,
+387:     },
+388:   ]
+389: 
+390:   return (
+391:     <main className="min-h-screen bg-slate-50 px-5 py-10">
+392:       <div className="mx-auto max-w-6xl">
+393:         <motion.div
+
+===========================================================================
+noscam-frontend/src/services/customerService.js
+===========================================================================
+Không tìm thấy từ khóa

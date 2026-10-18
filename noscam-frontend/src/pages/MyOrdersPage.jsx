@@ -5,7 +5,6 @@ import {
 } from 'react'
 import {
   Link,
-  useLocation,
 } from 'react-router-dom'
 import {
   AnimatePresence,
@@ -180,8 +179,9 @@ function progressOf(order) {
 }
 
 export default function MyOrdersPage() {
-  const location =
-    useLocation()
+const [cancelBusyId, setCancelBusyId] = useState(null)
+  const [cancelDialogOrder, setCancelDialogOrder] = useState(null)
+  const [cancelNotice, setCancelNotice] = useState(null)
 
   const [orders, setOrders] =
     useState([])
@@ -198,15 +198,8 @@ export default function MyOrdersPage() {
   const [search, setSearch] =
     useState('')
 
-  const [createdNotice, setCreatedNotice] =
-    useState(
-      Boolean(
-        location.state
-          ?.orderCreated,
-      ),
-    )
 
-  useEffect(() => {
+useEffect(() => {
     let active = true
 
     customerService
@@ -237,21 +230,44 @@ export default function MyOrdersPage() {
     }
   }, [])
 
-  useEffect(() => {
-    if (!createdNotice) {
-      return undefined
+
+async function handleCancelOrder(item) {
+    if (cancelBusyId !== null) return
+
+    const allowed = ['pending', 'processing', 'in_progress']
+    if (!allowed.includes(item.status)) return
+
+    setCancelBusyId(item.id)
+    setCancelNotice(null)
+
+    try {
+      const result = await customerService.cancelSocialOrder(item.id)
+
+      setCancelNotice({
+        type: 'success',
+        message:
+          result?.data?.message ||
+          result?.message ||
+          'Đã tiếp nhận yêu cầu hủy. Vui lòng kiểm tra trạng thái đơn.',
+      })
+
+      setCancelDialogOrder(null)
+
+      const refreshed = await customerService.orders()
+      setOrders(refreshed?.data || [])
+    } catch (err) {
+      setCancelNotice({
+        type: 'error',
+        message:
+          err?.response?.data?.message ||
+          err?.data?.message ||
+          err?.message ||
+          'Không thể gửi yêu cầu hủy đơn.',
+      })
+    } finally {
+      setCancelBusyId(null)
     }
-
-    const timer = setTimeout(
-      () => {
-        setCreatedNotice(false)
-      },
-      4500,
-    )
-
-    return () =>
-      clearTimeout(timer)
-  }, [createdNotice])
+  }
 
   const counts = useMemo(
     () => ({
@@ -423,43 +439,23 @@ export default function MyOrdersPage() {
           </Link>
         </motion.div>
 
-        <AnimatePresence>
-          {createdNotice && (
-            <motion.div
-              initial={{
-                opacity: 0,
-                y: -8,
-              }}
-              animate={{
-                opacity: 1,
-                y: 0,
-              }}
-              exit={{
-                opacity: 0,
-                y: -8,
-              }}
-              className="mt-6 flex items-center gap-3 rounded-2xl border border-emerald-100 bg-emerald-50 p-4"
-            >
-              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-500 font-black text-white">
-                ✓
-              </span>
 
-              <div>
-                <div className="font-black text-emerald-700">
-                  Tạo đơn thành công
-                </div>
-
-                <div className="text-sm text-emerald-600">
-                  Đơn hàng đã được ghi nhận và đang chờ xử lý.
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {error && (
+{error && (
           <div className="mt-6 rounded-2xl border border-red-100 bg-red-50 p-4 font-semibold text-red-600">
             {error}
+          </div>
+        )}
+
+        {cancelNotice && (
+          <div
+            role="status"
+            className={`mt-5 rounded-2xl border px-4 py-3 text-sm font-semibold ${
+              cancelNotice.type === 'success'
+                ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                : 'border-red-200 bg-red-50 text-red-700'
+            }`}
+          >
+            {cancelNotice.message}
           </div>
         )}
 
@@ -667,53 +663,42 @@ export default function MyOrdersPage() {
                         </div>
                       </div>
 
-                      <div className="mt-5 grid gap-3 md:grid-cols-3">
-                        <div className="rounded-2xl bg-slate-50 p-4">
-                          <div className="text-[11px] font-black uppercase tracking-wide text-slate-400">
-                            Target
-                          </div>
-
-                          <div
-                            title={
-                              item.target
-                            }
-                            className="mt-1 truncate text-sm font-bold text-slate-700"
-                          >
-                            {item.target}
-                          </div>
-                        </div>
-
-                        <div className="rounded-2xl bg-slate-50 p-4">
-                          <div className="text-[11px] font-black uppercase tracking-wide text-slate-400">
-                            Số lượng
-                          </div>
-
-                          <div className="mt-1 text-lg font-black text-slate-900">
-                            {number(
-                              item.quantity,
+                      <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 rounded-xl border border-slate-100 bg-slate-50/60 px-3 py-2.5 transition-all duration-300 hover:border-blue-200 hover:bg-blue-50/40 md:grid-cols-[minmax(0,1fr)_90px_90px_90px]">
+                          <div className="col-span-2 flex min-w-0 items-center gap-2 md:col-span-1">
+                            <span className="shrink-0 text-[10px] font-black uppercase text-slate-400">Target</span>
+                            {/^https?:\/\//i.test(String(item.target || '').trim()) ? (
+                              <a href={String(item.target).trim()} target="_blank" rel="noopener noreferrer"
+                                title={item.target}
+                                className="group/link inline-flex min-w-0 items-center gap-1 text-xs font-bold text-blue-600 transition-colors hover:text-blue-800">
+                                <span className="truncate group-hover/link:underline">{item.target}</span>
+                                <span className="shrink-0 transition-transform group-hover/link:-translate-y-0.5 group-hover/link:translate-x-0.5">↗</span>
+                              </a>
+                            ) : (
+                              <span className="truncate text-xs font-semibold" title={item.target}>{item.target || '—'}</span>
                             )}
                           </div>
-                        </div>
 
-                        <div className="rounded-2xl bg-slate-50 p-4">
-                          <div className="text-[11px] font-black uppercase tracking-wide text-slate-400">
-                            Còn lại
+                          <div className="flex items-center justify-between gap-2 md:flex-col md:items-end md:justify-center md:gap-0">
+                            <span className="text-[10px] font-bold uppercase text-slate-400">Số lượng</span>
+                            <span className="text-xs font-black tabular-nums">{number(item.quantity)}</span>
                           </div>
 
-                          <div className="mt-1 text-lg font-black text-slate-900">
-                            {item.remains ===
-                              null ||
-                            item.remains ===
-                              undefined
-                              ? '—'
-                              : number(
-                                  item.remains,
-                                )}
+                          <div className="flex items-center justify-between gap-2 md:flex-col md:items-end md:justify-center md:gap-0">
+                            <span className="text-[10px] font-bold uppercase text-slate-400">Đã chạy</span>
+                            <span className="text-xs font-black tabular-nums text-blue-600">
+                              {item.remains == null ? '—' : number(Math.max(0, Number(item.quantity || 0) - Number(item.remains || 0)))}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center justify-between gap-2 md:flex-col md:items-end md:justify-center md:gap-0">
+                            <span className="text-[10px] font-bold uppercase text-slate-400">Còn lại</span>
+                            <span className="text-xs font-black tabular-nums">
+                              {item.remains == null ? '—' : number(item.remains)}
+                            </span>
                           </div>
                         </div>
-                      </div>
 
-                      <div className="mt-5">
+                        <div className="mt-5">
                         <div className="mb-2 flex items-center justify-between gap-3">
                           <span className="text-xs font-black text-slate-500">
                             Tiến độ
@@ -740,6 +725,21 @@ export default function MyOrdersPage() {
                         </div>
                       </div>
 
+                      {['pending', 'processing', 'in_progress'].includes(item.status) && (
+                        <div className="mt-4 flex justify-end">
+                          <button
+                            type="button"
+                            disabled={cancelBusyId !== null}
+                            onClick={() => { setCancelNotice(null); setCancelDialogOrder(item) }}
+                            className="rounded-xl border border-red-200 bg-white px-4 py-2 text-xs font-black text-red-600 transition hover:border-red-400 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            {cancelBusyId === item.id
+                              ? 'Đang gửi yêu cầu...'
+                              : 'Hủy đơn'}
+                          </button>
+                        </div>
+                      )}
+
                       {Number(
                         item.refunded_amount ||
                           0,
@@ -760,6 +760,96 @@ export default function MyOrdersPage() {
           )}
         </div>
       </div>
+
+      <AnimatePresence>
+        {cancelDialogOrder && (
+          <motion.div
+            key="cancel-order-dialog"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/60 px-4 py-6 backdrop-blur-sm"
+            role="presentation"
+            onMouseDown={(event) => {
+              if (event.target === event.currentTarget && cancelBusyId === null) {
+                setCancelDialogOrder(null)
+              }
+            }}
+          >
+            <motion.div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="cancel-order-title"
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              transition={{ duration: 0.2 }}
+              className="w-full max-w-md overflow-hidden rounded-3xl bg-white p-6 shadow-2xl md:p-7"
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-red-50 text-2xl text-red-600">
+                  !
+                </div>
+
+                <button
+                  type="button"
+                  aria-label="Đóng popup"
+                  disabled={cancelBusyId !== null}
+                  onClick={() => setCancelDialogOrder(null)}
+                  className="rounded-full px-2 py-1 text-xl text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50"
+                >
+                  ×
+                </button>
+              </div>
+
+              <h2 id="cancel-order-title" className="mt-5 text-xl font-black text-slate-950">
+                Xác nhận hủy đơn hàng
+              </h2>
+
+              <p className="mt-2 text-sm leading-6 text-slate-500">
+                Bạn có chắc chắn muốn gửi yêu cầu hủy đơn hàng này?
+              </p>
+
+              <div className="mt-5 rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                <div className="text-xs font-bold uppercase text-slate-400">
+                  Mã đơn hàng
+                </div>
+                <div className="mt-1 font-black text-slate-900">
+                  {cancelDialogOrder.code || cancelDialogOrder.id}
+                </div>
+                <div className="mt-2 text-sm font-semibold text-slate-600">
+                  {cancelDialogOrder.service?.name || 'Dịch vụ tăng tương tác'}
+                </div>
+              </div>
+
+              <div className="mt-4 rounded-2xl border border-amber-100 bg-amber-50 p-4 text-xs leading-5 text-amber-800">
+                Đơn đã gửi đến nhà cung cấp có thể không hủy được.
+                Tiền chỉ được hoàn khi đơn đủ điều kiện và có kết quả xử lý hợp lệ.
+              </div>
+
+              <div className="mt-6 grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  disabled={cancelBusyId !== null}
+                  onClick={() => setCancelDialogOrder(null)}
+                  className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+                >
+                  Giữ đơn hàng
+                </button>
+
+                <button
+                  type="button"
+                  disabled={cancelBusyId !== null}
+                  onClick={() => handleCancelOrder(cancelDialogOrder)}
+                  className="rounded-xl bg-red-600 px-4 py-3 text-sm font-black text-white transition hover:bg-red-700 disabled:cursor-wait disabled:opacity-60"
+                >
+                  {cancelBusyId !== null ? 'Đang xử lý...' : 'Xác nhận hủy'}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </main>
   )
 }

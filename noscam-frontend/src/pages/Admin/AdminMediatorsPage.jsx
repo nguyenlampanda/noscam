@@ -1,3 +1,4 @@
+import NoScamSelect from '../../components/ui/NoScamSelect'
 import {
   useCallback,
   useEffect,
@@ -547,7 +548,7 @@ function AdminMediatorsPage() {
                     Trạng thái
                   </label>
 
-                  <select
+                  <NoScamSelect
                     value={
                       form.status
                     }
@@ -575,7 +576,7 @@ function AdminMediatorsPage() {
                     <option value="removed">
                       Đã gỡ
                     </option>
-                  </select>
+                  </NoScamSelect>
                 </div>
 
                 <label className="flex items-center gap-3 self-end rounded-xl border border-slate-200 px-4 py-3">

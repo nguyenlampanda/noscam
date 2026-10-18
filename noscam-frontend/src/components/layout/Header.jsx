@@ -49,6 +49,10 @@ const navigation = [
     path: '/digital-services',
   },
   {
+    name: 'Kiếm xu',
+    path: '/exchange',
+  },
+  {
     name: 'Hướng dẫn',
     path: '/guide',
   },

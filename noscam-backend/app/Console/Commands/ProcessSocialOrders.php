@@ -64,7 +64,8 @@ class ProcessSocialOrders extends Command
                                 [
                                     'nganhangsub',
                                     'hacklike17',
-                                ]
+            'vietnamfb',
+        ]
                             );
                     }
                 )
@@ -143,7 +144,8 @@ class ProcessSocialOrders extends Command
                                 [
                                     'nganhangsub',
                                     'hacklike17',
-                                ]
+            'vietnamfb',
+        ]
                             );
                     }
                 )

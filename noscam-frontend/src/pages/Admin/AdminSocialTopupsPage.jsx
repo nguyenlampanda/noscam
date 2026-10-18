@@ -1,3 +1,5 @@
+import NoScamSelect from '../../components/ui/NoScamSelect'
+import { useNoScamUI } from '../../components/ui/NoScamUI'
 import {
   useCallback,
   useEffect,
@@ -23,6 +25,7 @@ const statusMap = {
 }
 
 export default function AdminSocialTopupsPage() {
+  const { confirm, prompt } = useNoScamUI()
   const [items, setItems] = useState([])
   const [meta, setMeta] = useState({})
   const [loading, setLoading] = useState(true)
@@ -109,7 +112,7 @@ export default function AdminSocialTopupsPage() {
     }
 
     if (
-      !window.confirm(
+      !await confirm(
         `Cộng ${money(amount)} vào ví @${username}?`,
       )
     ) {
@@ -152,7 +155,7 @@ export default function AdminSocialTopupsPage() {
 
   async function approve(item) {
     if (
-      !window.confirm(
+      !await confirm(
         `Cộng ${money(item.amount)} vào ví khách hàng?`,
       )
     ) {
@@ -178,7 +181,7 @@ export default function AdminSocialTopupsPage() {
   }
 
   async function reject(item) {
-    const note = window.prompt(
+    const note = await prompt(
       'Lý do từ chối (có thể để trống):',
       '',
     )
@@ -334,7 +337,7 @@ export default function AdminSocialTopupsPage() {
             className="rounded-2xl border border-slate-200 bg-white px-4 py-3"
           />
 
-          <select
+          <NoScamSelect
             value={status}
             onChange={(e) =>
               setStatus(e.target.value)
@@ -345,7 +348,7 @@ export default function AdminSocialTopupsPage() {
             <option value="pending">Chờ duyệt</option>
             <option value="approved">Đã cộng tiền</option>
             <option value="rejected">Từ chối</option>
-          </select>
+          </NoScamSelect>
         </div>
 
         <div className="mt-5 text-sm font-semibold text-slate-500">

@@ -1,7 +1,9 @@
+import NoScamSelect from '../../ui/NoScamSelect'
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { motion } from 'framer-motion'
 import adminService from '../../../services/adminService'
+import { useNoScamUI, Spinner, NoScamBrand } from '../../ui/NoScamUI' // noscam-audit-ui-v1
 
 const results = [
   { value: 'uncertain', label: 'Chưa xác định kết quả' },
@@ -15,6 +17,7 @@ function unwrap(response) {
 }
 
 export default function SocialOrderAuditModal({ order, onClose }) {
+  const { notify } = useNoScamUI()
   const [history, setHistory] = useState([])
   const [preview, setPreview] = useState(null)
   const [previewLoading, setPreviewLoading] = useState(true)
@@ -138,13 +141,11 @@ export default function SocialOrderAuditModal({ order, onClose }) {
       setProviderOrderId('')
       setResult('uncertain')
       setSuccess('Đã lưu biên bản đối soát. Trạng thái đơn và ví không thay đổi.')
+      notify('Đã lưu biên bản đối soát.', 'success')
     } catch (err) {
-      setError(
-        err?.data?.message ||
-        err?.response?.data?.message ||
-        err?.message ||
-        'Không lưu được biên bản.'
-      )
+      const message = err?.data?.message || err?.response?.data?.message || err?.message || 'Không lưu được biên bản.'
+      setError(message)
+      notify(message, 'error')
     } finally {
       setSaving(false)
     }
@@ -160,6 +161,7 @@ export default function SocialOrderAuditModal({ order, onClose }) {
         aria-modal="true"
         aria-label="Đối soát đơn hàng"
       >
+        <div className="mb-5 flex justify-center"><NoScamBrand /></div>
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="text-xs font-black uppercase tracking-widest text-blue-600">
@@ -172,7 +174,7 @@ export default function SocialOrderAuditModal({ order, onClose }) {
               Provider: {order.provider?.name || '—'} · Lần thử gửi: {order.attempts || 0}
             </p>
           </div>
-          <button type="button" onClick={onClose} className="rounded-xl bg-slate-100 px-3 py-2 font-black text-slate-600">
+          <button type="button" onClick={onClose} disabled={saving} className="rounded-xl bg-slate-100 px-3 py-2 font-black text-slate-600 disabled:opacity-50">
             Đóng
           </button>
         </div>
@@ -195,12 +197,12 @@ export default function SocialOrderAuditModal({ order, onClose }) {
 
             <label className="block text-sm font-bold text-slate-700">
               Kết quả đối soát
-              <select value={result} onChange={(e) => setResult(e.target.value)}
+              <NoScamSelect value={result} onChange={(e) => setResult(e.target.value)}
                 className="mt-2 w-full rounded-xl border border-slate-200 p-3">
                 {results.map((item) => (
                   <option key={item.value} value={item.value}>{item.label}</option>
                 ))}
-              </select>
+              </NoScamSelect>
             </label>
 
             {result === 'provider_received' && (
@@ -231,7 +233,7 @@ export default function SocialOrderAuditModal({ order, onClose }) {
 
             <button type="submit" disabled={saving}
               className="w-full rounded-xl bg-blue-600 px-5 py-3 font-black text-white transition hover:bg-blue-700 disabled:opacity-50">
-              {saving ? 'Đang lưu...' : 'Lưu biên bản đối soát'}
+              {saving ? <span className="inline-flex items-center justify-center gap-2"><Spinner size="sm" /> Đang lưu...</span> : 'Lưu biên bản đối soát'}
             </button>
           </form>
         ) : (
@@ -247,7 +249,7 @@ export default function SocialOrderAuditModal({ order, onClose }) {
 
           {previewLoading ? (
             <p className="mt-2 text-sm text-slate-500">
-              Đang kiểm tra điều kiện...
+              <span className="inline-flex items-center gap-2"><Spinner size="sm" /> Đang kiểm tra điều kiện...</span>
             </p>
           ) : !preview ? (
             <p className="mt-2 text-sm text-red-600">
@@ -293,7 +295,7 @@ export default function SocialOrderAuditModal({ order, onClose }) {
 
           {resolutionLoading ? (
             <p className="mt-3 text-sm text-slate-400">
-              Đang tải lịch sử xử lý...
+              <span className="inline-flex items-center gap-2"><Spinner size="sm" /> Đang tải lịch sử xử lý...</span>
             </p>
           ) : resolutionError ? (
             <p className="mt-3 text-sm font-semibold text-red-600">
@@ -348,7 +350,7 @@ export default function SocialOrderAuditModal({ order, onClose }) {
         <div className="mt-8 border-t border-slate-100 pt-5">
           <h3 className="text-lg font-black text-slate-900">Lịch sử đối soát</h3>
           {loading ? (
-            <p className="mt-3 text-sm text-slate-400">Đang tải lịch sử...</p>
+            <div className="mt-3 flex items-center gap-2 text-sm text-slate-500"><Spinner size="sm" /> Đang tải lịch sử...</div>
           ) : history.length === 0 ? (
             <p className="mt-3 text-sm text-slate-400">Chưa có biên bản.</p>
           ) : (

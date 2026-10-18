@@ -322,6 +322,91 @@ Route::middleware([
     );
 
     Route::get(
+        '/exchange/campaigns',
+        [\App\Http\Controllers\Api\ExchangeCampaignController::class, 'index']
+    );
+
+    Route::get(
+        '/exchange/campaigns/by-request/{key}',
+        [\App\Http\Controllers\Api\ExchangeCampaignController::class, 'lookupByRequest']
+    )->where('key', '[A-Za-z0-9_-]{16,128}');
+
+    Route::get(
+        '/exchange/campaigns/{id}',
+        [\App\Http\Controllers\Api\ExchangeCampaignController::class, 'show']
+    )->whereNumber('id');
+
+    Route::get(
+        '/exchange/campaigns/{id}/claims',
+        [\App\Http\Controllers\Api\ExchangeCampaignController::class, 'claims']
+    )->whereNumber('id');
+
+    Route::post(
+        '/exchange/campaigns',
+        [\App\Http\Controllers\Api\ExchangeCampaignController::class, 'store']
+    );
+
+    Route::get(
+        '/exchange/tasks',
+        [\App\Http\Controllers\Api\ExchangeTaskController::class, 'index']
+    );
+
+    Route::get(
+        '/exchange/claims/mine',
+        [\App\Http\Controllers\Api\ExchangeTaskController::class, 'mine']
+    );
+
+    Route::post(
+        '/exchange/tasks/{campaignId}/claim',
+        [\App\Http\Controllers\Api\ExchangeTaskController::class, 'claim']
+    );
+
+    Route::post(
+        '/exchange/claims/{claimId}/submit',
+        [\App\Http\Controllers\Api\ExchangeTaskController::class, 'submit']
+    );
+
+    Route::post(
+        '/exchange/claims/{claimId}/approve',
+        [\App\Http\Controllers\Api\ExchangeTaskController::class, 'approve']
+    );
+
+    Route::post(
+        '/exchange/claims/{claimId}/reject',
+        [\App\Http\Controllers\Api\ExchangeTaskController::class, 'reject']
+    );
+
+    Route::post(
+        '/exchange/claims/{claimId}/appeal',
+        [\App\Http\Controllers\Api\ExchangeTaskController::class, 'appeal']
+    );
+
+    Route::get(
+        '/exchange/prices',
+        [\App\Http\Controllers\Api\ExchangeTaskPriceController::class, 'index']
+    );
+
+    Route::get(
+        '/exchange/accounts',
+        [\App\Http\Controllers\Api\ExchangeSocialAccountController::class, 'index']
+    );
+
+    Route::post(
+        '/exchange/accounts',
+        [\App\Http\Controllers\Api\ExchangeSocialAccountController::class, 'store']
+    );
+
+    Route::patch(
+        '/exchange/accounts/{id}/default',
+        [\App\Http\Controllers\Api\ExchangeSocialAccountController::class, 'setDefault']
+    )->whereNumber('id');
+
+    Route::delete(
+        '/exchange/accounts/{id}',
+        [\App\Http\Controllers\Api\ExchangeSocialAccountController::class, 'destroy']
+    )->whereNumber('id');
+
+    Route::get(
         '/wallet',
         [WalletController::class, 'show']
     );
@@ -409,6 +494,58 @@ Route::prefix('admin')
         'throttle:admin-api',
     ])
     ->group(function () {
+
+        /*
+        |--------------------------------------------------------------------------
+        | Exchange Task Prices
+        |--------------------------------------------------------------------------
+        */
+
+        Route::get(
+            '/exchange/campaigns',
+            [\App\Http\Controllers\Api\AdminExchangeCampaignController::class, 'index']
+        );
+
+        Route::get(
+            '/exchange/campaigns/{campaignId}/claims',
+            [\App\Http\Controllers\Api\AdminExchangeCampaignController::class, 'campaignClaims']
+        );
+
+        Route::patch(
+            '/exchange/campaigns/{campaignId}/status',
+            [\App\Http\Controllers\Api\AdminExchangeCampaignController::class, 'changeStatus']
+        );
+
+        Route::post(
+            '/exchange/campaigns/{campaignId}/cancel-request',
+            [\App\Http\Controllers\Api\AdminExchangeCampaignController::class, 'requestCancellation']
+        );
+
+        Route::post(
+            '/exchange/campaigns/{campaignId}/cancel-finalize',
+            [\App\Http\Controllers\Api\AdminExchangeCampaignController::class, 'finalizeCancellation']
+        );
+
+        Route::get(
+            '/exchange/prices',
+            [\App\Http\Controllers\Api\AdminExchangeTaskPriceController::class, 'index']
+        );
+
+        Route::put(
+            '/exchange/prices',
+            [\App\Http\Controllers\Api\AdminExchangeTaskPriceController::class, 'update']
+        );
+
+        Route::get(
+            '/exchange/disputes',
+            [\App\Http\Controllers\Api\AdminExchangeDisputeListController::class, 'index']
+        );
+
+        Route::post(
+            '/exchange/disputes/{disputeId}/resolve',
+            [\App\Http\Controllers\Api\AdminExchangeDisputeController::class, 'resolve']
+        );
+
         Route::post(
             '/logout',
             [

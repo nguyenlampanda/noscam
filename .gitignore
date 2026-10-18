@@ -1,0 +1,23 @@
+
+
+# NoScam local configuration
+**/.env
+**/.env.*
+!**/.env.example
+
+# Local backups and diagnostics
+.exchange-backups/
+debug/
+**/.exchange-backups/
+**/.exchange-audits/
+**/.exchange-reports/
+**/*.bak
+**/*.bak-*
+**/*.backup-*
+**/*.log
+
+# Local build/dependencies
+**/node_modules/
+**/vendor/
+**/dist/
+**/.DS_Store

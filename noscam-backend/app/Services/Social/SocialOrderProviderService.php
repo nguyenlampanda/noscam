@@ -73,14 +73,7 @@ class SocialOrderProviderService
                 );
             }
 
-            if (
-                $order->provider->driver ===
-                'vietnamfb'
-            ) {
-                throw new RuntimeException(
-                    'VietnamFB chưa bật gửi đơn tự động.'
-                );
-            }
+            
 
             if (
                 !in_array(
@@ -88,6 +81,7 @@ class SocialOrderProviderService
                     [
                         'nganhangsub',
                         'hacklike17',
+                        'vietnamfb',
                     ],
                     true
                 )

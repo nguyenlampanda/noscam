@@ -88,14 +88,22 @@ class CommunityCommentController extends Controller
             'parent_id' => $parentId,
             'content' => trim($validated['content']),
             'is_anonymous' => $validated['is_anonymous'],
-            'status' => 'pending',
+            'status' => 'approved',
         ]);
 
         return response()->json([
-            'message' => 'Bình luận đã được gửi và đang chờ kiểm duyệt.',
+            'message' => 'Bình luận đã được đăng thành công.',
             'data' => [
                 'id' => $comment->id,
                 'status' => $comment->status,
+                'parent_id' => $comment->parent_id,
+                'content' => $comment->content,
+                'author' => $comment->is_anonymous
+                    ? 'Thành viên ẩn danh'
+                    : ($request->user()->username
+                        ?: $request->user()->name
+                        ?: 'Thành viên NoScam'),
+                'is_anonymous' => $comment->is_anonymous,
             ],
         ], 201);
     }

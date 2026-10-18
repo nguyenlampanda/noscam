@@ -47,6 +47,34 @@ class SocialOrderController extends Controller
         ]);
     }
 
+
+    public function cancel(
+        Request $request,
+        SocialOrder $order,
+        \App\Services\Social\SocialOrderProviderService $providerService
+    ): JsonResponse {
+        abort_unless(
+            (int) $order->user_id === (int) $request->user()->id,
+            404
+        );
+
+        try {
+            $order = $providerService->cancel($order);
+
+            return response()->json([
+                'message' => $order->status === 'cancelled'
+                    ? 'Đơn đã được hủy và xử lý hoàn tiền.'
+                    : 'Đã gửi yêu cầu hủy tới nhà cung cấp. '
+                      .'Vui lòng chờ xác nhận.',
+                'data' => $order,
+            ]);
+        } catch (\RuntimeException $e) {
+            return response()->json([
+                'message' => $e->getMessage(),
+            ], 409);
+        }
+    }
+
     public function store(
         Request $request,
         SocialOrderService $orderService

@@ -46,6 +46,40 @@ function createKey() {
     .slice(2)}`
 }
 
+function getOrderKey(serviceId, target, quantity) {
+  const fingerprint = JSON.stringify([
+    String(serviceId),
+    String(target).trim(),
+    Number(quantity),
+  ])
+
+  const storageKey = 'noscam-social-pending-order'
+
+  try {
+    const previous = JSON.parse(
+      sessionStorage.getItem(storageKey) || 'null',
+    )
+
+    if (
+      previous?.fingerprint === fingerprint &&
+      previous?.key
+    ) {
+      return previous.key
+    }
+
+    const key = createKey()
+
+    sessionStorage.setItem(
+      storageKey,
+      JSON.stringify({ fingerprint, key }),
+    )
+
+    return key
+  } catch {
+    return createKey()
+  }
+}
+
 const platformOptions = [
   {
     value: 'facebook',
@@ -611,8 +645,20 @@ export default function SocialServicesPage() {
         quantity:
           numericQuantity,
         idempotency_key:
-          createKey(),
+          getOrderKey(
+            selected.id,
+            target,
+            numericQuantity,
+          ),
       })
+
+      try {
+        sessionStorage.removeItem(
+          'noscam-social-pending-order',
+        )
+      } catch {
+        // Storage không khả dụng.
+      }
 
       window.dispatchEvent(
         new Event(

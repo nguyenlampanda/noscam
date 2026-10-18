@@ -22,11 +22,23 @@ class StandardSmmProvider implements SocialProviderInterface
             );
         }
 
-        $response = Http::asForm()
+        // Không retry thao tác tạo đơn vì Provider có thể
+        // đã nhận đơn dù phản hồi bị timeout.
+        $isCreateOrder = in_array(
+            $data['action'] ?? null,
+            ['add', 'add_vip'],
+            true
+        );
+
+        $request = Http::asForm()
             ->acceptJson()
-            ->timeout(30)
-            ->retry(2, 500)
-            ->post(
+            ->timeout(30);
+
+        if (!$isCreateOrder) {
+            $request = $request->retry(2, 500);
+        }
+
+        $response = $request->post(
                 $this->apiUrl,
                 array_merge(
                     [

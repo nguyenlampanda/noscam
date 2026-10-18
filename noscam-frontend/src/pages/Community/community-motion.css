@@ -1,0 +1,443 @@
+/* NoScam Community — scoped motion and polish */
+.noscam-community {
+  background:
+    radial-gradient(ellipse 65% 25% at 50% 0%, rgba(37, 99, 235, .045), transparent 75%),
+    #f8fafc;
+}
+
+@keyframes noscam-community-rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes noscam-community-modal-in {
+  from { opacity: 0; transform: translateY(14px) scale(.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes noscam-community-overlay-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.noscam-community-layout > p:first-child,
+.noscam-community-layout > h1,
+.noscam-community-layout > h1 + p,
+.noscam-community-composer,
+.noscam-community-feed,
+.noscam-community-sidebar {
+  animation: noscam-community-rise .48s cubic-bezier(.2,.8,.2,1) both;
+}
+
+.noscam-community-layout > h1 { animation-delay: .06s; }
+.noscam-community-layout > h1 + p { animation-delay: .12s; }
+.noscam-community-composer { animation-delay: .16s; }
+.noscam-community-feed { animation-delay: .22s; }
+.noscam-community-sidebar { animation-delay: .28s; }
+
+.noscam-community-composer,
+.noscam-community-post,
+.noscam-community-sidebar > div,
+.noscam-community-feed > div {
+  transition:
+    transform .24s cubic-bezier(.2,.8,.2,1),
+    box-shadow .24s ease,
+    border-color .24s ease,
+    background-color .24s ease;
+}
+
+.noscam-community-composer:hover,
+.noscam-community-post:hover,
+.noscam-community-sidebar > div:hover {
+  transform: translateY(-3px);
+  border-color: #bfdbfe;
+  box-shadow: 0 12px 30px -16px rgba(30,64,175,.22);
+}
+
+.noscam-community-composer:focus-within {
+  border-color: #93c5fd;
+  box-shadow: 0 0 0 3px rgba(59,130,246,.09);
+}
+
+.noscam-community-composer button,
+.noscam-community-post button,
+.noscam-community-sidebar a,
+.noscam-community-modal button {
+  transition:
+    background-color .2s ease,
+    color .2s ease,
+    box-shadow .2s ease,
+    transform .2s ease;
+}
+
+.noscam-community-composer button:hover:not(:disabled),
+.noscam-community-post button:hover:not(:disabled) {
+  background-color: #dbeafe;
+  color: #1d4ed8;
+}
+
+.noscam-community-post button:active:not(:disabled),
+.noscam-community-composer button:active:not(:disabled) {
+  transform: scale(.98);
+}
+
+.noscam-community-sidebar a:hover {
+  color: #1e40af;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.noscam-community-overlay {
+  animation: noscam-community-overlay-in .2s ease-out both;
+  backdrop-filter: blur(3px);
+}
+
+.noscam-community-modal {
+  animation: noscam-community-modal-in .3s cubic-bezier(.2,.8,.2,1) both;
+}
+
+.noscam-community-modal input:focus,
+.noscam-community-modal textarea:focus {
+  box-shadow: 0 0 0 3px rgba(59,130,246,.1);
+}
+
+.noscam-community :where(button, a, input, textarea):focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 3px;
+}
+
+@media (max-width: 640px) {
+  .noscam-community-composer:hover,
+  .noscam-community-post:hover,
+  .noscam-community-sidebar > div:hover {
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .noscam-community *,
+  .noscam-community *::before,
+  .noscam-community *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+  .noscam-community-composer:hover,
+  .noscam-community-post:hover,
+  .noscam-community-sidebar > div:hover {
+    transform: none;
+  }
+}
+
+/* NoScam Community — refined card borders */
+.noscam-community {
+  --community-radius: 20px;
+  --community-border: rgba(148, 163, 184, .18);
+  --community-shadow: 0 5px 24px -12px rgba(15, 23, 42, .12);
+  --community-hover-shadow: 0 14px 34px -16px rgba(37, 99, 235, .20);
+}
+
+.noscam-community-composer,
+.noscam-community-post,
+.noscam-community-sidebar > div,
+.noscam-community-feed > div {
+  border: 1px solid var(--community-border);
+  border-radius: var(--community-radius);
+  box-shadow: var(--community-shadow);
+  background-clip: padding-box;
+}
+
+.noscam-community-composer,
+.noscam-community-post,
+.noscam-community-sidebar > div {
+  transition:
+    border-color .25s ease,
+    box-shadow .25s ease,
+    transform .25s ease;
+}
+
+.noscam-community-composer:hover,
+.noscam-community-post:hover,
+.noscam-community-sidebar > div:hover {
+  border-color: rgba(96, 165, 250, .32);
+  box-shadow: var(--community-hover-shadow);
+  transform: translateY(-2px);
+}
+
+.noscam-community-composer button {
+  border: 1px solid transparent;
+  border-radius: 999px;
+}
+
+.noscam-community-composer button:hover {
+  border-color: rgba(147, 197, 253, .45);
+}
+
+.noscam-community-sidebar > div:first-child {
+  background: #fff;
+}
+
+.noscam-community-sidebar > div:last-child {
+  background: linear-gradient(145deg, #eff6ff 0%, #f8fbff 100%);
+}
+
+.noscam-community-modal {
+  border: 1px solid rgba(226, 232, 240, .7);
+  border-radius: 24px;
+  box-shadow: 0 24px 70px -20px rgba(15, 23, 42, .25);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .noscam-community-composer,
+  .noscam-community-post,
+  .noscam-community-sidebar > div {
+    transition: none;
+  }
+
+  .noscam-community-composer:hover,
+  .noscam-community-post:hover,
+  .noscam-community-sidebar > div:hover {
+    transform: none;
+  }
+}
+
+
+/* NOSCAM COMMUNITY SOCIAL DESIGN V1 START */
+
+.noscam-community {
+  --community-blue: #155dfb;
+  --community-border: #e6ecf5;
+  --community-text: #17233d;
+  --community-muted: #64748b;
+  background:
+    radial-gradient(
+      ellipse at 50% 0%,
+      rgba(37, 99, 235, .045),
+      transparent 55%
+    ),
+    #f7f9fd;
+}
+
+/* Bố cục */
+.noscam-community-layout {
+  max-width: 1120px;
+}
+
+.noscam-community-grid {
+  align-items: start;
+  gap: 24px;
+}
+
+/* Thẻ bài đăng */
+.noscam-community-post {
+  border: 1px solid var(--community-border);
+  border-radius: 20px;
+  background: #fff;
+  box-shadow:
+    0 3px 10px rgba(15, 23, 42, .025),
+    0 12px 35px rgba(15, 23, 42, .035);
+  padding: 24px;
+  overflow: hidden;
+  transition:
+    box-shadow .2s ease,
+    border-color .2s ease;
+}
+
+.noscam-community-post:hover {
+  border-color: #d8e4f8;
+  box-shadow:
+    0 5px 16px rgba(15, 23, 42, .035),
+    0 18px 40px rgba(15, 23, 42, .05);
+}
+
+.noscam-community-post h3 {
+  color: #16233e;
+  font-size: 19px;
+  font-weight: 750;
+  letter-spacing: -.025em;
+  line-height: 1.4;
+}
+
+.noscam-community-post p {
+  line-height: 1.75;
+  overflow-wrap: anywhere;
+}
+
+/* Lưới hình ảnh */
+.noscam-community-post img {
+  display: block;
+  transition: transform .25s ease;
+}
+
+.noscam-community-post button:has(> img) {
+  cursor: zoom-in;
+  border-radius: 10px;
+}
+
+.noscam-community-post button:has(> img):hover img {
+  transform: scale(1.025);
+}
+
+.noscam-community-post button:has(> img):focus-visible {
+  outline: 3px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* Hành động bài đăng */
+.noscam-community-post button {
+  transition:
+    background-color .18s ease,
+    color .18s ease,
+    transform .18s ease;
+}
+
+.noscam-community-post button:not(:disabled):active {
+  transform: scale(.98);
+}
+
+/* Ô bình luận */
+.noscam-community-post textarea {
+  display: block;
+  width: 100%;
+  min-height: 72px;
+  max-height: 220px;
+  border: 1px solid #dce5f2;
+  border-radius: 14px;
+  background: #fbfcff;
+  padding: 13px 15px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #17233d;
+  resize: vertical;
+  transition:
+    border-color .2s ease,
+    box-shadow .2s ease,
+    background-color .2s ease;
+}
+
+.noscam-community-post textarea::placeholder {
+  color: #94a3b8;
+}
+
+.noscam-community-post textarea:focus {
+  outline: none;
+  background: #fff;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, .1);
+}
+
+/* Nút bình luận */
+.noscam-community-post button[type="submit"] {
+  border-radius: 11px;
+  font-weight: 650;
+  box-shadow: 0 3px 8px rgba(37, 99, 235, .12);
+}
+
+.noscam-community-post button[type="submit"]:not(:disabled):hover {
+  filter: brightness(.94);
+}
+
+/* Thanh phân cách */
+.noscam-community-post hr {
+  border: 0;
+  border-top: 1px solid #edf1f7;
+  margin: 18px 0;
+}
+
+/* Khu vực tạo bài */
+.noscam-community-composer {
+  border: 1px solid var(--community-border);
+  border-radius: 20px;
+  box-shadow: 0 5px 24px rgba(15, 23, 42, .035);
+}
+
+/* Sidebar */
+.noscam-community-sidebar > * {
+  border-radius: 18px;
+}
+
+.noscam-community-sidebar {
+  position: sticky;
+  top: 100px;
+}
+
+/* Cửa sổ tạo bài */
+.noscam-community-modal {
+  border-radius: 22px;
+  box-shadow: 0 25px 80px rgba(15, 23, 42, .22);
+}
+
+.noscam-community-modal input:not([type="checkbox"]):not([type="file"]),
+.noscam-community-modal textarea {
+  border-radius: 13px;
+}
+
+.noscam-community-modal textarea {
+  line-height: 1.7;
+}
+
+/* Responsive */
+@media (max-width: 1023px) {
+  .noscam-community-sidebar {
+    position: static;
+  }
+}
+
+@media (max-width: 640px) {
+  .noscam-community {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .noscam-community-post {
+    padding: 16px;
+    border-radius: 17px;
+  }
+
+  .noscam-community-post h3 {
+    font-size: 17px;
+  }
+
+  .noscam-community-post textarea {
+    min-height: 68px;
+  }
+
+  .noscam-community-modal {
+    border-radius: 18px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .noscam-community-post,
+  .noscam-community-post button,
+  .noscam-community-post img {
+    transition: none;
+  }
+}
+
+/* NOSCAM COMMUNITY SOCIAL DESIGN V1 END */
+
+
+/* NOSCAM COMMUNITY CLEAN ACTIONS START */
+.noscam-community-post > div.border-t,
+.noscam-community-post > div.border-b {
+  border-top: none !important;
+  border-bottom: none !important;
+}
+
+.noscam-community-post .border-t {
+  border-top-color: transparent !important;
+}
+
+.noscam-community-post .border-b {
+  border-bottom-color: transparent !important;
+}
+
+.noscam-community-post hr {
+  display: none !important;
+}
+
+.noscam-community-post textarea {
+  border-radius: 12px;
+}
+/* NOSCAM COMMUNITY CLEAN ACTIONS END */

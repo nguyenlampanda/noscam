@@ -8,6 +8,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\Storage;
 
 class CommunityPostController extends Controller
 {
@@ -46,8 +47,8 @@ class CommunityPostController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'title' => ['required', 'string', 'min:5', 'max:180'],
-            'content' => ['required', 'string', 'min:20', 'max:10000'],
+            'title' => ['nullable', 'string', 'max:180'],
+            'content' => ['nullable', 'string', 'max:10000'],
             'category' => [
                 'required',
                 Rule::in([
@@ -58,17 +59,42 @@ class CommunityPostController extends Controller
                 ]),
             ],
             'is_anonymous' => ['required', 'boolean'],
+            'images' => ['sometimes', 'array', 'max:10'],
+            'images.*' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
         ]);
 
-        $post = CommunityPost::create([
+        if (
+            trim((string) ($validated['title'] ?? '')) === '' &&
+            trim((string) ($validated['content'] ?? '')) === '' &&
+            count($request->file('images', [])) === 0
+        ) {
+            return response()->json([
+                'message' => 'Vui lòng nhập nội dung bài viết.',
+            ], 422);
+        }
+
+        $imagePaths = [];
+        try {
+            foreach ($request->file('images', []) as $image) {
+                $imagePaths[] = $image->store('community/posts', 'public');
+            }
+
+            $post = CommunityPost::create([
             'user_id' => $request->user()->id,
-            'title' => trim($validated['title']),
-            'content' => trim($validated['content']),
+            'title' => trim((string) ($validated['title'] ?? '')),
+            'content' => trim((string) ($validated['content'] ?? '')),
             'category' => $validated['category'],
             'is_anonymous' => $validated['is_anonymous'],
             'status' => 'pending',
             'published_at' => null,
-        ]);
+            'images' => $imagePaths,
+            ]);
+        } catch (\Throwable $e) {
+            foreach ($imagePaths as $path) {
+                Storage::disk('public')->delete($path);
+            }
+            throw $e;
+        }
 
         return response()->json([
             'message' => 'Bài viết đã được gửi và đang chờ kiểm duyệt.',
@@ -85,6 +111,7 @@ class CommunityPostController extends Controller
             'id' => $post->id,
             'title' => $post->title,
             'content' => $post->content,
+            'images' => collect($post->images ?? [])->map(fn ($path) => url('storage/'.$path))->values(),
             'category' => $post->category,
             'author' => $post->is_anonymous
                 ? 'Thành viên ẩn danh'
@@ -94,6 +121,11 @@ class CommunityPostController extends Controller
             'is_anonymous' => $post->is_anonymous,
             'comments_count' => $post->comments_count,
             'likes_count' => $post->reactions_count,
+                    'liked_by_me' => auth('sanctum')->check()
+                        ? $post->reactions()
+                            ->where('user_id', auth('sanctum')->id())
+                            ->exists()
+                        : false,
             'published_at' => $post->published_at?->toISOString(),
         ];
     }

@@ -396,8 +396,10 @@ class AdminSocialProviderController extends Controller
                                         'priority' =>
                                             100,
 
-                                        'is_active' =>
-                                            $providerActive,
+                                        'provider_availability' =>
+                                            $providerActive
+                                                ? 'available'
+                                                : 'unavailable',
 
                                         'provider_data' =>
                                             $item,
@@ -425,8 +427,8 @@ class AdminSocialProviderController extends Controller
                                 )
                         )
                         ->update([
-                            'is_active' =>
-                                false,
+                            'provider_availability' =>
+                                'unavailable',
                         ]);
                 }
             );

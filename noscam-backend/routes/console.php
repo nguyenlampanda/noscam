@@ -21,3 +21,17 @@ use Illuminate\Support\Facades\Schedule;
 Schedule::command('social:process-orders --limit=50')
     ->everyMinute()
     ->withoutOverlapping(5);
+
+
+/*
+|--------------------------------------------------------------------------
+| NoScam Exchange Auto Settlement
+|--------------------------------------------------------------------------
+|
+| Tự động duyệt nhiệm vụ sau 48 giờ hoặc hoàn xu hết hạn kháng nghị.
+|
+*/
+
+Schedule::command('exchange:process-expired --limit=50')
+    ->everyMinute()
+    ->withoutOverlapping(5);

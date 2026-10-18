@@ -1,0 +1,1819 @@
+
+======================================================================
+noscam-backend/app/Services/Social/SocialOrderService.php
+======================================================================
+1: <?php
+2: 
+3: namespace App\Services\Social;
+4: 
+5: use App\Models\SocialOrder;
+6: use App\Models\SocialProviderService;
+7: use App\Models\SocialService;
+8: use App\Models\User;
+9: use Illuminate\Support\Facades\DB;
+10: use Illuminate\Support\Str;
+11: use RuntimeException;
+12: 
+13: class SocialOrderService
+14: {
+15:     public function __construct(
+16:         private WalletService $walletService
+17:     ) {
+18:     }
+19: 
+20:     public function create(
+21:         User $user,
+22:         SocialService $service,
+23:         string $target,
+24:         int $quantity,
+25:         string $idempotencyKey
+26:     ): SocialOrder {
+27:         if (!$service->is_active) {
+28:             throw new RuntimeException(
+29:                 'Dịch vụ hiện đang tạm ngưng.'
+30:             );
+31:         }
+32: 
+33:         if (
+34:             $quantity < (int) $service->min_quantity ||
+35:             $quantity > (int) $service->max_quantity
+36:         ) {
+37:             throw new RuntimeException(
+38:                 'Số lượng không nằm trong giới hạn dịch vụ.'
+39:             );
+40:         }
+41: 
+42:         $existing = SocialOrder::query()
+43:             ->where(
+44:                 'idempotency_key',
+45:                 $idempotencyKey
+46:             )
+47:             ->first();
+48: 
+49:         if ($existing) {
+50:             if (
+51:                 (int) $existing->user_id !==
+52:                 (int) $user->id
+53:             ) {
+54:                 throw new RuntimeException(
+55:                     'Idempotency key không hợp lệ.'
+56:                 );
+57:             }
+58: 
+59:             return $existing;
+60:         }
+61: 
+62:         /*
+63:          * Admin chưa thiết lập giá:
+64:          * không tạo đơn, không trừ ví.
+65:          * Khách chỉ nhận thông báo chung.
+66:          */
+67:         if (
+68:             $service->sell_price_per_1000 === null ||
+69:             (float) $service->sell_price_per_1000 <= 0
+70:         ) {
+71:             throw new RuntimeException(
+72:                 'Dịch vụ hiện chưa thể xử lý. Vui lòng liên hệ Admin để được hỗ trợ.'
+73:             );
+74:         }
+75: 
+76:         $providerService =
+77:             SocialProviderService::query()
+78:                 ->with('provider')
+79:                 ->where(
+80:                     'social_service_id',
+81:                     $service->id
+82:                 )
+83:                 ->where('is_active', true)
+84:                 ->where('provider_availability', 'available')
+85:                 ->whereHas(
+86:                     'provider',
+87:                     fn ($query) =>
+88:                         $query->where(
+89:                             'status',
+90:                             'active'
+91:                         )
+92:                 )
+93:                 ->orderBy('priority')
+94:                 ->orderBy('id')
+95:                 ->first();
+96: 
+97:         if (!$providerService) {
+98:             throw new RuntimeException(
+99:                 'Dịch vụ chưa có nguồn API khả dụng.'
+100:             );
+101:         }
+102: 
+103:         /*
+104:          * Kiểm tra lại giá vốn tại thời điểm đặt.
+105:          * Không cho tạo đơn bán hòa vốn hoặc bán lỗ.
+106:          * Không tự chuyển sang Provider khác.
+107:          */
+108:         $costPer1000 = $providerService->costPriceVnd();
+109: 
+110:         if (
+111:             (float) $service->sell_price_per_1000
+112:             <= $costPer1000
+113:         ) {
+114:             throw new RuntimeException(
+115:                 'Dịch vụ hiện chưa thể xử lý. Vui lòng liên hệ Admin để được hỗ trợ.'
+116:             );
+117:         }
+118: 
+119:         $sellAmount = round(
+120:             (
+121:                 (float) $service
+122:                     ->sell_price_per_1000
+123:             ) *
+124:             $quantity /
+125:             1000,
+126:             4
+127:         );
+128: 
+129:         $costAmount = round(
+130:             $providerService->costPriceVnd()
+131:             * $quantity /
+132:             1000,
+133:             4
+134:         );
+135: 
+136:         return DB::transaction(
+137:             function () use (
+138:                 $user,
+139:                 $service,
+140:                 $providerService,
+141:                 $target,
+142:                 $quantity,
+143:                 $idempotencyKey,
+144:                 $sellAmount,
+145:                 $costAmount
+146:             ) {
+147:                 $existing =
+148:                     SocialOrder::query()
+149:                         ->where(
+150:                             'idempotency_key',
+151:                             $idempotencyKey
+152:                         )
+153:                         ->lockForUpdate()
+154:                         ->first();
+155: 
+156:                 if ($existing) {
+157:                     return $existing;
+158:                 }
+159: 
+160:                 $order = SocialOrder::create([
+161:                     'code' =>
+162:                         $this->orderCode(),
+163: 
+164:                     'user_id' =>
+165:                         $user->id,
+166: 
+167:                     'social_service_id' =>
+168:                         $service->id,
+169: 
+170:                     'social_provider_id' =>
+171:                         $providerService
+172:                             ->social_provider_id,
+173: 
+174:                     'social_provider_service_id' =>
+175:                         $providerService->id,
+176: 
+177:                     'target' =>
+178:                         trim($target),
+179: 
+180:                     'quantity' =>
+181:                         $quantity,
+182: 
+183:                     'sell_amount' =>
+184:                         $sellAmount,
+185: 
+186:                     'cost_amount' =>
+187:                         $costAmount,
+188: 
+189:                     'profit_amount' =>
+190:                         round(
+191:                             $sellAmount -
+192:                             $costAmount,
+193:                             4
+194:                         ),
+195: 
+196:                     'status' =>
+197:                         'pending',
+198: 
+199:                     'remains' =>
+200:                         $quantity,
+201: 
+202:                     'refunded_amount' =>
+203:                         0,
+204: 
+205:                     'idempotency_key' =>
+206:                         $idempotencyKey,
+207: 
+208:                     'attempts' =>
+209:                         0,
+210:                 ]);
+211: 
+212:                 $order->code =
+213:                     'NS-' . str_pad(
+214:                         (string) $order->id,
+215:                         6,
+216:                         '0',
+217:                         STR_PAD_LEFT
+218:                     );
+219: 
+220:                 $order->save();
+221: 
+222:                 $this->walletService->debit(
+223:                     user: $user,
+224:                     amount: $sellAmount,
+225:                     type: 'order',
+226:                     referenceType:
+227:                         SocialOrder::class,
+228:                     referenceId:
+229:                         $order->id,
+230:                     description:
+231:                         'Thanh toán đơn '
+232:                         .$order->code,
+233:                     meta: [
+234:                         'order_code' =>
+235:                             $order->code,
+236:                         'service_id' =>
+237:                             $service->id,
+238:                         'quantity' =>
+239:                             $quantity,
+240:                     ]
+241:                 );
+242: 
+243:                 return $order
+244:                     ->fresh()
+245:                     ->load([
+246:                         'service',
+247:                         'provider',
+248:                         'providerService',
+249:                     ]);
+250:             },
+251:             3
+252:         );
+253:     }
+254: 
+255:     public function refund(
+256:         SocialOrder $order,
+257:         ?int $createdBy = null
+258:     ): SocialOrder {
+259:         if (!$order->user_id) {
+260:             throw new RuntimeException(
+261:                 'Đơn hàng không có tài khoản để hoàn tiền.'
+262:             );
+263:         }
+264: 
+265:         return DB::transaction(
+266:             function () use (
+267:                 $order,
+268:                 $createdBy
+269:             ) {
+270:                 $locked = SocialOrder::query()
+271:                     ->lockForUpdate()
+272:                     ->findOrFail($order->id);
+273: 
+274:                 $sellAmount =
+275:                     (float) $locked->sell_amount;
+276: 
+277:                 $alreadyRefunded =
+278:                     (float) $locked->refunded_amount;
+279: 
+280:                 $refund =
+281:                     max(
+282:                         0,
+283:                         $sellAmount -
+284:                         $alreadyRefunded
+285:                     );
+286: 
+287:                 if ($refund <= 0) {
+288:                     return $locked;
+289:                 }
+290: 
+291:                 $this->walletService->credit(
+292:                     user:
+293:                         $locked->user,
+294:                     amount:
+295:                         $refund,
+296:                     type:
+297:                         'refund',
+298:                     referenceType:
+299:                         SocialOrder::class,
+300:                     referenceId:
+301:                         $locked->id,
+302:                     description:
+303:                         'Hoàn tiền đơn '
+304:                         .$locked->code,
+305:                     createdBy:
+306:                         $createdBy,
+307:                     meta: [
+308:                         'order_code' =>
+309:                             $locked->code,
+310:                     ]
+311:                 );
+312: 
+313:                 $locked->refunded_amount =
+314:                     $alreadyRefunded +
+315:                     $refund;
+316: 
+317:                 $locked->save();
+318: 
+319:                 return $locked->fresh();
+320:             },
+321:             3
+322:         );
+323:     }
+324: 
+325:     public function refundPartial(
+326:         SocialOrder $order
+327:     ): SocialOrder {
+328:         if (!$order->user_id) {
+329:             throw new RuntimeException(
+330:                 'Đơn hàng không có tài khoản để hoàn tiền.'
+331:             );
+332:         }
+333: 
+334:         return DB::transaction(
+335:             function () use ($order) {
+336:                 $locked =
+337:                     SocialOrder::query()
+338:                         ->lockForUpdate()
+339:                         ->findOrFail(
+340:                             $order->id
+341:                         );
+342: 
+343:                 $quantity =
+344:                     max(
+345:                         1,
+346:                         (int) $locked->quantity
+347:                     );
+348: 
+349:                 $remains =
+350:                     max(
+351:                         0,
+352:                         min(
+353:                             $quantity,
+354:                             (int) $locked->remains
+355:                         )
+356:                     );
+357: 
+358:                 $sellAmount =
+359:                     (float)
+360:                         $locked->sell_amount;
+361: 
+362:                 /*
+363:                  * Tiền tương ứng phần chưa chạy.
+364:                  */
+365:                 $shouldRefund =
+366:                     round(
+367:                         $sellAmount
+368:                         * $remains
+369:                         / $quantity,
+370:                         4
+371:                     );
+372: 
+373:                 $alreadyRefunded =
+374:                     (float)
+375:                         $locked->refunded_amount;
+376: 
+377:                 $refund =
+378:                     max(
+379:                         0,
+380:                         $shouldRefund
+381:                         - $alreadyRefunded
+382:                     );
+383: 
+384:                 if ($refund <= 0) {
+385:                     return $locked;
+386:                 }
+387: 
+388:                 $this->walletService->credit(
+389:                     user:
+390:                         $locked->user,
+391:                     amount:
+392:                         $refund,
+393:                     type:
+394:                         'refund',
+395:                     referenceType:
+396:                         SocialOrder::class,
+397:                     referenceId:
+398:                         $locked->id,
+399:                     description:
+400:                         'Hoàn phần còn lại đơn '
+401:                         .$locked->code,
+402:                     meta: [
+403:                         'order_code' =>
+404:                             $locked->code,
+405:                         'quantity' =>
+406:                             $quantity,
+407:                         'remains' =>
+408:                             $remains,
+409:                     ]
+410:                 );
+411: 
+412:                 $locked->refunded_amount =
+413:                     $alreadyRefunded
+414:                     + $refund;
+415: 
+416:                 $locked->save();
+417: 
+418:                 return $locked->fresh();
+419:             },
+420:             3
+421:         );
+422:     }
+423: 
+424:     private function orderCode(): string
+425:     {
+426:         return 'TMP-' . Str::uuid();
+427:     }
+428: }
+
+======================================================================
+noscam-backend/app/Http/Controllers/Api/AdminSocialServiceController.php
+======================================================================
+1: <?php
+2: 
+3: namespace App\Http\Controllers\Api;
+4: 
+5: use App\Http\Controllers\Controller;
+6: use App\Models\SocialProviderService;
+7: use App\Models\SocialService;
+8: use Illuminate\Http\JsonResponse;
+9: use Illuminate\Http\Request;
+10: use Illuminate\Support\Facades\DB;
+11: use Illuminate\Support\Str;
+12: use App\Services\Social\SocialServiceClassifier;
+13: use Illuminate\Validation\Rule;
+14: 
+15: class AdminSocialServiceController extends Controller
+16: {
+17:     public function index(Request $request): JsonResponse
+18:     {
+19:         $query = SocialService::query()
+20:             ->with([
+21:                 'providerServices' => fn ($q) =>
+22:                     $q->with('provider')
+23:                         ->orderBy('priority')
+24:                         ->orderBy('id'),
+25:             ]);
+26: 
+27:         if ($request->filled('platform')) {
+28:             $query->where(
+29:                 'platform',
+30:                 $request->string('platform')
+31:             );
+32:         }
+33: 
+34:         if ($request->filled('search')) {
+35:             $search = trim(
+36:                 (string) $request->input('search')
+37:             );
+38: 
+39:             $query->where(function ($q) use ($search) {
+40:                 $q->where(
+41:                     'name',
+42:                     'like',
+43:                     "%{$search}%"
+44:                 )->orWhere(
+45:                     'code',
+46:                     'like',
+47:                     "%{$search}%"
+48:                 )->orWhere(
+49:                     'category',
+50:                     'like',
+51:                     "%{$search}%"
+52:                 );
+53:             });
+54:         }
+55: 
+56:         return response()->json(
+57:             $query
+58:                 ->orderBy('sort_order')
+59:                 ->orderBy('id')
+60:                 ->paginate(
+61:                     min(
+62:                         100,
+63:                         max(
+64:                             10,
+65:                             (int) $request->input(
+66:                                 'per_page',
+67:                                 50
+68:                             )
+69:                         )
+70:                     )
+71:                 )
+72:         );
+73:     }
+74: 
+75:     public function providerServices(
+76:         Request $request
+77:     ): JsonResponse {
+78:         $query = SocialProviderService::query()
+79:             ->with([
+80:                 'provider:id,name,slug,driver,currency,exchange_rate_to_vnd,price_multiplier',
+81:                 'service:id,code,platform,category,name,sell_price_per_1000,is_active',
+82:             ]);
+83: 
+84:         if ($request->filled('provider_id')) {
+85:             $query->where(
+86:                 'social_provider_id',
+87:                 $request->integer('provider_id')
+88:             );
+89:         }
+90: 
+91:         if ($request->filled('mapped')) {
+92:             $mapped = filter_var(
+93:                 $request->input('mapped'),
+94:                 FILTER_VALIDATE_BOOLEAN
+95:             );
+96: 
+97:             $mapped
+98:                 ? $query->whereNotNull(
+99:                     'social_service_id'
+100:                 )
+101:                 : $query->whereNull(
+102:                     'social_service_id'
+103:                 );
+104:         }
+105: 
+106:         if ($request->filled('active')) {
+107:             $active = filter_var(
+108:                 $request->input('active'),
+109:                 FILTER_VALIDATE_BOOLEAN
+110:             );
+111: 
+112:             $query->where(
+113:                 'is_active',
+114:                 $active
+115:             );
+116:         }
+117: 
+118:         if ($request->filled('provider_availability')) {
+119:             $availability = $request->input('provider_availability');
+120: 
+121:             if (!in_array(
+122:                 $availability,
+123:                 ['available', 'unavailable', 'unknown'],
+124:                 true
+125:             )) {
+126:                 return response()->json([
+127:                     'message' => 'Trạng thái nguồn không hợp lệ.',
+128:                 ], 422);
+129:             }
+130: 
+131:             $query->where('provider_availability', $availability);
+132:         }
+133: 
+134:         if ($request->filled('search')) {
+135:             $search = trim(
+136:                 (string) $request->input('search')
+137:             );
+138: 
+139:             $query->where(function ($q) use ($search) {
+140:                 $q->where(
+141:                     'provider_service_name',
+142:                     'like',
+143:                     "%{$search}%"
+144:                 )->orWhere(
+145:                     'provider_service_id',
+146:                     'like',
+147:                     "%{$search}%"
+148:                 );
+149:             });
+150:         }
+151: 
+152:         $paginator = $query
+153:             ->orderBy('social_provider_id')
+154:             ->orderBy('provider_service_name')
+155:             ->orderBy('id')
+156:             ->paginate(
+157:                 min(
+158:                     100,
+159:                     max(
+160:                         10,
+161:                         (int) $request->input(
+162:                             'per_page',
+163:                             50
+164:                         )
+165:                     )
+166:                 )
+167:             );
+168: 
+169:         $paginator->getCollection()
+170:             ->transform(
+171:                 fn ($item) =>
+172:                     $this->serializeProviderService(
+173:                         $item
+174:                     )
+175:             );
+176: 
+177:         return response()->json(
+178:             $paginator
+179:         );
+180:     }
+181: 
+182:     public function store(
+183:         Request $request
+184:     ): JsonResponse {
+185:         $data = $this->validated(
+186:             $request
+187:         );
+188: 
+189:         $service = SocialService::create(
+190:             $data
+191:         );
+192: 
+193:         return response()->json([
+194:             'message' => 'Đã tạo dịch vụ.',
+195:             'data' => $service,
+196:         ], 201);
+197:     }
+198: 
+199:     public function update(
+200:         Request $request,
+201:         SocialService $service
+202:     ): JsonResponse {
+203:         $data = $this->validated(
+204:             $request,
+205:             $service
+206:         );
+207: 
+208:         if (
+209:             array_key_exists(
+210:                 'sell_price_per_1000',
+211:                 $data
+212:             ) &&
+213:             $data['sell_price_per_1000'] !== null
+214:         ) {
+215:             $providerServices = $service
+216:                 ->providerServices()
+217:                 ->where('is_active', true)
+218:                 ->with('provider')
+219:                 ->get();
+220: 
+221:             if ($providerServices->isNotEmpty()) {
+222:                 $maxCostVnd = $providerServices
+223:                     ->max(
+224:                         fn ($item) =>
+225:                             $item->costPriceVnd()
+226:                     );
+227: 
+228:                 if (
+229:                     (float) $data[
+230:                         'sell_price_per_1000'
+231:                     ] <= $maxCostVnd
+232:                 ) {
+233:                     return response()->json([
+234:                         'message' =>
+235:                             'Giá bán phải cao hơn giá vốn Provider.',
+236:                         'errors' => [
+237:                             'sell_price_per_1000' => [
+238:                                 'Giá bán phải lớn hơn '
+239:                                 .number_format(
+240:                                     $maxCostVnd,
+241:                                     0,
+242:                                     ',',
+243:                                     '.'
+244:                                 )
+245:                                 .'đ / 1.000.',
+246:                             ],
+247:                         ],
+248:                     ], 422);
+249:                 }
+250:             }
+251:         }
+252: 
+253:         $service->update($data);
+254: 
+255:         return response()->json([
+256:             'message' =>
+257:                 'Đã cập nhật dịch vụ.',
+258:             'data' =>
+259:                 $service
+260:                     ->fresh()
+261:                     ->load(
+262:                         'providerServices.provider'
+263:                     ),
+264:         ]);
+265:     }
+266: 
+267:     public function updateProviderService(
+268:         Request $request,
+269:         SocialProviderService $providerService
+270:     ): JsonResponse {
+271:         $data = $request->validate([
+272:             'priority' => [
+273:                 'sometimes',
+274:                 'integer',
+275:                 'min:0',
+276:                 'max:100000',
+277:             ],
+278:             'is_active' => [
+279:                 'sometimes',
+280:                 'boolean',
+281:             ],
+282:         ]);
+283: 
+284:         $providerService->update(
+285:             $data
+286:         );
+287: 
+288:         return response()->json([
+289:             'message' =>
+290:                 'Đã cập nhật dịch vụ nguồn.',
+291:             'data' =>
+292:                 $this->serializeProviderService(
+293:                     $providerService
+294:                         ->fresh()
+295:                         ->load([
+296:                             'provider',
+297:                             'service',
+298:                         ])
+299:                 ),
+300:         ]);
+301:     }
+302: 
+303:     public function mapProviderService(
+304:         Request $request,
+305:         SocialProviderService $providerService
+306:     ): JsonResponse {
+307:         if ($providerService->social_service_id !== null) {
+308:             return response()->json([
+309:                 'message' => 'Dịch vụ API này đã được đưa lên bán.',
+310:             ], 422);
+311:         }
+312: 
+313:         $data = $request->validate([
+314:             'social_service_id' => [
+315:                 'nullable',
+316:                 'integer',
+317:                 'exists:social_services,id',
+318:             ],
+319: 
+320:             'platform' => [
+321:                 'required_without:social_service_id',
+322:                 'nullable',
+323:                 'in:facebook,instagram,tiktok,other',
+324:             ],
+325: 
+326:             'category' => [
+327:                 'required_without:social_service_id',
+328:                 'nullable',
+329:                 'string',
+330:                 'max:100',
+331:             ],
+332: 
+333:             'name' => [
+334:                 'required_without:social_service_id',
+335:                 'nullable',
+336:                 'string',
+337:                 'max:255',
+338:             ],
+339: 
+340:             'code' => [
+341:                 'nullable',
+342:                 'string',
+343:                 'max:100',
+344:             ],
+345: 
+346:             'description' => [
+347:                 'nullable',
+348:                 'string',
+349:                 'max:5000',
+350:             ],
+351: 
+352:             'sell_price_per_1000' => [
+353:                 'nullable',
+354:                 'numeric',
+355:                 'min:0',
+356:             ],
+357: 
+358:             'min_quantity' => [
+359:                 'nullable',
+360:                 'integer',
+361:                 'min:1',
+362:             ],
+363: 
+364:             'max_quantity' => [
+365:                 'nullable',
+366:                 'integer',
+367:                 'min:1',
+368:             ],
+369: 
+370:             'priority' => [
+371:                 'nullable',
+372:                 'integer',
+373:                 'min:0',
+374:                 'max:100000',
+375:             ],
+376: 
+377:             'is_active' => [
+378:                 'nullable',
+379:                 'boolean',
+380:             ],
+381:         ]);
+382: 
+383:         if (empty($data['social_service_id'])) {
+384:             $cost = $providerService->costPriceVnd();
+385: 
+386:             if (
+387:                 !isset($data['sell_price_per_1000']) ||
+388:                 (float) $data['sell_price_per_1000'] <= $cost
+389:             ) {
+390:                 return response()->json([
+391:                     'message' => 'Giá bán phải cao hơn giá vốn Provider.',
+392:                 ], 422);
+393:             }
+394:         }
+395: 
+396:         $service = DB::transaction(
+397:             function () use (
+398:                 $data,
+399:                 $providerService
+400:             ) {
+401:                 if (
+402:                     !empty(
+403:                         $data['social_service_id']
+404:                     )
+405:                 ) {
+406:                     $service =
+407:                         SocialService::findOrFail(
+408:                             $data[
+409:                                 'social_service_id'
+410:                             ]
+411:                         );
+412:                 } else {
+413:                     $min = (int) (
+414:                         $data['min_quantity']
+415:                         ?? $providerService
+416:                             ->min_quantity
+417:                         ?? 1
+418:                     );
+419: 
+420:                     $max = (int) (
+421:                         $data['max_quantity']
+422:                         ?? $providerService
+423:                             ->max_quantity
+424:                         ?? 1000000
+425:                     );
+426: 
+427:                     if ($max < $min) {
+428:                         $max = $min;
+429:                     }
+430: 
+431:                     $code = trim(
+432:                         (string) (
+433:                             $data['code']
+434:                             ?? ''
+435:                         )
+436:                     );
+437: 
+438:                     if ($code === '') {
+439:                         $code =
+440:                             $this->makeUniqueCode(
+441:                                 $data['platform'],
+442:                                 $data['category'],
+443:                                 $data['name']
+444:                             );
+445:                     } else {
+446:                         $code = Str::upper(
+447:                             Str::slug(
+448:                                 $code,
+449:                                 '_'
+450:                             )
+451:                         );
+452: 
+453:                         if (
+454:                             SocialService::where(
+455:                                 'code',
+456:                                 $code
+457:                             )->exists()
+458:                         ) {
+459:                             $code .= '_'
+460:                                 .Str::upper(
+461:                                     Str::random(5)
+462:                                 );
+463:                         }
+464:                     }
+465: 
+466:                     $service =
+467:                         SocialService::create([
+468:                             'code' => $code,
+469:                             'platform' =>
+470:                                 $data['platform'],
+471:                             'category' =>
+472:                                 $data['category'],
+473:                             'name' =>
+474:                                 $data['name'],
+475:                             'description' =>
+476:                                 $data['description']
+477:                                 ?? null,
+478:                             'min_quantity' =>
+479:                                 $min,
+480:                             'max_quantity' =>
+481:                                 $max,
+482:                             'sell_price_per_1000' =>
+483:                                 $data['sell_price_per_1000']
+484:                                 ?? null,
+485:                             'is_active' =>
+486:                                 true,
+487:                             'sort_order' =>
+488:                                 0,
+489:                             'settings' => [
+490:                                 'created_from_provider_service_id'
+491:                                     => $providerService->id,
+492:                             ],
+493:                         ]);
+494:                 }
+495: 
+496:                 $providerService->update([
+497:                     'social_service_id' =>
+498:                         $service->id,
+499: 
+500:                     'priority' =>
+501:                         $data['priority']
+502:                         ?? $providerService
+503:                             ->priority,
+504: 
+505:                     'is_active' =>
+506:                         array_key_exists(
+507:                             'is_active',
+508:                             $data
+509:                         )
+510:                             ? (bool) $data[
+511:                                 'is_active'
+512:                             ]
+513:                             : true,
+514:                 ]);
+515: 
+516:                 return $service;
+517:             }
+518:         );
+519: 
+520:         return response()->json([
+521:             'message' =>
+522:                 'Đã map dịch vụ nguồn.',
+523:             'data' =>
+524:                 $service
+525:                     ->fresh()
+526:                     ->load(
+527:                         'providerServices.provider'
+528:                     ),
+529:         ]);
+530:     }
+531: 
+532:     public function unmapProviderService(
+533:         SocialProviderService $providerService
+534:     ): JsonResponse {
+535:         $providerService->update([
+536:             'social_service_id' => null,
+537:         ]);
+538: 
+539:         return response()->json([
+540:             'message' =>
+541:                 'Đã bỏ map dịch vụ nguồn.',
+542:             'data' =>
+543:                 $this->serializeProviderService(
+544:                     $providerService
+545:                         ->fresh()
+546:                         ->load('provider')
+547:                 ),
+548:         ]);
+549:     }
+550: 
+551:     private function makeUniqueCode(
+552:         string $platform,
+553:         string $category,
+554:         string $name
+555:     ): string {
+556:         $base = Str::upper(
+557:             Str::slug(
+558:                 $platform
+559:                 .'_'.$category
+560:                 .'_'.$name,
+561:                 '_'
+562:             )
+563:         );
+564: 
+565:         $base = Str::limit(
+566:             $base,
+567:             80,
+568:             ''
+569:         );
+570: 
+571:         $code = $base;
+572:         $number = 2;
+573: 
+574:         while (
+575:             SocialService::where(
+576:                 'code',
+577:                 $code
+578:             )->exists()
+579:         ) {
+580:             $code =
+581:                 $base.'_'.$number;
+582: 
+583:             $number++;
+584:         }
+585: 
+586:         return $code;
+587:     }
+588: 
+589:     private function serializeProviderService(
+590:         SocialProviderService $item
+591:     ): array {
+592:         $provider = $item->provider;
+593: 
+594:         $exchangeRate = (float) (
+595:             $provider?->exchange_rate_to_vnd
+596:             ?: 1
+597:         );
+598: 
+599:         $multiplier = (float) (
+600:             $provider?->price_multiplier
+601:             ?: 1
+602:         );
+603: 
+604:         $rawCost = (float) (
+605:             $item->cost_price_per_1000
+606:             ?? 0
+607:         );
+608: 
+609:         $costVnd =
+610:             $rawCost
+611:             * $exchangeRate
+612:             * $multiplier;
+613: 
+614:         return [
+615:             'id' =>
+616:                 $item->id,
+617: 
+618:             'provider_service_id' =>
+619:                 $item->provider_service_id,
+620: 
+621:             'provider_service_name' =>
+622:                 $item->provider_service_name,
+623: 
+624:             'cost_price_per_1000' =>
+625:                 $item->cost_price_per_1000,
+626: 
+627:             'cost_currency' =>
+628:                 $provider?->currency
+629:                 ?? 'VND',
+630: 
+631:             'exchange_rate_to_vnd' =>
+632:                 $exchangeRate,
+633: 
+634:             'price_multiplier' =>
+635:                 $multiplier,
+636: 
+637:             'cost_price_vnd' =>
+638:                 round(
+639:                     $costVnd,
+640:                     4
+641:                 ),
+642: 
+643:             'min_quantity' =>
+644:                 $item->min_quantity,
+645: 
+646:             'max_quantity' =>
+647:                 $item->max_quantity,
+648: 
+649:             'priority' =>
+650:                 $item->priority,
+651: 
+652:             'is_active' =>
+653:                 $item->is_active,
+654: 
+655:             'provider_availability' =>
+656:                 $item->provider_availability,
+657: 
+658:             'provider_data' =>
+659:                 $item->provider_data,
+660: 
+661:             'last_synced_at' =>
+662:                 $item->last_synced_at,
+663: 
+664:             'provider' =>
+665:                 $provider,
+666: 
+667:             'service' =>
+668:                 $item->service,
+669: 
+670:             'is_mapped' =>
+671:                 !is_null(
+672:                     $item->social_service_id
+673:                 ),
+674:         ];
+675:     }
+676: 
+677:     private function validated(
+678:         Request $request,
+679:         ?SocialService $service = null
+680:     ): array {
+681:         return $request->validate([
+682:             'code' => [
+683:                 'required',
+684:                 'string',
+685:                 'max:100',
+686:                 Rule::unique(
+687:                     'social_services',
+688:                     'code'
+689:                 )->ignore($service?->id),
+690:             ],
+691: 
+692:             'platform' => [
+693:                 'required',
+694:                 'in:facebook,instagram,tiktok,other',
+695:             ],
+696: 
+697:             'category' => [
+698:                 'required',
+699:                 'string',
+700:                 'max:100',
+701:             ],
+702: 
+703:             'name' => [
+704:                 'required',
+705:                 'string',
+706:                 'max:255',
+707:             ],
+708: 
+709:             'description' => [
+710:                 'nullable',
+711:                 'string',
+712:                 'max:5000',
+713:             ],
+714: 
+715:             'min_quantity' => [
+716:                 'required',
+717:                 'integer',
+718:                 'min:1',
+719:             ],
+720: 
+721:             'max_quantity' => [
+722:                 'required',
+723:                 'integer',
+724:                 'gte:min_quantity',
+725:             ],
+726: 
+727:             'sell_price_per_1000' => [
+728:                 'nullable',
+729:                 'numeric',
+730:                 'min:0',
+731:             ],
+732: 
+733:             'is_active' => [
+734:                 'required',
+735:                 'boolean',
+736:             ],
+737: 
+738:             'sort_order' => [
+739:                 'nullable',
+740:                 'integer',
+741:                 'min:0',
+742:             ],
+743:         ]);
+744:     }
+745: }
+
+======================================================================
+noscam-backend/app/Http/Controllers/Api/AdminSocialProviderController.php
+======================================================================
+1: <?php
+2: 
+3: namespace App\Http\Controllers\Api;
+4: 
+5: use App\Http\Controllers\Controller;
+6: use App\Models\SocialProvider;
+7: use App\Models\SocialProviderService;
+8: use App\Services\Social\SocialProviderManager;
+9: use Illuminate\Http\JsonResponse;
+10: use Illuminate\Http\Request;
+11: use Illuminate\Support\Facades\DB;
+12: use Illuminate\Support\Facades\Log;
+13: use Throwable;
+14: 
+15: class AdminSocialProviderController extends Controller
+16: {
+17:     public function index(): JsonResponse
+18:     {
+19:         $providers = SocialProvider::query()
+20:             ->withCount(['services', 'orders'])
+21:             ->orderBy('priority')
+22:             ->orderBy('id')
+23:             ->get()
+24:             ->map(
+25:                 fn (SocialProvider $provider) =>
+26:                     $this->serialize($provider)
+27:             );
+28: 
+29:         return response()->json([
+30:             'data' => $providers,
+31:         ]);
+32:     }
+33: 
+34:     public function show(
+35:         SocialProvider $provider
+36:     ): JsonResponse {
+37:         $provider->loadCount([
+38:             'services',
+39:             'orders',
+40:         ]);
+41: 
+42:         return response()->json([
+43:             'data' =>
+44:                 $this->serialize($provider),
+45:         ]);
+46:     }
+47: 
+48:     public function update(
+49:         Request $request,
+50:         SocialProvider $provider
+51:     ): JsonResponse {
+52:         $data = $request->validate([
+53:             'name' => [
+54:                 'sometimes',
+55:                 'string',
+56:                 'max:255',
+57:             ],
+58: 
+59:             'api_url' => [
+60:                 'sometimes',
+61:                 'url',
+62:                 'max:1000',
+63:             ],
+64: 
+65:             'api_key' => [
+66:                 'nullable',
+67:                 'string',
+68:                 'max:10000',
+69:             ],
+70: 
+71:             'status' => [
+72:                 'sometimes',
+73:                 'in:active,inactive,error',
+74:             ],
+75: 
+76:             'priority' => [
+77:                 'sometimes',
+78:                 'integer',
+79:                 'min:0',
+80:                 'max:100000',
+81:             ],
+82: 
+83:             'auto_sync' => [
+84:                 'sometimes',
+85:                 'boolean',
+86:             ],
+87: 
+88:             'exchange_rate_to_vnd' => [
+89:                 'sometimes',
+90:                 'numeric',
+91:                 'gt:0',
+92:                 'max:1000000000',
+93:             ],
+94: 
+95:             'price_multiplier' => [
+96:                 'sometimes',
+97:                 'numeric',
+98:                 'gt:0',
+99:                 'max:1000000',
+100:             ],
+101: 
+102:             'settings' => [
+103:                 'sometimes',
+104:                 'nullable',
+105:                 'array',
+106:             ],
+107: 
+108:             'settings.username' => [
+109:                 'nullable',
+110:                 'string',
+111:                 'max:255',
+112:             ],
+113:         ]);
+114: 
+115:         if (
+116:             array_key_exists(
+117:                 'api_key',
+118:                 $data
+119:             )
+120:             && blank($data['api_key'])
+121:         ) {
+122:             unset($data['api_key']);
+123:         }
+124: 
+125:         if (
+126:             array_key_exists(
+127:                 'settings',
+128:                 $data
+129:             )
+130:         ) {
+131:             $data['settings'] = array_merge(
+132:                 $provider->settings ?? [],
+133:                 $data['settings'] ?? []
+134:             );
+135:         }
+136: 
+137:         $provider->update($data);
+138: 
+139:         $provider->loadCount([
+140:             'services',
+141:             'orders',
+142:         ]);
+143: 
+144:         return response()->json([
+145:             'message' =>
+146:                 'Đã cập nhật nhà cung cấp.',
+147: 
+148:             'data' =>
+149:                 $this->serialize($provider),
+150:         ]);
+151:     }
+152: 
+153:     public function test(
+154:         SocialProvider $provider,
+155:         SocialProviderManager $manager
+156:     ): JsonResponse {
+157:         if (empty($provider->api_key)) {
+158:             return response()->json([
+159:                 'message' =>
+160:                     'Nhà cung cấp chưa có API key.',
+161:             ], 422);
+162:         }
+163: 
+164:         try {
+165:             $result =
+166:                 $manager
+167:                     ->make($provider)
+168:                     ->balance();
+169: 
+170:             $balance =
+171:                 $this->extractBalance(
+172:                     $result
+173:                 );
+174: 
+175:             $currency = strtoupper(
+176:                 (string) (
+177:                     data_get(
+178:                         $result,
+179:                         'currency'
+180:                     )
+181:                     ?? data_get(
+182:                         $result,
+183:                         'data.currency'
+184:                     )
+185:                     ?? $provider->currency
+186:                     ?? 'VND'
+187:                 )
+188:             );
+189: 
+190:             $provider->update([
+191:                 'balance' =>
+192:                     $balance
+193:                     ?? $provider->balance,
+194: 
+195:                 'currency' =>
+196:                     $currency,
+197: 
+198:                 'status' =>
+199:                     'active',
+200: 
+201:                 'last_checked_at' =>
+202:                     now(),
+203: 
+204:                 'last_error' =>
+205:                     null,
+206:             ]);
+207: 
+208:             return response()->json([
+209:                 'message' =>
+210:                     'Kết nối API thành công.',
+211: 
+212:                 'data' => [
+213:                     'balance' =>
+214:                         $balance,
+215: 
+216:                     'currency' =>
+217:                         $currency,
+218: 
+219:                     'balance_vnd' =>
+220:                         $balance !== null
+221:                             ? $balance
+222:                                 * (float) (
+223:                                     $provider
+224:                                         ->exchange_rate_to_vnd
+225:                                     ?: 1
+226:                                 )
+227:                             : null,
+228:                 ],
+229:             ]);
+230:         } catch (Throwable $e) {
+231:             Log::warning(
+232:                 'Social provider test failed',
+233:                 [
+234:                     'provider_id' =>
+235:                         $provider->id,
+236: 
+237:                     'driver' =>
+238:                         $provider->driver,
+239: 
+240:                     'error' =>
+241:                         $e->getMessage(),
+242:                 ]
+243:             );
+244: 
+245:             $provider->update([
+246:                 'status' =>
+247:                     'error',
+248: 
+249:                 'last_checked_at' =>
+250:                     now(),
+251: 
+252:                 'last_error' =>
+253:                     $e->getMessage(),
+254:             ]);
+255: 
+256:             return response()->json([
+257:                 'message' =>
+258:                     'Không thể kết nối API.',
+259: 
+260:                 'error' =>
+261:                     $e->getMessage(),
+262:             ], 422);
+263:         }
+264:     }
+265: 
+266:     public function sync(
+267:         SocialProvider $provider,
+268:         SocialProviderManager $manager
+269:     ): JsonResponse {
+270:         if (empty($provider->api_key)) {
+271:             return response()->json([
+272:                 'message' =>
+273:                     'Nhà cung cấp chưa có API key.',
+274:             ], 422);
+275:         }
+276: 
+277:         try {
+278:             $result =
+279:                 $manager
+280:                     ->make($provider)
+281:                     ->services();
+282: 
+283:             $services =
+284:                 $this->normalizeServices(
+285:                     $result
+286:                 );
+287: 
+288:             if (empty($services)) {
+289:                 throw new \RuntimeException(
+290:                     'API không trả về danh sách dịch vụ.'
+291:                 );
+292:             }
+293: 
+294:             $syncedIds = [];
+295: 
+296:             DB::transaction(
+297:                 function () use (
+298:                     $provider,
+299:                     $services,
+300:                     &$syncedIds
+301:                 ) {
+302:                     foreach (
+303:                         $services as $item
+304:                     ) {
+305:                         $providerServiceId =
+306:                             (string) (
+307:                                 $item['service']
+308:                                 ?? $item['id']
+309:                                 ?? ''
+310:                             );
+311: 
+312:                         if (
+313:                             $providerServiceId === ''
+314:                         ) {
+315:                             continue;
+316:                         }
+317: 
+318:                         $name =
+319:                             (string) (
+320:                                 $item['name']
+321:                                 ?? $item[
+322:                                     'service_name'
+323:                                 ]
+324:                                 ?? (
+325:                                     'Service '
+326:                                     .$providerServiceId
+327:                                 )
+328:                             );
+329: 
+330:                         $rate =
+331:                             $item['rate']
+332:                             ?? 0;
+333: 
+334:                         if (
+335:                             !is_numeric($rate)
+336:                         ) {
+337:                             $rate = 0;
+338:                         }
+339: 
+340:                         $min =
+341:                             $item['min']
+342:                             ?? 1;
+343: 
+344:                         $max =
+345:                             $item['max']
+346:                             ?? 1;
+347: 
+348:                         $providerActive =
+349:                             array_key_exists(
+350:                                 'provider_active',
+351:                                 $item
+352:                             )
+353:                                 ? (bool) $item[
+354:                                     'provider_active'
+355:                                 ]
+356:                                 : (
+357:                                     array_key_exists(
+358:                                         'is_active',
+359:                                         $item
+360:                                     )
+361:                                         ? (bool) $item[
+362:                                             'is_active'
+363:                                         ]
+364:                                         : true
+365:                                 );
+366: 
+367:                         $record =
+368:                             SocialProviderService::
+369:                                 updateOrCreate(
+370:                                     [
+371:                                         'social_provider_id' =>
+372:                                             $provider->id,
+373: 
+374:                                         'provider_service_id' =>
+375:                                             $providerServiceId,
+376:                                     ],
+377:                                     [
+378:                                         'provider_service_name' =>
+379:                                             $name,
+380: 
+381:                                         'cost_price_per_1000' =>
+382:                                             $rate,
+383: 
+384:                                         'min_quantity' =>
+385:                                             max(
+386:                                                 1,
+387:                                                 (int) $min
+388:                                             ),
+389: 
+390:                                         'max_quantity' =>
+391:                                             max(
+392:                                                 1,
+393:                                                 (int) $max
+394:                                             ),
+395: 
+396:                                         'priority' =>
+397:                                             100,
+398: 
+399:                                         'provider_availability' =>
+400:                                             $providerActive
+401:                                                 ? 'available'
+402:                                                 : 'unavailable',
+403: 
+404:                                         'provider_data' =>
+405:                                             $item,
+406: 
+407:                                         'last_synced_at' =>
+408:                                             now(),
+409:                                     ]
+410:                                 );
+411: 
+412:                         $syncedIds[] =
+413:                             $record->id;
+414:                     }
+415: 
+416:                     SocialProviderService::query()
+417:                         ->where(
+418:                             'social_provider_id',
+419:                             $provider->id
+420:                         )
+421:                         ->when(
+422:                             !empty($syncedIds),
+423:                             fn ($q) =>
+424:                                 $q->whereNotIn(
+425:                                     'id',
+426:                                     $syncedIds
+427:                                 )
+428:                         )
+429:                         ->update([
+430:                             'provider_availability' =>
+431:                                 'unavailable',
+432:                         ]);
+433:                 }
+434:             );
+435: 
+436:             $provider->update([
+437:                 'last_synced_at' =>
+438:                     now(),
+439: 
+440:                 'last_error' =>
+441:                     null,
+442:             ]);
+443: 
+444:             return response()->json([
+445:                 'message' =>
+446:                     'Đồng bộ dịch vụ thành công.',
+447: 
+448:                 'data' => [
+449:                     'synced' =>
+450:                         count($syncedIds),
+451:                 ],
+452:             ]);
+453:         } catch (Throwable $e) {
+454:             Log::warning(
+455:                 'Social provider sync failed',
+456:                 [
+457:                     'provider_id' =>
+458:                         $provider->id,
+459: 
+460:                     'driver' =>
+461:                         $provider->driver,
+462: 
+463:                     'error' =>
+464:                         $e->getMessage(),
+465:                 ]
+466:             );
+467: 
+468:             $provider->update([
+469:                 'last_error' =>
+470:                     $e->getMessage(),
+471:             ]);
+472: 
+473:             return response()->json([
+474:                 'message' =>
+475:                     'Không thể đồng bộ dịch vụ.',
+476: 
+477:                 'error' =>
+478:                     $e->getMessage(),
+479:             ], 422);
+480:         }
+481:     }
+482: 
+483:     private function normalizeServices(
+484:         array $result
+485:     ): array {
+486:         if (array_is_list($result)) {
+487:             return $result;
+488:         }
+489: 
+490:         foreach (
+491:             [
+492:                 'data',
+493:                 'services',
+494:                 'data.services',
+495:             ] as $path
+496:         ) {
+497:             $value =
+498:                 data_get(
+499:                     $result,
+500:                     $path
+501:                 );
+502: 
+503:             if (
+504:                 is_array($value)
+505:                 && array_is_list($value)
+506:             ) {
+507:                 return $value;
+508:             }
+509:         }
+510: 
+511:         return [];
+512:     }
+513: 
+514:     private function extractBalance(
+515:         array $response
+516:     ): ?float {
+517:         foreach (
+518:             [
+519:                 'balance',
+520:                 'data.balance',
+521:                 'data.user.balance',
+522:                 'money',
+523:             ] as $path
+524:         ) {
+525:             $value =
+526:                 data_get(
+527:                     $response,
+528:                     $path
+529:                 );
+530: 
+531:             if (
+532:                 $value !== null
+533:                 && is_numeric($value)
+534:             ) {
+535:                 return (float) $value;
+536:             }
+537:         }
+538: 
+539:         return null;
+540:     }
+541: 
+542:     private function serialize(
+543:         SocialProvider $provider
+544:     ): array {
+545:         $balance =
+546:             (float) (
+547:                 $provider->balance
+548:                 ?? 0
+549:             );
+550: 
+551:         $exchangeRate =
+552:             (float) (
+553:                 $provider
+554:                     ->exchange_rate_to_vnd
+555:                 ?: 1
+556:             );
+557: 
+558:         return [
+559:             'id' =>
+560:                 $provider->id,
+561: 
+562:             'name' =>
+563:                 $provider->name,
+564: 
+565:             'slug' =>
+566:                 $provider->slug,
+567: 
+568:             'driver' =>
+569:                 $provider->driver,
+570: 
+571:             'api_url' =>
+572:                 $provider->api_url,
+573: 
+574:             'has_api_key' =>
+575:                 !empty(
+576:                     $provider->api_key
+577:                 ),
+578: 
+579:             'api_key' =>
+580:                 $provider->api_key,
+581: 
+582:             'status' =>
+583:                 $provider->status,
+584: 
+585:             'balance' =>
+586:                 $provider->balance,
+587: 
+588:             'currency' =>
+589:                 $provider->currency,
+590: 
+591:             'exchange_rate_to_vnd' =>
+592:                 $provider
+593:                     ->exchange_rate_to_vnd,
+594: 
+595:             'price_multiplier' =>
+596:                 $provider
+597:                     ->price_multiplier,
+598: 
+599:             'balance_vnd' =>
+600:                 $balance
+601:                 * $exchangeRate,
+602: 
+603:             'priority' =>
+604:                 $provider->priority,
+605: 
+606:             'auto_sync' =>
+607:                 $provider->auto_sync,
+608: 
+609:             'settings' =>
+610:                 $provider->settings,
+611: 
+612:             'last_checked_at' =>
+613:                 $provider
+614:                     ->last_checked_at,
+615: 
+616:             'last_synced_at' =>
+617:                 $provider
+618:                     ->last_synced_at,
+619: 
+620:             'last_error' =>
+621:                 $provider->last_error,
+622: 
+623:             'services_count' =>
+624:                 $provider
+625:                     ->services_count
+626:                 ?? 0,
+627: 
+628:             'orders_count' =>
+629:                 $provider
+630:                     ->orders_count
+631:                 ?? 0,
+632:         ];
+633:     }
+634: }

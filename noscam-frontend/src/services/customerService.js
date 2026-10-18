@@ -37,6 +37,18 @@ async function customerRequest(callback) {
 }
 
 const customerService = {
+
+  async cancelSocialOrder(orderId) {
+    return customerRequest(() =>
+      apiClient.post(
+        `/social/orders/${encodeURIComponent(orderId)}/cancel`,
+        {},
+        authOptions(),
+      ),
+    )
+  },
+
+
   async register(data) {
     const response = await apiClient.post(
       '/auth/register',

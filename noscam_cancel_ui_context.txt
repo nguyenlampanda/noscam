@@ -1,0 +1,738 @@
+
+======================================================================
+noscam-frontend/src/pages/MyOrdersPage.jsx
+======================================================================
+390:   return (
+391:     <main className="min-h-screen bg-slate-50 px-5 py-10">
+392:       <div className="mx-auto max-w-6xl">
+393:         <motion.div
+394:           initial={{
+395:             opacity: 0,
+396:             y: 10,
+397:           }}
+398:           animate={{
+399:             opacity: 1,
+400:             y: 0,
+401:           }}
+402:           className="flex flex-wrap items-end justify-between gap-5"
+403:         >
+404:           <div>
+405:             <div className="text-sm font-black uppercase tracking-[0.18em] text-blue-600">
+406:               Tài khoản
+407:             </div>
+408: 
+409:             <h1 className="mt-2 text-3xl font-black text-slate-950">
+410:               Đơn của tôi
+411:             </h1>
+412: 
+413:             <p className="mt-2 text-sm text-slate-400">
+414:               Theo dõi tiến độ các đơn tăng tương tác.
+415:             </p>
+416:           </div>
+417: 
+418:           <Link
+419:             to="/social-services"
+420:             className="rounded-2xl bg-blue-600 px-5 py-3 font-black text-white shadow-sm transition hover:bg-blue-700"
+421:           >
+422:             + Tạo đơn mới
+423:           </Link>
+424:         </motion.div>
+425: 
+426:         <AnimatePresence>
+427:           {createdNotice && (
+428:             <motion.div
+429:               initial={{
+430:                 opacity: 0,
+431:                 y: -8,
+432:               }}
+433:               animate={{
+434:                 opacity: 1,
+435:                 y: 0,
+436:               }}
+437:               exit={{
+438:                 opacity: 0,
+439:                 y: -8,
+440:               }}
+441:               className="mt-6 flex items-center gap-3 rounded-2xl border border-emerald-100 bg-emerald-50 p-4"
+442:             >
+443:               <span className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-500 font-black text-white">
+444:                 ✓
+445:               </span>
+446: 
+447:               <div>
+448:                 <div className="font-black text-emerald-700">
+449:                   Tạo đơn thành công
+450:                 </div>
+451: 
+452:                 <div className="text-sm text-emerald-600">
+453:                   Đơn hàng đã được ghi nhận và đang chờ xử lý.
+454:                 </div>
+455:               </div>
+456:             </motion.div>
+457:           )}
+458:         </AnimatePresence>
+459: 
+460:         {error && (
+461:           <div className="mt-6 rounded-2xl border border-red-100 bg-red-50 p-4 font-semibold text-red-600">
+462:             {error}
+463:           </div>
+464:         )}
+465: 
+466:         <div className="mt-7 grid grid-cols-2 gap-3 md:grid-cols-4">
+467:           {tabs.map(
+468:             (item) => {
+469:               const active =
+470:                 status ===
+471:                 item.value
+472: 
+473:               return (
+474:                 <motion.button
+475:                   type="button"
+476:                   key={
+477:                     item.value
+478:                   }
+479:                   whileTap={{
+480:                     scale: 0.98,
+481:                   }}
+482:                   onClick={() =>
+483:                     setStatus(
+484:                       item.value,
+485:                     )
+486:                   }
+487:                   className={`rounded-2xl border p-4 text-left transition ${
+488:                     active
+489:                       ? 'border-blue-600 bg-blue-600 text-white shadow-md'
+490:                       : 'border-slate-200 bg-white hover:border-blue-200'
+491:                   }`}
+492:                 >
+493:                   <div
+494:                     className={`text-xs font-black uppercase ${
+495:                       active
+496:                         ? 'text-blue-100'
+497:                         : 'text-slate-400'
+498:                     }`}
+499:                   >
+500:                     {item.label}
+501:                   </div>
+502: 
+503:                   <div className="mt-1 text-2xl font-black">
+504:                     {item.count}
+505:                   </div>
+506:                 </motion.button>
+507:               )
+508:             },
+509:           )}
+510:         </div>
+511: 
+512:         <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-3">
+513:           <div className="flex items-center gap-3">
+514:             <span className="pl-2 text-slate-400">
+515:               ⌕
+516:             </span>
+517: 
+518:             <input
+519:               value={search}
+520:               onChange={(e) =>
+521:                 setSearch(
+522:                   e.target.value,
+523:                 )
+524:               }
+525:               placeholder="Tìm mã đơn, dịch vụ hoặc target..."
+526:               className="min-w-0 flex-1 bg-transparent py-2 text-sm font-semibold outline-none"
+527:             />
+528: 
+529:             {search && (
+530:               <button
+531:                 type="button"
+532:                 onClick={() =>
+533:                   setSearch('')
+534:                 }
+535:                 className="rounded-xl bg-slate-100 px-3 py-2 text-xs font-black text-slate-500"
+536:               >
+537:                 Xóa
+538:               </button>
+539:             )}
+540:           </div>
+541:         </div>
+542: 
+543:         <div className="mt-5 space-y-4">
+544:           {loading ? (
+545:             <div className="rounded-3xl border border-slate-200 bg-white p-14 text-center text-slate-400">
+546:               Đang tải đơn hàng...
+547:             </div>
+548:           ) : filteredOrders.length ===
+549:             0 ? (
+550:             <div className="rounded-3xl border border-slate-200 bg-white p-12 text-center">
+551:               <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-2xl">
+552:                 ◫
+553:               </div>
+554: 
+555:               <div className="mt-4 text-lg font-black text-slate-800">
+556:                 {orders.length === 0
+557:                   ? 'Chưa có đơn hàng'
+558:                   : 'Không tìm thấy đơn'}
+559:               </div>
+560: 
+561:               <p className="mt-2 text-sm text-slate-400">
+562:                 {orders.length === 0
+563:                   ? 'Tạo đơn đầu tiên để bắt đầu.'
+564:                   : 'Thử thay đổi bộ lọc hoặc từ khóa.'}
+565:               </p>
+566: 
+567:               {orders.length ===
+568:                 0 && (
+569:                 <Link
+570:                   to="/social-services"
+571:                   className="mt-5 inline-flex rounded-xl bg-blue-600 px-5 py-3 text-sm font-black text-white"
+572:                 >
+573:                   Tạo đơn ngay
+574:                 </Link>
+575:               )}
+576:             </div>
+577:           ) : (
+578:             filteredOrders.map(
+579:               (item, index) => {
+580:                 const meta =
+581:                   getStatus(
+582:                     item.status,
+583:                   )
+584: 
+585:                 const progress =
+586:                   progressOf(item)
+587: 
+588:                 return (
+589:                   <motion.article
+590:                     key={item.id}
+591:                     initial={{
+592:                       opacity: 0,
+593:                       y: 8,
+594:                     }}
+595:                     animate={{
+596:                       opacity: 1,
+597:                       y: 0,
+598:                     }}
+599:                     transition={{
+600:                       delay:
+601:                         Math.min(
+602:                           index *
+603:                             0.03,
+604:                           0.2,
+605:                         ),
+606:                     }}
+607:                     className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm"
+608:                   >
+609:                     <div className="p-5 md:p-6">
+610:                       <div className="flex flex-wrap items-start justify-between gap-4">
+611:                         <div className="flex min-w-0 items-start gap-4">
+612:                           <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-slate-50">
+613:                             <PlatformIcon
+614:                               platform={
+615:                                 item.service
+616:                                   ?.platform ||
+617:                                 'other'
+618:                               }
+619:                               className="h-7 w-7"
+620:                             />
+621:                           </span>
+622: 
+623:                           <div className="min-w-0">
+624:                             <div className="flex flex-wrap items-center gap-2">
+625:                               <span className="font-black text-slate-950">
+626:                                 {item.code}
+627:                               </span>
+628: 
+629:                               <span
+630:                                 className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-black ${meta.badge}`}
+631:                               >
+632:                                 <span
+633:                                   className={`h-1.5 w-1.5 rounded-full ${meta.dot}`}
+634:                                 />
+635: 
+636:                                 {
+637:                                   meta.label
+638:                                 }
+639:                               </span>
+640:                             </div>
+641: 
+642:                             <div className="mt-2 max-w-3xl font-bold leading-5 text-slate-700">
+643:                               {item
+644:                                 .service
+645:                                 ?.name ||
+646:                                 'Dịch vụ'}
+647:                             </div>
+648: 
+649:                             <div className="mt-2 text-xs font-semibold text-slate-400">
+650:                               {dateTime(
+651:                                 item.created_at,
+652:                               )}
+653:                             </div>
+654:                           </div>
+655:                         </div>
+656: 
+657:                         <div className="shrink-0 text-right">
+658:                           <div className="text-xs font-bold uppercase text-slate-400">
+659:                             Thành tiền
+660:                           </div>
+661: 
+662:                           <div className="mt-1 text-xl font-black text-blue-600">
+663:                             {money(
+664:                               item.sell_amount,
+665:                             )}
+666:                           </div>
+667:                         </div>
+668:                       </div>
+669: 
+670:                       <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 rounded-xl border border-slate-100 bg-slate-50/60 px-3 py-2.5 transition-all duration-300 hover:border-blue-200 hover:bg-blue-50/40 md:grid-cols-[minmax(0,1fr)_90px_90px_90px]">
+671:                           <div className="col-span-2 flex min-w-0 items-center gap-2 md:col-span-1">
+672:                             <span className="shrink-0 text-[10px] font-black uppercase text-slate-400">Target</span>
+673:                             {/^https?:\/\//i.test(String(item.target || '').trim()) ? (
+674:                               <a href={String(item.target).trim()} target="_blank" rel="noopener noreferrer"
+675:                                 title={item.target}
+676:                                 className="group/link inline-flex min-w-0 items-center gap-1 text-xs font-bold text-blue-600 transition-colors hover:text-blue-800">
+677:                                 <span className="truncate group-hover/link:underline">{item.target}</span>
+678:                                 <span className="shrink-0 transition-transform group-hover/link:-translate-y-0.5 group-hover/link:translate-x-0.5">↗</span>
+679:                               </a>
+680:                             ) : (
+681:                               <span className="truncate text-xs font-semibold" title={item.target}>{item.target || '—'}</span>
+682:                             )}
+683:                           </div>
+684: 
+685:                           <div className="flex items-center justify-between gap-2 md:flex-col md:items-end md:justify-center md:gap-0">
+686:                             <span className="text-[10px] font-bold uppercase text-slate-400">Số lượng</span>
+687:                             <span className="text-xs font-black tabular-nums">{number(item.quantity)}</span>
+688:                           </div>
+689: 
+690:                           <div className="flex items-center justify-between gap-2 md:flex-col md:items-end md:justify-center md:gap-0">
+691:                             <span className="text-[10px] font-bold uppercase text-slate-400">Đã chạy</span>
+692:                             <span className="text-xs font-black tabular-nums text-blue-600">
+693:                               {item.remains == null ? '—' : number(Math.max(0, Number(item.quantity || 0) - Number(item.remains || 0)))}
+694:                             </span>
+695:                           </div>
+696: 
+697:                           <div className="flex items-center justify-between gap-2 md:flex-col md:items-end md:justify-center md:gap-0">
+698:                             <span className="text-[10px] font-bold uppercase text-slate-400">Còn lại</span>
+699:                             <span className="text-xs font-black tabular-nums">
+700:                               {item.remains == null ? '—' : number(item.remains)}
+701:                             </span>
+702:                           </div>
+703:                         </div>
+704: 
+705:                         <div className="mt-5">
+706:                         <div className="mb-2 flex items-center justify-between gap-3">
+707:                           <span className="text-xs font-black text-slate-500">
+708:                             Tiến độ
+709:                           </span>
+710: 
+711:                           <span className="text-xs font-black text-slate-700">
+712:                             {progress}%
+713:                           </span>
+714:                         </div>
+715: 
+716:                         <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+717:                           <motion.div
+718:                             initial={{
+719:                               width: 0,
+720:                             }}
+721:                             animate={{
+722:                               width: `${progress}%`,
+723:                             }}
+724:                             transition={{
+725:                               duration: 0.6,
+726:                             }}
+727:                             className={`h-full rounded-full ${meta.bar}`}
+728:                           />
+729:                         </div>
+730:                       </div>
+731: 
+732:                       {Number(
+733:                         item.refunded_amount ||
+734:                           0,
+735:                       ) > 0 && (
+736:                         <div className="mt-4 rounded-xl bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-600">
+737:                           Đã hoàn{' '}
+738:                           {money(
+739:                             item.refunded_amount,
+740:                           )}{' '}
+741:                           vào ví.
+742:                         </div>
+743:                       )}
+744:                     </div>
+745:                   </motion.article>
+746:                 )
+747:               },
+748:             )
+749:           )}
+750:         </div>
+751:       </div>
+752:     </main>
+753:   )
+754: }
+
+======================================================================
+noscam-frontend/src/services/customerService.js
+======================================================================
+1: import apiClient from './apiClient'
+2: 
+3: const TOKEN_KEY = 'noscam_customer_token'
+4: 
+5: export function getCustomerToken() {
+6:   return localStorage.getItem(TOKEN_KEY)
+7: }
+8: 
+9: export function setCustomerToken(token) {
+10:   localStorage.setItem(TOKEN_KEY, token)
+11: }
+12: 
+13: export function removeCustomerToken() {
+14:   localStorage.removeItem(TOKEN_KEY)
+15: }
+16: 
+17: function authOptions() {
+18:   const token = getCustomerToken()
+19: 
+20:   return {
+21:     headers: {
+22: [ĐÃ ẨN THÔNG TIN NHẠY CẢM]
+23:     },
+24:   }
+25: }
+26: 
+27: async function customerRequest(callback) {
+28:   try {
+29:     return await callback()
+30:   } catch (error) {
+31:     if (error?.status === 401) {
+32:       removeCustomerToken()
+33:     }
+34: 
+35:     throw error
+36:   }
+37: }
+38: 
+39: const customerService = {
+40: 
+41:   async cancelSocialOrder(orderId) {
+42:     return customerRequest(() =>
+43:       apiClient.post(
+44:         `/social/orders/${encodeURIComponent(orderId)}/cancel`,
+45:         {},
+46:         authOptions(),
+47:       ),
+48:     )
+49:   },
+50: 
+51: 
+52:   async register(data) {
+53:     const response = await apiClient.post(
+54:       '/auth/register',
+55:       data,
+56:     )
+57: 
+58:     const token = response?.data?.token
+59: 
+60:     if (!token) {
+61:       throw new Error(
+62:         'Máy chủ không trả về token.',
+63:       )
+64:     }
+65: 
+66:     setCustomerToken(token)
+67: 
+68:     return response.data
+69:   },
+70: 
+71:   async login(username, password) {
+72:     const response = await apiClient.post(
+73:       '/auth/login',
+74:       {
+75:         username: username.trim(),
+76:         password,
+77:       },
+78:     )
+79: 
+80:     const token = response?.data?.token
+81: 
+82:     if (!token) {
+83:       throw new Error(
+84:         'Máy chủ không trả về token.',
+85:       )
+86:     }
+87: 
+88:     setCustomerToken(token)
+89: 
+90:     return response.data
+91:   },
+92: 
+93:   async me() {
+94:     return customerRequest(() =>
+95:       apiClient.get(
+96:         '/auth/me',
+97:         authOptions(),
+98:       ),
+99:     )
+100:   },
+101: 
+102:   async logout() {
+103:     try {
+104:       if (getCustomerToken()) {
+105:         await apiClient.post(
+106:           '/auth/logout',
+107:           undefined,
+108:           authOptions(),
+109:         )
+110:       }
+111:     } finally {
+112:       removeCustomerToken()
+113:     }
+114:   },
+115: 
+116:   async services({
+117:     platform = '',
+118:     category = '',
+119:     search = '',
+120:   } = {}) {
+121:     const params = new URLSearchParams()
+122: 
+123:     if (platform) {
+124:       params.set('platform', platform)
+125:     }
+126: 
+127:     if (category) {
+128:       params.set('category', category)
+129:     }
+130: 
+131:     if (search.trim()) {
+132:       params.set('search', search.trim())
+133:     }
+134: 
+135:     const query = params.toString()
+136: 
+137:     return apiClient.get(
+138:       `/social/services${
+139:         query ? `?${query}` : ''
+140:       }`,
+141:     )
+142:   },
+143: 
+144:   async profile() {
+145:     return customerRequest(() =>
+146:       apiClient.get(
+147:         '/profile',
+148:         authOptions(),
+149:       ),
+150:     )
+151:   },
+152: 
+153:   async updateProfile(data) {
+154:     return customerRequest(() =>
+155:       apiClient.put(
+156:         '/profile',
+157:         data,
+158:         authOptions(),
+159:       ),
+160:     )
+161:   },
+162: 
+163:   async changePassword(data) {
+164:     return customerRequest(() =>
+165:       apiClient.put(
+166:         '/profile/password',
+167:         data,
+168:         authOptions(),
+169:       ),
+170:     )
+171:   },
+172: 
+173:   async wallet() {
+174:     return customerRequest(() =>
+175:       apiClient.get(
+176:         '/wallet',
+177:         authOptions(),
+178:       ),
+179:     )
+180:   },
+181: 
+182:   async transactions() {
+183:     return customerRequest(() =>
+184:       apiClient.get(
+185:         '/wallet/transactions',
+186:         authOptions(),
+187:       ),
+188:     )
+189:   },
+190: 
+191:   async topups() {
+192:     return customerRequest(() =>
+193:       apiClient.get(
+194:         '/wallet/topups',
+195:         authOptions(),
+196:       ),
+197:     )
+198:   },
+199: 
+200:   async createTopup(data) {
+201:     return customerRequest(() =>
+202:       apiClient.post(
+203:         '/wallet/topups',
+204:         data,
+205:         authOptions(),
+206:       ),
+207:     )
+208:   },
+209: 
+210:   async orders() {
+211:     return customerRequest(() =>
+212:       apiClient.get(
+213:         '/social/orders',
+214:         authOptions(),
+215:       ),
+216:     )
+217:   },
+218: 
+219:   async digitalOrders(page = 1) {
+220:     return customerRequest(() =>
+221:       apiClient.get(
+222:         `/digital/orders?page=${encodeURIComponent(page)}`,
+223:         authOptions(),
+224:       ),
+225:     )
+226:   },
+227: 
+228:   async digitalOrder(id) {
+229:     return customerRequest(() =>
+230:       apiClient.get(
+231:         `/digital/orders/${encodeURIComponent(id)}`,
+232:         authOptions(),
+233:       ),
+234:     )
+235:   },
+236: 
+237:   async createDigitalOrder(data) {
+238:     return customerRequest(() =>
+239:       apiClient.post(
+240:         '/digital/orders',
+
+======================================================================
+noscam-backend/routes/api.php
+======================================================================
+440:     Route::post(
+441:         '/digital/orders/{digitalOrder}/quotes/{quote}/respond',
+442:         [\App\Http\Controllers\Api\DigitalOrderController::class, 'respondToQuote']
+443:     )->whereNumber('digitalOrder')->whereNumber('quote');
+444: 
+445:     Route::post(
+446:         '/digital/orders/{digitalOrder}/pay-wallet',
+447:         [\App\Http\Controllers\Api\DigitalOrderPaymentController::class, 'payWithWallet']
+448:     )->whereNumber('digitalOrder');
+449: 
+450:     Route::get(
+451:         '/digital/orders/{digitalOrder}',
+452:         [\App\Http\Controllers\Api\DigitalOrderController::class, 'show']
+453:     )->whereNumber('digitalOrder');
+454: 
+455:     Route::get(
+456:         '/social/orders',
+457:         [SocialOrderController::class, 'index']
+458:     );
+459: 
+460:     Route::post(
+461:         '/social/orders',
+462:         [SocialOrderController::class, 'store']
+463:     );
+464: 
+465:     Route::get(
+466:         '/social/orders/{order}',
+467:         [SocialOrderController::class, 'show']
+468:     );
+469: });
+470: 
+471: /*
+472: |--------------------------------------------------------------------------
+473: | Admin Login
+474: |--------------------------------------------------------------------------
+475: */
+476: 
+477: Route::post(
+478:     '/admin/login',
+479:     [AdminAuthController::class, 'login']
+480: )->middleware(
+481:     'throttle:admin-login'
+482: );
+483: 
+484: /*
+485: |--------------------------------------------------------------------------
+
+======================================================================
+noscam-backend/app/Services/Social/SocialOrderProviderService.php
+======================================================================
+490:                     throw new RuntimeException(
+491:                         'Đơn đã gửi yêu cầu tới Provider nhưng chưa xác định kết quả. '
+492:                         .'Vui lòng đối soát trước khi hủy hoặc hoàn tiền.'
+493:                     );
+494:                 }
+495: 
+496:                 $order->status =
+497:                     'cancelled';
+498: 
+499:                 $order->save();
+500: 
+501:                 return $this->orders
+502:                     ->refund(
+503:                         $order,
+504:                         $createdBy
+505:                     );
+506:             }
+507: 
+508:             if (!$order->provider) {
+509:                 throw new RuntimeException(
+510:                     'Không tìm thấy provider.'
+511:                 );
+512:             }
+513: 
+514:             if (
+515:                 $order->provider->driver ===
+516:                 'vietnamfb'
+517:             ) {
+518:                 throw new RuntimeException(
+519:                     'VietnamFB chưa hỗ trợ hủy tự động.'
+520:                 );
+521:             }
+522: 
+523:             /*
+524:              * Đơn đã gửi:
+525:              * chỉ yêu cầu provider hủy.
+526:              * KHÔNG hoàn tiền ngay.
+527:              */
+528:             $api =
+529:                 $this->providers->make(
+530:                     $order->provider
+531:                 );
+532: 
+533:             $response =
+534:                 $api->cancel(
+535:                     (string)
+536:                         $order
+537:                             ->provider_order_id
+538:                 );
+539: 
+540:             $order->provider_response =
+541:                 $response;
+542: 
+543:             $order->provider_error = null;
+544: 
+545:             /*
+546:              * Giữ processing/in_progress.
+547:              * Scheduler sẽ sync và chỉ hoàn tiền
+548:              * khi provider xác nhận cancelled.
+549:              */
+550:             $order->last_synced_at =
+551:                 now();
+552: 
+553:             $order->save();
+554: 
+555:             return $order->fresh();
+556:         } finally {
+557:             $lock->release();
+558:         }
+559:     }
+560: 

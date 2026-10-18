@@ -1,0 +1,1288 @@
+
+===========================================================================
+noscam-backend/app/Services/Social/SocialOrderService.php
+===========================================================================
+...
+5: use App\Models\SocialOrder;
+6: use App\Models\SocialProviderService;
+7: use App\Models\SocialService;
+8: use App\Models\User;
+9: use Illuminate\Support\Facades\DB;
+10: use Illuminate\Support\Str;
+11: use RuntimeException;
+12: 
+13: class SocialOrderService
+14: {
+15:     public function __construct(
+16:         private WalletService $walletService
+17:     ) {
+18:     }
+19: 
+20:     public function create(
+21:         User $user,
+22:         SocialService $service,
+23:         string $target,
+24:         int $quantity,
+25:         string $idempotencyKey
+26:     ): SocialOrder {
+27:         if (!$service->is_active) {
+28:             throw new RuntimeException(
+29:                 'Dịch vụ hiện đang tạm ngưng.'
+30:             );
+31:         }
+32: 
+33:         if (
+34:             $quantity < (int) $service->min_quantity ||
+35:             $quantity > (int) $service->max_quantity
+36:         ) {
+37:             throw new RuntimeException(
+38:                 'Số lượng không nằm trong giới hạn dịch vụ.'
+39:             );
+40:         }
+41: 
+42:         $existing = SocialOrder::query()
+43:             ->where(
+44:                 'idempotency_key',
+45:                 $idempotencyKey
+46:             )
+47:             ->first();
+48: 
+49:         if ($existing) {
+50:             if (
+51:                 (int) $existing->user_id !==
+52:                 (int) $user->id
+53:             ) {
+54:                 throw new RuntimeException(
+55:                     'Idempotency key không hợp lệ.'
+56:                 );
+57:             }
+58: 
+59:             return $existing;
+60:         }
+61: 
+62:         /*
+63:          * Admin chưa thiết lập giá:
+64:          * không tạo đơn, không trừ ví.
+65:          * Khách chỉ nhận thông báo chung.
+66:          */
+67:         if (
+68:             $service->sell_price_per_1000 === null ||
+69:             (float) $service->sell_price_per_1000 <= 0
+70:         ) {
+71:             throw new RuntimeException(
+72:                 'Dịch vụ hiện chưa thể xử lý. Vui lòng liên hệ Admin để được hỗ trợ.'
+73:             );
+74:         }
+75: 
+76:         $providerService =
+77:             SocialProviderService::query()
+78:                 ->with('provider')
+79:                 ->where(
+
+===========================================================================
+noscam-backend/app/Http/Controllers/Api/AdminSocialProviderController.php
+===========================================================================
+...
+325:                                     'Service '
+326:                                     .$providerServiceId
+327:                                 )
+328:                             );
+329: 
+330:                         $rate =
+331:                             $item['rate']
+332:                             ?? 0;
+333: 
+334:                         if (
+335:                             !is_numeric($rate)
+336:                         ) {
+337:                             $rate = 0;
+338:                         }
+339: 
+340:                         $min =
+341:                             $item['min']
+342:                             ?? 1;
+343: 
+344:                         $max =
+345:                             $item['max']
+346:                             ?? 1;
+347: 
+348:                         $providerActive =
+349:                             array_key_exists(
+350:                                 'provider_active',
+351:                                 $item
+352:                             )
+353:                                 ? (bool) $item[
+354:                                     'provider_active'
+355:                                 ]
+356:                                 : (
+357:                                     array_key_exists(
+358:                                         'is_active',
+359:                                         $item
+360:                                     )
+361:                                         ? (bool) $item[
+362:                                             'is_active'
+363:                                         ]
+364:                                         : true
+365:                                 );
+366: 
+367:                         $record =
+368:                             SocialProviderService::
+369:                                 updateOrCreate(
+370:                                     [
+371:                                         'social_provider_id' =>
+372:                                             $provider->id,
+373: 
+374:                                         'provider_service_id' =>
+375:                                             $providerServiceId,
+376:                                     ],
+377:                                     [
+378:                                         'provider_service_name' =>
+379:                                             $name,
+380: 
+381:                                         'cost_price_per_1000' =>
+382:                                             $rate,
+383: 
+384:                                         'min_quantity' =>
+385:                                             max(
+386:                                                 1,
+387:                                                 (int) $min
+388:                                             ),
+389: 
+390:                                         'max_quantity' =>
+391:                                             max(
+392:                                                 1,
+393:                                                 (int) $max
+394:                                             ),
+395: 
+396:                                         'priority' =>
+397:                                             100,
+398: 
+399:                                         'provider_availability' =>
+400:                                             $providerActive
+401:                                                 ? 'available'
+402:                                                 : 'unavailable',
+403: 
+404:                                         'provider_data' =>
+405:                                             $item,
+406: 
+407:                                         'last_synced_at' =>
+408:                                             now(),
+409:                                     ]
+410:                                 );
+411: 
+412:                         $syncedIds[] =
+413:                             $record->id;
+414:                     }
+415: 
+416:                     SocialProviderService::query()
+417:                         ->where(
+418:                             'social_provider_id',
+419:                             $provider->id
+420:                         )
+421:                         ->when(
+422:                             !empty($syncedIds),
+423:                             fn ($q) =>
+424:                                 $q->whereNotIn(
+425:                                     'id',
+426:                                     $syncedIds
+427:                                 )
+428:                         )
+429:                         ->update([
+430:                             'provider_availability' =>
+431:                                 'unavailable',
+432:                         ]);
+433:                 }
+434:             );
+435: 
+436:             $provider->update([
+437:                 'last_synced_at' =>
+...
+468:             $provider->update([
+469:                 'last_error' =>
+470:                     $e->getMessage(),
+471:             ]);
+472: 
+473:             return response()->json([
+474:                 'message' =>
+475:                     'Không thể đồng bộ dịch vụ.',
+476: 
+477:                 'error' =>
+478:                     $e->getMessage(),
+479:             ], 422);
+480:         }
+481:     }
+482: 
+483:     private function normalizeServices(
+484:         array $result
+485:     ): array {
+486:         if (array_is_list($result)) {
+487:             return $result;
+488:         }
+489: 
+490:         foreach (
+491:             [
+492:                 'data',
+493:                 'services',
+494:                 'data.services',
+495:             ] as $path
+496:         ) {
+497:             $value =
+498:                 data_get(
+499:                     $result,
+500:                     $path
+501:                 );
+502: 
+503:             if (
+504:                 is_array($value)
+505:                 && array_is_list($value)
+506:             ) {
+507:                 return $value;
+508:             }
+509:         }
+510: 
+511:         return [];
+512:     }
+513: 
+514:     private function extractBalance(
+515:         array $response
+516:     ): ?float {
+517:         foreach (
+518:             [
+519:                 'balance',
+520:                 'data.balance',
+521:                 'data.user.balance',
+522:                 'money',
+523:             ] as $path
+524:         ) {
+525:             $value =
+526:                 data_get(
+527:                     $response,
+
+===========================================================================
+noscam-backend/app/Services/Social/Providers/VietnamFbProvider.php
+===========================================================================
+...
+175:                         $groupName.':'.$channelId,
+176: 
+177:                     'name' =>
+178:                         $this->serviceName(
+179:                             $groupName,
+180:                             $channelId
+181:                         ),
+182: 
+183:                     'rate' =>
+184:                         is_numeric(
+185:                             $channel['price'] ?? null
+186:                         )
+187:                             ? (float) $channel['price']
+188:                             : 0,
+189: 
+190:                     'min' =>
+191:                         is_numeric(
+192:                             $channel['min'] ?? null
+193:                         )
+194:                             ? (int) $channel['min']
+195:                             : 1,
+196: 
+197:                     'max' =>
+198:                         is_numeric(
+199:                             $channel['max'] ?? null
+200:                         )
+201:                             ? (int) $channel['max']
+202:                             : 1000000,
+203: 
+204:                     'group' => $groupName,
+205: 
+206:                     'channel' => $channelId,
+207: 
+208:                     'status_text' => $statusText,
+209: 
+210:                     'provider_active' =>
+211:                         $this->isChannelActive(
+212:                             $channel
+213:                         ),
+214: 
+215:                     'provider_data' => $channel,
+216:                 ];
+217:             }
+218:         }
+219: 
+220:         return $services;
+221:     }
+222: 
+223:     protected function serviceName(
+224:         string $group,
+225:         string $channel
+226:     ): string {
+227:         $label = str_replace(
+228:             '_',
+229:             ' ',
+230:             $group
+231:         );
+232: 
+233:         return trim(
+234:             $label.' - Kênh '.$channel
+235:         );
+236:     }
+237: 
+238:     protected function isChannelActive(
+239:         array $channel
+240:     ): bool {
+241:         $status = strtolower(
+242:             trim(
+243:                 (string) (
+244:                     $channel['status_text']
+245:                     ?? $channel['status']
+246:                     ?? ''
+247:                 )
+248:             )
+249:         );
+250: 
+251:         if ($status === '') {
+252:             return true;
+253:         }
+254: 
+255:         foreach ([
+256:             'tắt',
+257:             'tat',
+258:             'ngưng',
+259:             'ngung',
+
+===========================================================================
+noscam-backend/app/Models/SocialService.php
+===========================================================================
+...
+1: <?php
+2: 
+3: namespace App\Models;
+4: 
+5: use Illuminate\Database\Eloquent\Model;
+6: use Illuminate\Database\Eloquent\Relations\HasMany;
+7: 
+8: class SocialService extends Model
+9: {
+10:     protected $fillable = [
+11:         'code',
+12:         'platform',
+13:         'category',
+14:         'name',
+15:         'description',
+16:         'min_quantity',
+17:         'max_quantity',
+18:         'sell_price_per_1000',
+19:         'is_active',
+20:         'sort_order',
+21:         'settings',
+22:     ];
+23: 
+24:     protected function casts(): array
+25:     {
+26:         return [
+27:             'sell_price_per_1000' => 'decimal:4',
+28:             'is_active' => 'boolean',
+29:             'settings' => 'array',
+30:         ];
+31:     }
+32: 
+33:     public function providerServices(): HasMany
+34:     {
+35:         return $this->hasMany(
+36:             SocialProviderService::class
+37:         );
+38:     }
+39: 
+40:     public function orders(): HasMany
+41:     {
+42:         return $this->hasMany(
+43:             SocialOrder::class
+44:         );
+45:     }
+46: }
+
+===========================================================================
+noscam-backend/app/Models/SocialProviderService.php
+===========================================================================
+...
+1: <?php
+2: 
+3: namespace App\Models;
+4: 
+5: use Illuminate\Database\Eloquent\Model;
+6: use Illuminate\Database\Eloquent\Relations\BelongsTo;
+7: use Illuminate\Database\Eloquent\Relations\HasMany;
+8: 
+9: class SocialProviderService extends Model
+10: {
+11:     protected $fillable = [
+12:         'social_provider_id',
+13:         'social_service_id',
+14:         'provider_service_id',
+15:         'provider_service_name',
+16:         'cost_price_per_1000',
+17:         'min_quantity',
+18:         'max_quantity',
+19:         'priority',
+20:         'is_active',
+21:         'provider_availability',
+22:         'provider_data',
+23:         'last_synced_at',
+24:     ];
+25: 
+26:     protected function casts(): array
+27:     {
+28:         return [
+29:             'cost_price_per_1000' =>
+30:                 'decimal:4',
+31: 
+32:             'is_active' =>
+33:                 'boolean',
+34: 
+35:             'provider_data' =>
+36:                 'array',
+37: 
+38:             'last_synced_at' =>
+39:                 'datetime',
+40:         ];
+41:     }
+42: 
+43:     public function provider(): BelongsTo
+44:     {
+45:         return $this->belongsTo(
+46:             SocialProvider::class,
+47:             'social_provider_id'
+48:         );
+49:     }
+50: 
+51:     public function service(): BelongsTo
+52:     {
+53:         return $this->belongsTo(
+54:             SocialService::class,
+55:             'social_service_id'
+56:         );
+57:     }
+58: 
+59:     public function orders(): HasMany
+60:     {
+61:         return $this->hasMany(
+62:             SocialOrder::class
+63:         );
+64:     }
+65: 
+66:     public function costPriceVnd(): float
+67:     {
+68:         $provider = $this->provider;
+69: 
+70:         if (!$provider) {
+
+===========================================================================
+noscam-backend/app/Http/Controllers/Api/SocialServiceController.php
+===========================================================================
+...
+1: <?php
+2: 
+3: namespace App\Http\Controllers\Api;
+4: 
+5: use App\Http\Controllers\Controller;
+6: use App\Models\SocialService;
+7: use Illuminate\Http\JsonResponse;
+8: use Illuminate\Http\Request;
+9: 
+10: class SocialServiceController extends Controller
+11: {
+12:     public function index(
+13:         Request $request
+14:     ): JsonResponse {
+15:         $query = SocialService::query()
+16:             ->where('is_active', true)
+17:             ->whereHas(
+18:                 'providerServices',
+19:                 function ($q) {
+20:                     $q->where(
+21:                         'is_active',
+22:                         true
+23:                     )->whereHas(
+24:                         'provider',
+25:                         fn ($provider) =>
+26:                             $provider->where(
+27:                                 'status',
+28:                                 'active'
+29:                             )
+30:                     );
+31:                 }
+32:             );
+33: 
+34:         if ($request->filled('platform')) {
+35:             $query->where(
+36:                 'platform',
+37:                 $request->string('platform')
+38:             );
+39:         }
+40: 
+41:         if ($request->filled('category')) {
+42:             $query->where(
+43:                 'category',
+44:                 $request->string('category')
+45:             );
+46:         }
+47: 
+48:         if ($request->filled('search')) {
+49:             $search = trim(
+50:                 (string) $request->input(
+51:                     'search'
+52:                 )
+53:             );
+54: 
+55:             $query->where(
+56:                 function ($q) use ($search) {
+...
+70:                 }
+71:             );
+72:         }
+73: 
+74:         $services = $query
+75:             ->orderBy('platform')
+76:             ->orderBy('sort_order')
+77:             ->orderBy('name')
+78:             ->get([
+79:                 'id',
+80:                 'code',
+81:                 'platform',
+82:                 'category',
+83:                 'name',
+84:                 'description',
+85:                 'min_quantity',
+86:                 'max_quantity',
+87:                 'sell_price_per_1000',
+88:             ]);
+89: 
+90:         return response()->json([
+91:             'data' => $services,
+92:         ]);
+93:     }
+94: 
+95:     public function show(
+96:         SocialService $service
+97:     ): JsonResponse {
+98:         if (!$service->is_active) {
+99:             abort(404);
+100:         }
+101: 
+102:         return response()->json([
+103:             'data' => [
+104:                 'id' =>
+105:                     $service->id,
+106:                 'code' =>
+107:                     $service->code,
+108:                 'platform' =>
+109:                     $service->platform,
+110:                 'category' =>
+111:                     $service->category,
+112:                 'name' =>
+113:                     $service->name,
+114:                 'description' =>
+115:                     $service->description,
+116:                 'min_quantity' =>
+117:                     $service->min_quantity,
+118:                 'max_quantity' =>
+119:                     $service->max_quantity,
+120:                 'sell_price_per_1000' =>
+121:                     $service
+122:                         ->sell_price_per_1000,
+123:             ],
+124:         ]);
+125:     }
+126: }
+
+===========================================================================
+FRONTEND - MIN/MAX
+===========================================================================
+
+FILE: noscam-frontend/src/pages/SocialServicesPage.jsx
+...
+535:     setError('')
+536: 
+537:     const service =
+538:       services.find(
+539:         (item) =>
+540:           String(item.id) ===
+541:           String(value),
+542:       )
+543: 
+544:     setQuantity(
+545:       service
+546:         ? String(
+547:             service.min_quantity ||
+548:               1,
+549:           )
+550:         : '',
+551:     )
+552:   }
+553: 
+554:   function prepareOrder(event) {
+555:     event.preventDefault()
+556:     setError('')
+557: 
+558:     if (!isLoggedIn) {
+559:       navigate('/login')
+560:       return
+561:     }
+562: 
+563:     if (!selected) {
+564:       setError(
+565:         'Vui lòng chọn dịch vụ.',
+566:       )
+567:       return
+568:     }
+...
+573:       )
+574:       return
+575:     }
+576: 
+577:     if (requiresComments && commentLines.length === 0) {
+578:       setError('Vui lòng nhập nội dung bình luận.')
+579:       return
+580:     }
+581: 
+582:     if (
+583:       numericQuantity <
+584:         Number(
+585:           selected.min_quantity,
+586:         ) ||
+587:       numericQuantity >
+588:         Number(
+589:           selected.max_quantity,
+590:         )
+591:     ) {
+592:       setError(
+593:         `Số lượng phải từ ${Number(
+594:           selected.min_quantity,
+595:         ).toLocaleString(
+596:           'vi-VN',
+597:         )} đến ${Number(
+598:           selected.max_quantity,
+599:         ).toLocaleString(
+600:           'vi-VN',
+601:         )}.`,
+602:       )
+603:       return
+604:     }
+605: 
+606:     if (balance === null) {
+607:       setError(
+608:         'Không kiểm tra được số dư.',
+609:       )
+610:       return
+611:     }
+612: 
+613:     if (insufficient) {
+614:       return
+615:     }
+616: 
+617:     if (requiresComments) {
+618:       setError(
+619:         'Chức năng đặt Comment đang chờ kết nối Backend.'
+...
+1136:                             />
+1137:                           </span>
+1138: 
+1139:                           <div className="min-w-0 flex-1">
+1140:                             <div className="line-clamp-2 font-black leading-5 text-slate-950">
+1141:                               {selected.name}
+1142:                             </div>
+1143: 
+1144:                             <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-semibold text-slate-400">
+1145:                               <span>
+1146:                                 Min:{' '}
+1147:                                 {Number(
+1148:                                   selected.min_quantity,
+1149:                                 ).toLocaleString(
+1150:                                   'vi-VN',
+1151:                                 )}
+1152:                               </span>
+1153: 
+1154:                               <span>
+1155:                                 Max:{' '}
+1156:                                 {Number(
+1157:                                   selected.max_quantity,
+1158:                                 ).toLocaleString(
+1159:                                   'vi-VN',
+1160:                                 )}
+1161:                               </span>
+1162:                             </div>
+1163:                           </div>
+1164:                         </div>
+1165: 
+1166:                         <div className="shrink-0 text-right">
+1167:                           <div className="font-black text-blue-600">
+1168:                             {Number(selected.sell_price_per_1000) > 0
+1169:                               ? moneyUnit(Number(selected.sell_price_per_1000) / 1000)
+1170:                               : 'Liên hệ Admin'}
+1171:                           </div>
+1172: 
+1173:                           <div className="text-[11px] font-bold text-slate-400">
+1174:                             / lượt
+1175:                           </div>
+1176:                         </div>
+1177:                       </>
+1178:                     ) : (
+...
+1327:                                             : 'text-slate-900'
+1328:                                         }`}
+1329:                                       >
+1330:                                         {
+1331:                                           item.name
+1332:                                         }
+1333:                                       </div>
+1334: 
+1335:                                       <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] font-semibold text-slate-400">
+1336:                                         <span className="rounded-md bg-slate-100 px-2 py-1">
+1337:                                           Min{' '}
+1338:                                           {Number(
+1339:                                             item.min_quantity,
+1340:                                           ).toLocaleString(
+1341:                                             'vi-VN',
+1342:                                           )}
+1343:                                         </span>
+1344: 
+1345:                                         <span className="rounded-md bg-slate-100 px-2 py-1">
+1346:                                           Max{' '}
+1347:                                           {Number(
+1348:                                             item.max_quantity,
+1349:                                           ).toLocaleString(
+1350:                                             'vi-VN',
+1351:                                           )}
+1352:                                         </span>
+1353:                                       </div>
+1354:                                     </div>
+1355: 
+1356:                                     <div className="ml-3 shrink-0 text-right">
+1357:                                       <div
+1358:                                         className={`text-sm font-black ${
+1359:                                           active
+1360:                                             ? colors.text
+1361:                                             : 'text-blue-600'
+1362:                                         }`}
+1363:                                       >
+1364:                                         {Number(item.sell_price_per_1000) > 0
+1365:                                           ? moneyUnit(Number(item.sell_price_per_1000) / 1000)
+1366:                                           : 'Liên hệ Admin'}
+1367:                                       </div>
+1368: 
+1369:                                       <div className="text-[10px] font-bold text-slate-400">
+...
+1441:                       </div>
+1442:                     )}
+1443: 
+1444:                     <div>
+1445:                       <label className="mb-2 block text-sm font-black text-slate-700">
+1446:                         5. Số lượng
+1447:                       </label>
+1448: 
+1449:                       <input
+1450:                         required
+1451:                         type="number"
+1452:                         min={
+1453:                           selected.min_quantity
+1454:                         }
+1455:                         max={
+1456:                           selected.max_quantity
+1457:                         }
+1458:                         value={
+1459:                             requiresComments
+1460:                               ? numericQuantity
+1461:                               : quantity
+1462:                           }
+1463:                           readOnly={requiresComments}
+1464:                         onChange={(e) =>
+1465:                           setQuantity(
+1466:                             e.target.value,
+1467:                           )
+1468:                         }
+1469:                         className="w-full rounded-2xl border border-slate-200 px-4 py-4 text-lg font-black outline-none transition focus:border-blue-500"
+1470:                       />
+1471: 
+1472:                       <div className="mt-2 flex justify-between text-xs font-semibold text-slate-400">
+1473:                         <span>
+1474:                           Min:{' '}
+1475:                           {Number(
+1476:                             selected.min_quantity,
+1477:                           ).toLocaleString(
+1478:                             'vi-VN',
+1479:                           )}
+1480:                         </span>
+1481: 
+1482:                         <span>
+1483:                           Max:{' '}
+1484:                           {Number(
+1485:                             selected.max_quantity,
+1486:                           ).toLocaleString(
+1487:                             'vi-VN',
+1488:                           )}
+1489:                         </span>
+1490:                       </div>
+1491:                     </div>
+1492: 
+1493:                     <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+1494:                       <div className="flex items-center justify-between gap-4">
+1495:                         <span className="font-bold text-slate-500">
+1496:                           Đơn giá / 1 lượt
+1497:                         </span>
+
+FILE: noscam-frontend/src/pages/Exchange/ExchangeCreateCampaign.jsx
+...
+180:   const [error, setError] = useState('')
+181:   const [success, setSuccess] = useState('')
+182:   const [pending, setPending] = useState(readPending)
+183:   const lock = useRef(false)
+184: 
+185:   const price = prices.find(
+186:     (item) =>
+187:       item.platform === platform &&
+188:       item.task_type === taskType,
+189:   )
+190: 
+191:   const normalizedUrl = normalizeTarget(targetUrl, platform, taskType)
+192:   const minimum = Number(price?.min_quantity ?? 10)
+193:   const count = Number(quantity)
+194:   const validCount =
+195:     quantity.trim() !== '' &&
+196:     Number.isSafeInteger(count) &&
+197:     Number.isSafeInteger(minimum) &&
+198:     minimum >= 1 &&
+199:     minimum <= 100000 &&
+200:     count >= minimum &&
+201:     count <= 100000
+202: 
+203:   const cost = Number(price?.cost_per_task || 0)
+204:   const total = validCount ? cost * count : 0
+205: 
+206:   const validTotal =
+207:     Number.isSafeInteger(total) &&
+208:     total > 0 &&
+209:     total <= 99999999999999
+210: 
+211:   const valid =
+212:     Boolean(price) &&
+213:     validCount &&
+...
+248:         ])
+249: 
+250:         const latest = (latestPrices?.data || []).find(
+251:           (item) =>
+252:             item.platform === platform &&
+253:             item.task_type === taskType,
+254:         )
+255: 
+256:         if (!latest) {
+257:           throw new Error('Loại nhiệm vụ hiện đã ngừng hoạt động.')
+258:         }
+259: 
+260:         const latestMinimum = Number(latest.min_quantity ?? 10)
+261: 
+262:         if (
+263:           !Number.isSafeInteger(latestMinimum) ||
+264:           latestMinimum < 1 ||
+265:           latestMinimum > 100000 ||
+266:           count < latestMinimum
+267:         ) {
+268:           throw new Error(
+269:             `Số lượng tối thiểu hiện tại là ${latestMinimum} lượt.`
+270:           )
+271:         }
+272: 
+273:         const latestCost = Number(latest.cost_per_task)
+274:         const latestTotal = latestCost * count
+275:         const latestBalance = Number(walletResponse?.data?.balance)
+276: 
+277:         if (
+278:           !Number.isSafeInteger(latestTotal) ||
+279:           latestTotal <= 0 ||
+280:           latestTotal > 99999999999999
+281:         ) {
+
+FILE: noscam-frontend/src/pages/Admin/AdminSocialServicesPage.jsx
+...
+365: 
+366:     if (
+367:       price.trim() === '' ||
+368:       !Number.isFinite(sell1) ||
+369:       sell1 <= cost1
+370:     ) {
+371:       setError(
+372:         `Giá bán phải cao hơn giá vốn ${format(cost1)}đ/lượt.`
+373:       )
+374:       return
+375:     }
+376: 
+377:     const min = Number(item.min_quantity || 1)
+378:     const max = Number(item.max_quantity || 1000000)
+379: 
+380:     if (
+381:       !Number.isInteger(min) ||
+382:       !Number.isInteger(max) ||
+383:       max < min
+384:     ) {
+385:       setError('Số lượng Min/Max không hợp lệ.')
+386:       return
+387:     }
+388: 
+389:     setBusy(true)
+390: 
+391:     try {
+392:       await adminService.mapSocialProviderService(item.id, {
+393:         platform,
+394:         category,
+395:         name: name.trim(),
+396:         description: description.trim() || null,
+397:         sell_price_per_1000: Number((sell1 * 1000).toFixed(4)),
+398:         min_quantity: min,
+399:         max_quantity: max,
+400:         priority: Number(item.priority ?? 100),
+401:         is_active: true,
+402:       })
+403: 
+404:       await onDone()
+405:       onClose()
+406:     } catch (err) {
+407:       setError(
+408:         err?.data?.message ||
+409:         err?.message ||
+410:         'Không thể đưa dịch vụ lên bán.'
+411:       )
+412:     } finally {
+413:       setBusy(false)
+414:     }
+415:   }
+416: 
+417:   const fieldClass =
+418:     'w-full rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-blue-400'
+419: 
+420:   return (
+...
+519:               Giá vốn / 1 lượt
+520:             </div>
+521:             <div className="mt-1 text-xl font-black text-blue-800">
+522:               {format(cost1)}đ
+523:             </div>
+524:           </div>
+525: 
+526:           <div className="rounded-xl bg-slate-50 p-4">
+527:             <div className="text-xs font-bold text-slate-500">
+528:               Min / Max từ API
+529:             </div>
+530:             <div className="mt-1 font-bold">
+531:               {format(item.min_quantity || 1)}
+532:               {' – '}
+533:               {format(item.max_quantity || 1000000)}
+534:             </div>
+535:           </div>
+536:         </div>
+537: 
+538:         <label className="mt-5 grid gap-2">
+539:           <span className="text-sm font-bold">
+540:             Giá bán / 1 lượt (VND)
+541:           </span>
+542:           <input
+543:             type="number"
+544:             min="0"
+545:             step="any"
+546:             value={price}
+547:             onChange={(e) => setPrice(e.target.value)}
+548:             placeholder="Ví dụ: 0.5 hoặc 2"
+549:             className={fieldClass}
+550:           />
+551:         </label>
+552: 
+553:         {price !== '' && Number.isFinite(sell1) && (
+554:           <div className={`mt-3 rounded-xl p-3 text-sm font-bold ${
+...
+606:   const cost1 = cost1000 / 1000
+607: 
+608:   const [name, setName] = useState(service.name || '')
+609:   const [platform, setPlatform] = useState(service.platform || 'other')
+610:   const [category, setCategory] = useState(service.category || 'other')
+611:   const [description, setDescription] = useState(service.description || '')
+612:   const [price, setPrice] = useState(
+613:     service.sell_price_per_1000 == null
+614:       ? ''
+615:       : String(Number(service.sell_price_per_1000) / 1000)
+616:   )
+617:   const [min, setMin] = useState(
+618:     String(service.min_quantity ?? item.min_quantity ?? 1)
+619:   )
+620:   const [max, setMax] = useState(
+621:     String(service.max_quantity ?? item.max_quantity ?? 1000000)
+622:   )
+623:   const [active, setActive] = useState(Boolean(service.is_active))
+624:   const [busy, setBusy] = useState(false)
+625:   const [error, setError] = useState('')
+626: 
+627:   const field =
+628:     'w-full rounded-xl border border-slate-200 px-4 py-3 ' +
+629:     'outline-none focus:border-blue-500 bg-white'
+630: 
+631:   const price1 = Number(price)
+632:   const providerMin = Number(item.min_quantity ?? 1)
+633:   const providerMax = Number(item.max_quantity ?? 1000000)
+634: 
+635:   async function save() {
+636:     setError('')
+637: 
+638:     if (!service.id || !service.code) {
+639:       setError('Thiếu ID hoặc mã dịch vụ. Không thể lưu.')
+640:       return
+641:     }
+642: 
+643:     if (!name.trim() || !category.trim()) {
+644:       setError('Vui lòng nhập tên và loại dịch vụ.')
+645:       return
+646:     }
+647: 
+648:     if (
+649:       price.trim() === '' ||
+650:       !Number.isFinite(price1) ||
+651:       price1 <= cost1
+652:     ) {
+653:       setError(
+654:         'Giá bán / 1 phải lớn hơn giá vốn ' +
+...
+677:       )
+678:       return
+679:     }
+680: 
+681:     setBusy(true)
+682:     try {
+683:       await adminService.updateSocialService(service.id, {
+684:         code: service.code,
+685:         platform,
+686:         category: category.trim(),
+687:         name: name.trim(),
+688:         description: description.trim() || null,
+689:         min_quantity: minNumber,
+690:         max_quantity: maxNumber,
+691:         sell_price_per_1000: Number((price1 * 1000).toFixed(4)),
+692:         is_active: active,
+693:         sort_order: Number(service.sort_order ?? 0)
+694:       })
+695:       await onDone()
+696:       onClose()
+697:     } catch (err) {
+698:       setError(
+699:         err?.data?.message ||
+700:         err?.message ||
+701:         'Không thể cập nhật dịch vụ.'
+702:       )
+703:     } finally {
+704:       setBusy(false)
+705:     }
+706:   }
+707: 
+708:   return (
+709:     <motion.div
+710:       className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4"
+711:       initial={{ opacity: 0 }}
+
+FILE: noscam-frontend/src/pages/Admin/AdminExchangePage.jsx
+...
+22:   new Intl.NumberFormat('vi-VN', {
+23:     maximumFractionDigits: 0,
+24:   }).format(Number(value || 0))
+25: 
+26: function PriceCard({ platform, task, saved, onSaved, onDirtyChange }) {
+27:   const { confirm, notify } = useNoScamUI()
+28:   const [cost, setCost] = useState(
+29:     String(saved?.cost_per_task ?? 2000),
+30:   )
+31:   const [reward, setReward] = useState(
+32:     String(saved?.reward_per_task ?? 1000),
+33:   )
+34:   const [minQuantity, setMinQuantity] = useState(
+35:     String(saved?.min_quantity ?? 10),
+36:   )
+37:   const [enabled, setEnabled] = useState(
+38:     saved?.is_enabled ?? false,
+39:   )
+40:   const [confirmed, setConfirmed] = useState({
+41:     cost: String(saved?.cost_per_task ?? 2000),
+42:     reward: String(saved?.reward_per_task ?? 1000),
+43:     enabled: saved?.is_enabled ?? false,
+44:     minQuantity: String(saved?.min_quantity ?? 10),
+45:   })
+46:   const [busy, setBusy] = useState(false)
+47:   const [error, setError] = useState('')
+48:   const [success, setSuccess] = useState('')
+49:   const locked = useRef(false)
+50: 
+51:   const dirty =
+52:     cost !== confirmed.cost ||
+53:     reward !== confirmed.reward ||
+54:     minQuantity !== confirmed.minQuantity ||
+55:     enabled !== confirmed.enabled
+56: 
+57:   useEffect(() => {
+58:     onDirtyChange(platform.id, task.id, dirty)
+59:   }, [platform.id, task.id, dirty, onDirtyChange])
+60: 
+61:   const costNumber = Number(cost)
+62:   const rewardNumber = Number(reward)
+63:   const minQuantityNumber = Number(minQuantity)
+64: 
+65:   const valid =
+66:     /^\d+$/.test(cost) &&
+67:     /^\d+$/.test(reward) &&
+68:     Number.isSafeInteger(costNumber) &&
+69:     Number.isSafeInteger(rewardNumber) &&
+70:     costNumber >= 1 &&
+71:     costNumber <= 999999999 &&
+72:     rewardNumber >= 1 &&
+73:     rewardNumber <= costNumber &&
+74:     /^\d+$/.test(minQuantity) &&
+75:     Number.isSafeInteger(minQuantityNumber) &&
+76:     minQuantityNumber >= 1 &&
+77:     minQuantityNumber <= 100000
+78: 
+79:   const fee = valid ? costNumber - rewardNumber : null
+80: 
+81:   async function save() {
+82:     if (locked.current || busy) return
+83: 
+84:     setError('')
+85:     setSuccess('')
+86: 
+87:     if (!valid) {
+88:       setError('Giá và thưởng phải là số nguyên dương; thưởng không vượt quá giá.')
+89:       return
+90:     }
+91: 
+92:     if (!(await confirm(
+93:       `Lưu giá ${platform.name} - ${task.name}?\\n` +
+94:       `Giá: ${formatCoins(costNumber)} xu\\n` +
+95:       `Thưởng: ${formatCoins(rewardNumber)} xu\\n` +
+96:       `Phí: ${formatCoins(fee)} xu\\n` +
+97:       `Trạng thái: ${enabled ? 'Bật' : 'Tắt'}`
+98:     ))) return
+99: 
+100:     locked.current = true
+101:     setBusy(true)
+102: 
+103:     try {
+104:       const response = await adminExchangeService.updatePrice({
+105:         platform: platform.id,
+106:         task_type: task.id,
+107:         cost_per_task: costNumber,
+108:         reward_per_task: rewardNumber,
+109:         min_quantity: minQuantityNumber,
+110:         is_enabled: enabled,
+111:       })
+112: 
+113:       const serverPrice = response?.data
+114: 
+115:       if (
+116:         serverPrice?.platform !== platform.id ||
+117:         serverPrice?.task_type !== task.id ||
+118:         Number(serverPrice?.cost_per_task) !== costNumber ||
+119:         Number(serverPrice?.reward_per_task) !== rewardNumber ||
+120:         Number(serverPrice?.min_quantity) !== minQuantityNumber ||
+121:         Boolean(serverPrice?.is_enabled) !== enabled
+122:       ) {
+123:         throw new Error(
+124:           'Máy chủ chưa xác nhận đầy đủ giá vừa lưu. Vui lòng tải lại để kiểm tra.'
+125:         )
+126:       }
+127: 
+128:       setConfirmed({
+129:         cost: String(serverPrice.cost_per_task),
+130:         reward: String(serverPrice.reward_per_task),
+131:         minQuantity: String(serverPrice.min_quantity),
+132:         enabled: Boolean(serverPrice.is_enabled),
+133:       })
+134: 
+135:       const updated = await onSaved({
+136:         platform: platform.id,
+137:         task_type: task.id,
+138:         cost_per_task: costNumber,
+139:         reward_per_task: rewardNumber,
+140:         min_quantity: minQuantityNumber,
+141:         is_enabled: enabled,
+142:       })
+143:       if (updated) {
+144:         setSuccess('Đã lưu giá thành công.')
+145:         notify('Đã lưu giá thành công.', 'success')
+146:       }
+147:     } catch (err) {
+148:       setError(err?.message || 'Không thể xác nhận cập nhật.')
+149:       notify(err?.message || 'Không thể xác nhận cập nhật.', 'error')
+150:     } finally {
+151:       locked.current = false
+152:       setBusy(false)
+
+FILE: noscam-frontend/src/services/adminExchangeService.js
+...
+20:   const taskTypes = ['follow', 'like', 'comment']
+21: 
+22:   if (!platforms.includes(data.platform)) {
+23:     throw new Error('Nền tảng không hợp lệ.')
+24:   }
+25: 
+26:   if (!taskTypes.includes(data.task_type)) {
+27:     throw new Error('Loại nhiệm vụ không hợp lệ.')
+28:   }
+29: 
+30:   const cost = Number(data.cost_per_task)
+31:   const reward = Number(data.reward_per_task)
+32:   const minQuantity = Number(data.min_quantity)
+33: 
+34:   if (
+35:     !Number.isSafeInteger(cost) ||
+36:     !Number.isSafeInteger(reward) ||
+37:     cost < 1 ||
+38:     reward < 1 ||
+39:     cost > 999999999 ||
+40:     reward > cost
+41:   ) {
+42:     throw new Error(
+43:       'Giá và thưởng phải là số nguyên dương; thưởng không vượt quá giá.',
+44:     )
+45:   }
+46: 
+47:   if (
+48:     !Number.isSafeInteger(minQuantity) ||
+49:     minQuantity < 1 ||
+50:     minQuantity > 100000
+51:   ) {
+52:     throw new Error(
+53:       'Số lượng tối thiểu phải từ 1 đến 100.000 lượt.',
+54:     )
+55:   }
+56: 
+57:   if (typeof data.is_enabled !== 'boolean') {
+58:     throw new Error('Trạng thái nhiệm vụ không hợp lệ.')
+59:   }
+60: 
+61:   return {
+62:     platform: data.platform,
+63:     task_type: data.task_type,
+64:     cost_per_task: cost,
+65:     reward_per_task: reward,
+66:     min_quantity: minQuantity,
+67:     is_enabled: data.is_enabled,
+68:   }
+69: }
+70: 
+71: export const adminExchangeService = {
+72:   async campaigns({ status = '', platform = '', page = 1 } = {}) {
+73:     const params = new URLSearchParams()
+74: 
+75:     if (status) params.set('status', status)
+76:     if (platform) params.set('platform', platform)
+77:     params.set('page', String(page))
+78:     params.set('per_page', '15')
+79: 
+80:     return apiClient.get(
+81:       `/admin/exchange/campaigns?${params.toString()}`,
+82:       authOptions(),
+83:     )
+84:   },
+85: 
+86:   async campaignClaims(campaignId) {
+87:     const id = Number(campaignId)

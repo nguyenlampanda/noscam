@@ -54,9 +54,8 @@ class VietnamFbProvider implements SocialProviderInterface
         $response = Http::asForm()
             ->acceptJson()
             ->timeout(30)
-            ->retry(2, 500)
             ->post(
-                $this->endpoint().'?'.http_build_query([
+                rtrim($this->apiUrl, '/').'?'.http_build_query([
                     'mc' => $mc,
                     'site' => $site,
                     'api_key' => $this->apiKey,
@@ -188,18 +187,24 @@ class VietnamFbProvider implements SocialProviderInterface
                             : 0,
 
                     'min' =>
-                        is_numeric(
-                            $channel['min'] ?? null
-                        )
+                        is_numeric($channel['min'] ?? null)
+                        && (int) $channel['min'] > 0
                             ? (int) $channel['min']
                             : 1,
 
                     'max' =>
-                        is_numeric(
-                            $channel['max'] ?? null
-                        )
+                        is_numeric($channel['max'] ?? null)
+                        && (int) $channel['max'] > 0
                             ? (int) $channel['max']
                             : 1000000,
+
+                    'min_verified' =>
+                        is_numeric($channel['min'] ?? null)
+                        && (int) $channel['min'] > 0,
+
+                    'max_verified' =>
+                        is_numeric($channel['max'] ?? null)
+                        && (int) $channel['max'] > 0,
 
                     'group' => $groupName,
 
@@ -277,13 +282,76 @@ class VietnamFbProvider implements SocialProviderInterface
         int $quantity,
         array $options = []
     ): array {
+        $parts = explode(':', $serviceId, 2);
+
+        if (count($parts) !== 2) {
+            throw new RuntimeException(
+                'VietnamFB service ID không hợp lệ: '.$serviceId
+            );
+        }
+
+        [$group, $channel] = $parts;
+
+        $group = strtoupper(trim($group));
+        $channel = trim($channel);
+
+        if ($channel === '' || !ctype_digit($channel)) {
+            throw new RuntimeException(
+                'VietnamFB channel_number không hợp lệ.'
+            );
+        }
+
+        $routes = [
+            'BUFF_LIKE' => 'buff',
+            'BUFF_COMMENT' => 'buff_comment',
+            'BUFF_LIVE' => 'buff_live',
+            'TIKTOK_VIEW' => 'tiktok_view',
+            'TIKTOK_SUB' => 'tiktok_sub',
+        ];
+
+        if (!isset($routes[$group])) {
+            throw new RuntimeException(
+                'VietnamFB chưa hỗ trợ tạo đơn nhóm: '.$group
+            );
+        }
+
+        $payload = [
+            'amount' => $quantity,
+            'channel_number' => $channel,
+        ];
+
+        if (str_starts_with($group, 'TIKTOK_')) {
+            $payload['link'] = $target;
+        } else {
+            $payload['id'] = $target;
+        }
+
+        if ($group === 'BUFF_LIKE') {
+            $payload['reaction'] = $options['reaction'] ?? 'LIKE';
+        }
+
+        if ($group === 'BUFF_COMMENT') {
+            throw new RuntimeException(
+                'BUFF_COMMENT cần nội dung bình luận riêng.'
+            );
+        }
+
+        if ($group === 'BUFF_LIVE') {
+            throw new RuntimeException(
+                'BUFF_LIVE cần tham số mins.'
+            );
+        }
+
+        if ($group === 'TIKTOK_SUB') {
+            throw new RuntimeException(
+                'TIKTOK_SUB cần package_type.'
+            );
+        }
+
         return $this->post(
-            $options['mc'] ?? 'buff',
+            $routes[$group],
             'create',
-            array_merge([
-                'id' => $target,
-                'amount' => $quantity,
-            ], $options['payload'] ?? [])
+            array_merge($payload, $options['payload'] ?? [])
         );
     }
 

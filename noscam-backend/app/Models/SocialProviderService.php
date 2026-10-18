@@ -18,6 +18,7 @@ class SocialProviderService extends Model
         'max_quantity',
         'priority',
         'is_active',
+        'provider_availability',
         'provider_data',
         'last_synced_at',
     ];

@@ -16,6 +16,8 @@ const labels = {
   bank_account:
     'Tài khoản ngân hàng',
   facebook: 'Facebook',
+  instagram: 'Instagram',
+  tiktok: 'TikTok',
   zalo: 'Zalo',
   telegram: 'Telegram',
   other: 'Thông tin khác',
@@ -25,6 +27,152 @@ function money(value) {
   return `${Number(
     value || 0,
   ).toLocaleString('vi-VN')}đ`
+}
+
+
+const platformInfo = {
+  facebook: { name: 'Facebook', icon: 'f', color: 'bg-blue-600' },
+  instagram: { name: 'Instagram', icon: '◎', color: 'bg-pink-600' },
+  tiktok: { name: 'TikTok', icon: '♪', color: 'bg-slate-950' },
+  telegram: { name: 'Telegram', icon: '➤', color: 'bg-sky-500' },
+  zalo: { name: 'Zalo', icon: 'Z', color: 'bg-blue-500' },
+  phone: { name: 'Số điện thoại', icon: '☎', color: 'bg-emerald-600' },
+  bank_account: { name: 'Tài khoản ngân hàng', icon: '▣', color: 'bg-slate-600' },
+  other: { name: 'Thông tin khác', icon: '↗', color: 'bg-slate-500' },
+}
+
+function safeExternalUrl(value, type) {
+  const raw = String(value || '').trim()
+  if (!raw) return null
+
+  if (type === 'phone') {
+    const number = raw.replace(/[^\d+]/g, '')
+    return /^\+?\d{9,15}$/.test(number) ? `tel:${number}` : null
+  }
+
+  if (type === 'zalo' && /^\+?[\d\s().-]{9,20}$/.test(raw)) {
+    const number = raw.replace(/\D/g, '')
+    return number.length >= 9 && number.length <= 15
+      ? `https://zalo.me/${number}`
+      : null
+  }
+
+  let candidate = raw
+
+  if (!/^[a-z][a-z0-9+.-]*:/i.test(candidate)) {
+    if (/^(www\.|[a-z0-9-]+\.[a-z]{2,})/i.test(candidate)) {
+      candidate = `https://${candidate}`
+    } else {
+      return null
+    }
+  }
+
+  try {
+    const url = new URL(candidate)
+    return ['https:', 'http:'].includes(url.protocol)
+      ? url.href
+      : null
+  } catch {
+    return null
+  }
+}
+
+function isImageUrl(url) {
+  if (!url || url.startsWith('tel:')) return false
+  try {
+    return /\.(png|jpe?g|webp|gif|avif)$/i.test(
+      new URL(url).pathname
+    )
+  } catch {
+    return false
+  }
+}
+
+function MediatorIdentifier({ item }) {
+  const type = String(item.type || 'other').toLowerCase()
+  const platform = platformInfo[type] || platformInfo.other
+  const value = String(item.value || '').trim()
+  const href = safeExternalUrl(value, type)
+  const image = isImageUrl(href)
+  const isPhone = type === 'phone'
+  const isZalo = type === 'zalo'
+
+  return (
+    <div className="group min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 transition-all duration-200 hover:border-blue-200 hover:shadow-md sm:p-5">
+      <div className="flex items-start gap-3">
+        <span
+          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-lg font-black text-white ${platform.color}`}
+          aria-hidden="true"
+        >
+          {platform.icon}
+        </span>
+
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-bold uppercase tracking-wide text-slate-400">
+            {labels[type] || platform.name}
+          </p>
+
+          {href ? (
+            <a
+              href={href}
+              target={isPhone ? undefined : '_blank'}
+              rel={isPhone ? undefined : 'noopener noreferrer'}
+              className="mt-2 block break-all text-sm font-bold leading-6 text-blue-600 underline decoration-blue-200 underline-offset-4 transition hover:text-blue-800 hover:decoration-blue-600"
+              title={value}
+            >
+              {value}
+            </a>
+          ) : (
+            <p className="mt-2 break-all text-sm font-bold leading-6 text-slate-900">
+              {value || 'Chưa cập nhật'}
+            </p>
+          )}
+
+          {(item.bank_name || item.label) && (
+            <p className="mt-2 text-xs leading-5 text-slate-500">
+              {item.bank_name || item.label}
+            </p>
+          )}
+        </div>
+      </div>
+
+      {image && (
+        <a
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-4 block overflow-hidden rounded-xl border border-slate-100 bg-slate-50"
+        >
+          <img
+            src={href}
+            alt={`Hình ảnh ${platform.name}`}
+            loading="lazy"
+            className="max-h-64 w-full object-contain transition duration-200 group-hover:scale-[1.01]"
+          />
+        </a>
+      )}
+
+      {href && (
+        <div className="mt-4 flex justify-end">
+          <a
+            href={href}
+            target={isPhone ? undefined : '_blank'}
+            rel={isPhone ? undefined : 'noopener noreferrer'}
+            className="inline-flex items-center gap-2 rounded-xl bg-blue-50 px-4 py-2 text-xs font-bold text-blue-700 transition hover:bg-blue-600 hover:text-white"
+          >
+            {isPhone
+              ? 'Gọi điện'
+              : isZalo
+                ? 'Mở Zalo'
+                : image
+                  ? 'Xem hình ảnh'
+                  : 'Truy cập liên kết'}
+            <span aria-hidden="true">↗</span>
+          </a>
+        </div>
+      )}
+    </div>
+  )
 }
 
 function MediatorDetailPage() {
@@ -159,33 +307,12 @@ function MediatorDetailPage() {
                 </h2>
 
                 <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                  {data.identifiers?.map(
-                    (item) => (
-                      <div
-                        key={item.id}
-                        className="rounded-2xl border border-slate-200 p-4"
-                      >
-                        <p className="text-xs font-bold text-slate-400">
-                          {labels[
-                            item.type
-                          ] ||
-                            item.type}
-                        </p>
-
-                        <p className="mt-2 break-all font-black text-slate-900">
-                          {item.value}
-                        </p>
-
-                        {(item.bank_name ||
-                          item.label) && (
-                          <p className="mt-1 text-xs text-slate-500">
-                            {item.bank_name ||
-                              item.label}
-                          </p>
-                        )}
-                      </div>
-                    ),
-                  )}
+                  {data.identifiers?.map(item => (
+                    <MediatorIdentifier
+                      key={item.id}
+                      item={item}
+                    />
+                  ))}
                 </div>
               </div>
 

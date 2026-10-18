@@ -115,6 +115,22 @@ class AdminSocialServiceController extends Controller
             );
         }
 
+        if ($request->filled('provider_availability')) {
+            $availability = $request->input('provider_availability');
+
+            if (!in_array(
+                $availability,
+                ['available', 'unavailable', 'unknown'],
+                true
+            )) {
+                return response()->json([
+                    'message' => 'Trạng thái nguồn không hợp lệ.',
+                ], 422);
+            }
+
+            $query->where('provider_availability', $availability);
+        }
+
         if ($request->filled('search')) {
             $search = trim(
                 (string) $request->input('search')
@@ -377,6 +393,46 @@ class AdminSocialServiceController extends Controller
             }
         }
 
+        /*
+         * New VietnamFB mappings without published limits must
+         * receive explicit quantity limits from the administrator.
+         */
+        if (empty($data['social_service_id'])) {
+            $providerService->loadMissing('provider');
+
+            $isVietnamFb =
+                strtolower((string) ($providerService->provider?->driver ?? ''))
+                === 'vietnamfb';
+
+            if ($isVietnamFb) {
+                $source = $providerService->provider_data ?? [];
+                $source = is_array($source) ? $source : [];
+                $raw = $source['provider_data'] ?? [];
+                $raw = is_array($raw) ? $raw : [];
+
+                $hasMin = (
+                    is_numeric($raw['min'] ?? null)
+                    && (int) $raw['min'] > 0
+                ) || (($source['min_verified'] ?? false) === true);
+
+                $hasMax = (
+                    is_numeric($raw['max'] ?? null)
+                    && (int) $raw['max'] > 0
+                ) || (($source['max_verified'] ?? false) === true);
+
+                if (
+                    (!$hasMin && empty($data['min_quantity']))
+                    || (!$hasMax && empty($data['max_quantity']))
+                ) {
+                    return response()->json([
+                        'message' =>
+                            'API VietnamFB chưa cung cấp đầy đủ Min/Max. '
+                            .'Admin cần nhập giới hạn trước khi đưa dịch vụ lên bán.',
+                    ], 422);
+                }
+            }
+        }
+
         $service = DB::transaction(
             function () use (
                 $data,
@@ -635,6 +691,9 @@ class AdminSocialServiceController extends Controller
 
             'is_active' =>
                 $item->is_active,
+
+            'provider_availability' =>
+                $item->provider_availability,
 
             'provider_data' =>
                 $item->provider_data,

@@ -1,0 +1,9 @@
+/* NoScam shared modal and processing polish — additive, no API interception */
+[role="dialog"][aria-modal="true"] { color: #0f172a; border: 1px solid rgba(148,163,184,.22); box-shadow: 0 24px 70px rgba(15,23,42,.22); }
+[role="dialog"][aria-modal="true"] :is(input,textarea,select,button):focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
+[role="dialog"][aria-modal="true"] :is(button,input,select,textarea):disabled { cursor: not-allowed; opacity: .55; }
+[role="dialog"][aria-modal="true"] [aria-busy="true"] { cursor: progress; }
+[role="dialog"][aria-modal="true"] [role="status"] { color: #2563eb; }
+[role="dialog"][aria-modal="true"] .animate-spin { animation-duration: .85s; }
+[role="dialog"][aria-modal="true"] :is(h1,h2,h3) { letter-spacing: -.015em; }
+@media (prefers-reduced-motion: reduce) { [role="dialog"][aria-modal="true"] .animate-spin, [role="dialog"][aria-modal="true"] .animate-pulse { animation-duration: .01ms !important; animation-iteration-count: 1 !important; } }

@@ -1,3 +1,4 @@
+import { useNoScamUI } from '../components/ui/NoScamUI'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import customerService from '../services/customerService'
@@ -24,6 +25,7 @@ function getLookupTimestamp() {
 }
 
 export default function GuestDigitalOrderLookupPage() {
+  const { confirm } = useNoScamUI()
   const [orderId, setOrderId] = useState('')
   const [lookupToken, setLookupToken] = useState('')
   const [loading, setLoading] = useState(false)
@@ -83,7 +85,7 @@ export default function GuestDigitalOrderLookupPage() {
       ? `Chấp nhận báo giá ${money(quote.amount_vnd)}?`
       : 'Bạn xác nhận từ chối báo giá này?'
 
-    if (!window.confirm(question)) return
+    if (!await confirm(question)) return
 
     const currentOrderId = result.data.id
     const currentToken = lookupToken.trim()

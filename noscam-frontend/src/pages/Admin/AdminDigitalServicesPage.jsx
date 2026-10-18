@@ -1,3 +1,4 @@
+import { useNoScamUI } from '../../components/ui/NoScamUI'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import AdminNav from '../../components/admin/AdminNav'
 import apiClient from '../../services/apiClient'
@@ -174,6 +175,7 @@ function Dropdown({ value, onChange, options, placeholder = 'Tất cả' }) {
 }
 
 export default function AdminDigitalServicesPage() {
+  const { confirm } = useNoScamUI()
   const [items, setItems] = useState([])
   const [form, setForm] = useState(emptyForm)
   const [editingId, setEditingId] = useState(null)
@@ -414,7 +416,7 @@ export default function AdminDigitalServicesPage() {
 
   async function toggle(item) {
     const next = !item.is_active
-    if (!window.confirm(
+    if (!await confirm(
       `${next ? 'Bật' : 'Tắt'} dịch vụ "${item.name}"?`
     )) return
 

@@ -1,3 +1,4 @@
+import NoScamSelect from '../../components/ui/NoScamSelect'
 import {
   useCallback,
   useEffect,
@@ -530,7 +531,7 @@ function AlertsPage() {
                   Sắp xếp
                 </label>
 
-                <select
+                <NoScamSelect
                   id="alerts-sort"
                   value={sort}
                   onChange={
@@ -554,7 +555,7 @@ function AlertsPage() {
                       </option>
                     ),
                   )}
-                </select>
+                </NoScamSelect>
               </div>
             </div>
           </motion.div>

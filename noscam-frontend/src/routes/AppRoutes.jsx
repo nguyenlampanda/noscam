@@ -8,6 +8,7 @@ import {
 } from 'react-router-dom'
 
 import ProtectedAdminRoute from '../components/admin/ProtectedAdminRoute'
+import { PageLoading } from '../components/ui/NoScamUI'
 import AppLayout from '../layouts/AppLayout'
 
 const CommunityPage = lazy(() =>
@@ -84,6 +85,10 @@ const AdminLoginPage = lazy(() =>
   ),
 )
 
+const AdminExchangePage = lazy(() =>
+  import('../pages/Admin/AdminExchangePage'),
+)
+
 const AdminSocialPage = lazy(() =>
   import(
     '../pages/Admin/AdminSocialPage'
@@ -110,21 +115,7 @@ const AdminReportDetailPage =
   )
 
 function RouteLoading() {
-  return (
-    <div className="flex min-h-[60vh] items-center justify-center bg-white px-4">
-      <div className="text-center">
-        <div className="relative mx-auto h-10 w-10">
-          <div className="absolute inset-0 rounded-full border-2 border-slate-200" />
-
-          <div className="absolute inset-0 animate-spin rounded-full border-2 border-transparent border-t-blue-600" />
-        </div>
-
-        <p className="mt-4 text-sm font-medium text-slate-500">
-          Đang tải NoScam...
-        </p>
-      </div>
-    </div>
-  )
+  return <PageLoading message="Đang tải NoScam.vn..." />
 }
 
 const AdminSocialOrdersPage = lazy(() =>
@@ -166,6 +157,10 @@ const MyDigitalOrdersPage = lazy(() =>
 
 const GuestDigitalOrderLookupPage = lazy(() =>
   import('../pages/GuestDigitalOrderLookupPage')
+)
+
+const ExchangePage = lazy(() =>
+  import('../pages/Exchange/ExchangePage')
 )
 
 const WalletPage = lazy(() =>
@@ -271,6 +266,11 @@ function AppRoutes() {
           />
 
           <Route
+            path="/exchange"
+            element={<ExchangePage />}
+          />
+
+          <Route
             path="/wallet"
             element={<WalletPage />}
           />
@@ -322,7 +322,25 @@ function AppRoutes() {
         />
 
         <Route
+          path="/admin/exchange"
+          element={
+            <ProtectedAdminRoute>
+              <AdminExchangePage />
+            </ProtectedAdminRoute>
+          }
+        />
+
+        <Route
           path="/admin/social"
+          element={
+            <ProtectedAdminRoute>
+              <AdminSocialPage />
+            </ProtectedAdminRoute>
+          }
+        />
+
+        <Route
+          path="/admin/social/providers"
           element={
             <ProtectedAdminRoute>
               <AdminSocialPage />

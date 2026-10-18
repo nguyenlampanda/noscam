@@ -1,0 +1,964 @@
+
+=================================================================
+noscam-backend/app/Console/Commands/ProcessSocialOrders.php
+=================================================================
+1: <?php
+2: 
+3: namespace App\Console\Commands;
+4: 
+5: use App\Models\SocialOrder;
+6: use App\Services\Social\SocialOrderProviderService;
+7: use Illuminate\Console\Command;
+8: use Throwable;
+9: 
+10: class ProcessSocialOrders extends Command
+11: {
+12:     protected $signature =
+13:         'social:process-orders
+14:         {--limit=50 : Số đơn tối đa mỗi lượt}';
+15: 
+16:     protected $description =
+17:         'Gửi đơn social và đồng bộ trạng thái provider';
+18: 
+19:     public function handle(
+20:         SocialOrderProviderService $providerService
+21:     ): int {
+22:         $limit = max(
+23:             1,
+24:             min(
+25:                 200,
+26:                 (int) $this->option('limit')
+27:             )
+28:         );
+29: 
+30:         /*
+31:          * SUBMIT
+32:          *
+33:          * Chỉ retry tối đa 3 lần.
+34:          * Chỉ provider đã xác nhận chuẩn SMM V2.
+35:          */
+36:         $pendingOrders =
+37:             SocialOrder::query()
+38:                 ->with([
+39:                     'provider',
+40:                     'providerService',
+41:                 ])
+42:                 ->where(
+43:                     'status',
+44:                     'pending'
+45:                 )
+46:                 ->whereNull(
+47:                     'provider_order_id'
+48:                 )
+49:                 ->where(
+50:                     'attempts',
+51:                     '=',
+52:                     0
+53:                 )
+54:                 ->whereHas(
+55:                     'provider',
+56:                     function ($query) {
+57:                         $query
+58:                             ->where(
+59:                                 'status',
+60:                                 'active'
+61:                             )
+62:                             ->whereIn(
+63:                                 'driver',
+64:                                 [
+65:                                     'nganhangsub',
+66:                                     'hacklike17',
+67:                                 ]
+68:                             );
+69:                     }
+70:                 )
+71:                 ->orderBy('id')
+72:                 ->limit($limit)
+73:                 ->get();
+74: 
+75:         foreach ($pendingOrders as $order) {
+76:             try {
+77:                 $result =
+78:                     $providerService->submit(
+79:                         $order
+80:                     );
+81: 
+82:                 $this->info(
+83:                     $result->code
+84:                     .' -> submitted'
+85:                     .' -> '
+86:                     .$result->provider_order_id
+87:                 );
+88:             } catch (Throwable $e) {
+89:                 $this->error(
+90:                     $order->code
+91:                     .' -> submit error: '
+92:                     .$e->getMessage()
+93:                 );
+94:             }
+95:         }
+96: 
+97:         /*
+98:          * SYNC
+99:          *
+100:          * Chỉ sync đơn đang chạy.
+101:          * Không đụng completed/partial/
+102:          * cancelled/failed.
+103:          */
+104:         $syncOrders =
+105:             SocialOrder::query()
+106:                 ->with([
+107:                     'provider',
+108:                     'providerService',
+109:                 ])
+110:                 ->whereNotNull(
+111:                     'provider_order_id'
+112:                 )
+113:                 ->whereIn(
+114:                     'status',
+115:                     [
+116:                         'processing',
+117:                         'in_progress',
+118:                     ]
+119:                 )
+120:                 ->where(
+121:                     function ($query) {
+122:                         $query
+123:                             ->whereNull(
+124:                                 'last_synced_at'
+125:                             )
+126:                             ->orWhere(
+127:                                 'last_synced_at',
+128:                                 '<=',
+129:                                 now()->subSeconds(45)
+130:                             );
+131:                     }
+132:                 )
+133:                 ->whereHas(
+134:                     'provider',
+135:                     function ($query) {
+136:                         $query
+137:                             ->where(
+138:                                 'status',
+139:                                 'active'
+140:                             )
+141:                             ->whereIn(
+142:                                 'driver',
+143:                                 [
+144:                                     'nganhangsub',
+145:                                     'hacklike17',
+146:                                 ]
+147:                             );
+148:                     }
+149:                 )
+150:                 ->orderByRaw(
+151:                     'COALESCE(last_synced_at, created_at) ASC'
+152:                 )
+153:                 ->limit($limit)
+154:                 ->get();
+155: 
+156:         foreach ($syncOrders as $order) {
+157:             try {
+158:                 $result =
+159:                     $providerService->sync(
+160:                         $order
+161:                     );
+162: 
+163:                 $this->line(
+164:                     $result->code
+165:                     .' -> '
+166:                     .$result->status
+167:                 );
+168:             } catch (Throwable $e) {
+169:                 $this->error(
+170:                     $order->code
+171:                     .' -> sync error: '
+172:                     .$e->getMessage()
+173:                 );
+174:             }
+175:         }
+176: 
+177:         return self::SUCCESS;
+178:     }
+179: }
+
+=================================================================
+noscam-backend/app/Services/Social/SocialOrderProviderService.php
+=================================================================
+1: <?php
+2: 
+3: namespace App\Services\Social;
+4: 
+5: use App\Models\SocialOrder;
+6: use Illuminate\Support\Facades\Cache;
+7: use Illuminate\Support\Facades\DB;
+8: use RuntimeException;
+9: use Throwable;
+10: 
+11: class SocialOrderProviderService
+12: {
+13:     public function __construct(
+14:         private SocialProviderManager $providers,
+15:         private SocialOrderService $orders
+16:     ) {
+17:     }
+18: 
+19:     public function submit(
+20:         SocialOrder $order
+21:     ): SocialOrder {
+22:         $lock = Cache::lock(
+23:             'social-order-operation-'.$order->id,
+24:             60
+25:         );
+26: 
+27:         if (!$lock->get()) {
+28:             throw new RuntimeException(
+29:                 'Đơn đang được tiến trình khác xử lý.'
+30:             );
+31:         }
+32: 
+33:         try {
+34:             /*
+35:              * Luôn đọc lại DB sau khi có lock.
+36:              */
+37:             $order = SocialOrder::query()
+38:                 ->with([
+39:                     'provider',
+40:                     'providerService',
+41:                 ])
+42:                 ->findOrFail(
+43:                     $order->id
+44:                 );
+45: 
+46:             if ($order->provider_order_id) {
+47:                 return $order;
+48:             }
+49: 
+50:             if ($order->status !== 'pending') {
+51:                 throw new RuntimeException(
+52:                     'Đơn không còn ở trạng thái chờ xử lý.'
+53:                 );
+54:             }
+55: 
+56:             if (!$order->provider) {
+57:                 throw new RuntimeException(
+58:                     'Đơn chưa có nhà cung cấp.'
+59:                 );
+60:             }
+61: 
+62:             if (!$order->providerService) {
+63:                 throw new RuntimeException(
+64:                     'Đơn chưa có dịch vụ API.'
+65:                 );
+66:             }
+67: 
+68:             if (
+69:                 (int) $order->attempts >= 1
+70:             ) {
+71:                 throw new RuntimeException(
+72:                     'Đơn đã vượt quá số lần thử gửi API.'
+73:                 );
+74:             }
+75: 
+76:             if (
+77:                 $order->provider->driver ===
+78:                 'vietnamfb'
+79:             ) {
+80:                 throw new RuntimeException(
+81:                     'VietnamFB chưa bật gửi đơn tự động.'
+82:                 );
+83:             }
+84: 
+85:             if (
+86:                 !in_array(
+87:                     $order->provider->driver,
+88:                     [
+89:                         'nganhangsub',
+90:                         'hacklike17',
+91:                     ],
+92:                     true
+93:                 )
+94:             ) {
+95:                 throw new RuntimeException(
+96:                     'Provider chưa hỗ trợ gửi đơn tự động.'
+97:                 );
+98:             }
+99: 
+100:             /*
+101:              * Đánh dấu attempt TRƯỚC khi gọi provider.
+102:              */
+103:             $order->attempts =
+104:                 (int) $order->attempts + 1;
+105: 
+106:             $order->provider_error = null;
+107:             $order->save();
+108: 
+109:             try {
+110:                 $api =
+111:                     $this->providers->make(
+112:                         $order->provider
+113:                     );
+114: 
+115:                 $response =
+116:                     $api->createOrder(
+117:                         (string)
+118:                             $order
+119:                                 ->providerService
+120:                                 ->provider_service_id,
+121:                         (string)
+122:                             $order->target,
+123:                         (int)
+124:                             $order->quantity
+125:                     );
+126: 
+127:                 $providerOrderId =
+128:                     $response['order']
+129:                     ?? $response['order_id']
+130:                     ?? $response['id']
+131:                     ?? null;
+132: 
+133:                 if (
+134:                     $providerOrderId === null ||
+135:                     $providerOrderId === ''
+136:                 ) {
+137:                     throw new RuntimeException(
+138:                         'Provider không trả về mã đơn.'
+139:                     );
+140:                 }
+141: 
+142:                 DB::transaction(
+143:                     function () use (
+144:                         $order,
+145:                         $response,
+146:                         $providerOrderId
+147:                     ) {
+148:                         $locked =
+149:                             SocialOrder::query()
+150:                                 ->lockForUpdate()
+151:                                 ->findOrFail(
+152:                                     $order->id
+153:                                 );
+154: 
+155:                         if (
+156:                             $locked
+157:                                 ->provider_order_id
+158:                         ) {
+159:                             return;
+160:                         }
+161: 
+162:                         $locked
+163:                             ->provider_order_id =
+164:                             (string)
+165:                                 $providerOrderId;
+166: 
+167:                         $locked->provider_response =
+168:                             $response;
+169: 
+170:                         $locked->provider_error =
+171:                             null;
+172: 
+173:                         $locked->submitted_at =
+174:                             now();
+175: 
+176:                         $locked->last_synced_at =
+177:                             null;
+178: 
+179:                         $locked->status =
+180:                             'processing';
+181: 
+182:                         $locked->save();
+183:                     },
+184:                     3
+185:                 );
+186:             } catch (Throwable $e) {
+187:                 $failed =
+188:                     SocialOrder::query()
+189:                         ->find(
+190:                             $order->id
+191:                         );
+192: 
+193:                 if (
+194:                     $failed &&
+195:                     !$failed->provider_order_id
+196:                 ) {
+197:                     $failed->provider_error =
+198:                         mb_substr(
+199:                             $e->getMessage(),
+200:                             0,
+201:                             2000
+202:                         );
+203: 
+204:                     $failed->save();
+205:                 }
+206: 
+207:                 throw $e;
+208:             }
+209: 
+210:             return SocialOrder::query()
+211:                 ->with([
+212:                     'service',
+213:                     'provider',
+214:                     'providerService',
+215:                 ])
+216:                 ->findOrFail(
+217:                     $order->id
+218:                 );
+219:         } finally {
+220:             $lock->release();
+221:         }
+222:     }
+223: 
+224:     public function sync(
+225:         SocialOrder $order
+226:     ): SocialOrder {
+227:         $lock = Cache::lock(
+228:             'social-order-operation-'.$order->id,
+229:             45
+230:         );
+231: 
+232:         if (!$lock->get()) {
+233:             return $order->fresh();
+234:         }
+235: 
+236:         try {
+237:             $order =
+238:                 SocialOrder::query()
+239:                     ->with([
+240:                         'provider',
+241:                         'providerService',
+242:                     ])
+243:                     ->findOrFail(
+244:                         $order->id
+245:                     );
+246: 
+247:             if (
+248:                 !$order->provider ||
+249:                 !$order->provider_order_id
+250:             ) {
+251:                 return $order;
+252:             }
+253: 
+254:             if (
+255:                 !in_array(
+256:                     $order->status,
+257:                     [
+258:                         'processing',
+259:                         'in_progress',
+260:                     ],
+261:                     true
+262:                 )
+263:             ) {
+264:                 return $order;
+265:             }
+266: 
+267:             if (
+268:                 $order->provider->driver ===
+269:                 'vietnamfb'
+270:             ) {
+271:                 return $order;
+272:             }
+273: 
+274:             $api =
+275:                 $this->providers->make(
+276:                     $order->provider
+277:                 );
+278: 
+279:             $response =
+280:                 $api->orderStatus(
+281:                     (string)
+282:                         $order
+283:                             ->provider_order_id
+284:                 );
+285: 
+286:             $providerStatus =
+287:                 strtolower(
+288:                     trim(
+289:                         (string) (
+290:                             $response['status']
+291:                             ?? ''
+292:                         )
+293:                     )
+294:                 );
+295: 
+296:             $status =
+297:                 $this->mapStatus(
+298:                     $providerStatus
+299:                 );
+300: 
+301:             $remains =
+302:                 isset(
+303:                     $response['remains']
+304:                 )
+305:                     ? max(
+306:                         0,
+307:                         (int)
+308:                             $response[
+309:                                 'remains'
+310:                             ]
+311:                     )
+312:                     : null;
+313: 
+314:             $startCount =
+315:                 isset(
+316:                     $response['start_count']
+317:                 )
+318:                     ? max(
+319:                         0,
+320:                         (int)
+321:                             $response[
+322:                                 'start_count'
+323:                             ]
+324:                     )
+325:                     : null;
+326: 
+327:             $order =
+328:                 DB::transaction(
+329:                     function () use (
+330:                         $order,
+331:                         $response,
+332:                         $status,
+333:                         $remains,
+334:                         $startCount
+335:                     ) {
+336:                         $locked =
+337:                             SocialOrder::query()
+338:                                 ->lockForUpdate()
+339:                                 ->findOrFail(
+340:                                     $order->id
+341:                                 );
+342: 
+343:                         $locked
+344:                             ->provider_response =
+345:                             $response;
+346: 
+347:                         $locked
+348:                             ->provider_error =
+349:                             null;
+350: 
+351:                         $locked
+352:                             ->last_synced_at =
+353:                             now();
+354: 
+355:                         if ($status) {
+356:                             $locked->status =
+357:                                 $status;
+358:                         }
+359: 
+360:                         if (
+361:                             $remains !== null
+362:                         ) {
+363:                             $locked->remains =
+364:                                 min(
+365:                                     (int)
+366:                                         $locked
+367:                                             ->quantity,
+368:                                     $remains
+369:                                 );
+370:                         }
+371: 
+372:                         if (
+373:                             $startCount !==
+374:                             null
+375:                         ) {
+376:                             $locked->start_count =
+377:                                 $startCount;
+378:                         }
+379: 
+380:                         if (
+381:                             $status ===
+382:                             'completed'
+383:                         ) {
+384:                             $locked->remains = 0;
+385: 
+386:                             $locked
+387:                                 ->completed_at =
+388:                                 $locked
+389:                                     ->completed_at
+390:                                 ?? now();
+391:                         }
+392: 
+393:                         $locked->save();
+394: 
+395:                         return $locked->fresh();
+396:                     },
+397:                     3
+398:                 );
+399: 
+400:             if (
+401:                 in_array(
+402:                     $order->status,
+403:                     [
+404:                         'failed',
+405:                         'cancelled',
+406:                     ],
+407:                     true
+408:                 )
+409:             ) {
+410:                 $order =
+411:                     $this->orders->refund(
+412:                         $order
+413:                     );
+414:             }
+415: 
+416:             if (
+417:                 $order->status ===
+418:                 'partial'
+419:             ) {
+420:                 $order =
+421:                     $this->orders
+422:                         ->refundPartial(
+423:                             $order
+424:                         );
+425:             }
+426: 
+427:             return $order
+428:                 ->fresh()
+429:                 ->load([
+430:                     'service',
+431:                     'provider',
+432:                     'providerService',
+433:                 ]);
+434:         } finally {
+435:             $lock->release();
+436:         }
+437:     }
+438: 
+439:     public function cancel(
+440:         SocialOrder $order,
+441:         ?int $createdBy = null
+442:     ): SocialOrder {
+443:         $lock = Cache::lock(
+444:             'social-order-operation-'.$order->id,
+445:             60
+446:         );
+447: 
+448:         if (!$lock->get()) {
+449:             throw new RuntimeException(
+450:                 'Đơn đang được xử lý.'
+451:             );
+452:         }
+453: 
+454:         try {
+455:             $order =
+456:                 SocialOrder::query()
+457:                     ->with([
+458:                         'provider',
+459:                         'providerService',
+460:                     ])
+461:                     ->findOrFail(
+462:                         $order->id
+463:                     );
+464: 
+465:             if (
+466:                 in_array(
+467:                     $order->status,
+468:                     [
+469:                         'completed',
+470:                         'partial',
+471:                         'cancelled',
+472:                         'failed',
+473:                     ],
+474:                     true
+475:                 )
+476:             ) {
+477:                 throw new RuntimeException(
+478:                     'Đơn này không thể hủy.'
+479:                 );
+480:             }
+481: 
+482:             /*
+483:              * Chưa gửi provider:
+484:              * hủy + hoàn tiền ngay.
+485:              */
+486:             if (
+487:                 !$order->provider_order_id
+488:             ) {
+489:                 if ((int) $order->attempts >= 1) {
+490:                     throw new RuntimeException(
+491:                         'Đơn đã gửi yêu cầu tới Provider nhưng chưa xác định kết quả. '
+492:                         .'Vui lòng đối soát trước khi hủy hoặc hoàn tiền.'
+493:                     );
+494:                 }
+495: 
+496:                 $order->status =
+497:                     'cancelled';
+498: 
+499:                 $order->save();
+500: 
+501:                 return $this->orders
+502:                     ->refund(
+503:                         $order,
+504:                         $createdBy
+505:                     );
+506:             }
+507: 
+508:             if (!$order->provider) {
+509:                 throw new RuntimeException(
+510:                     'Không tìm thấy provider.'
+511:                 );
+512:             }
+513: 
+514:             if (
+515:                 $order->provider->driver ===
+516:                 'vietnamfb'
+517:             ) {
+518:                 throw new RuntimeException(
+519:                     'VietnamFB chưa hỗ trợ hủy tự động.'
+520:                 );
+521:             }
+522: 
+523:             /*
+524:              * Đơn đã gửi:
+525:              * chỉ yêu cầu provider hủy.
+526:              * KHÔNG hoàn tiền ngay.
+527:              */
+528:             $api =
+529:                 $this->providers->make(
+530:                     $order->provider
+531:                 );
+532: 
+533:             $response =
+534:                 $api->cancel(
+535:                     (string)
+536:                         $order
+537:                             ->provider_order_id
+538:                 );
+539: 
+540:             $order->provider_response =
+541:                 $response;
+542: 
+543:             $order->provider_error = null;
+544: 
+545:             /*
+546:              * Giữ processing/in_progress.
+547:              * Scheduler sẽ sync và chỉ hoàn tiền
+548:              * khi provider xác nhận cancelled.
+549:              */
+550:             $order->last_synced_at =
+551:                 now();
+552: 
+553:             $order->save();
+554: 
+555:             return $order->fresh();
+556:         } finally {
+557:             $lock->release();
+558:         }
+559:     }
+560: 
+561:     private function mapStatus(
+562:         string $status
+563:     ): ?string {
+564:         return match ($status) {
+565:             'pending',
+566:             'awaiting',
+567:             'waiting' =>
+568:                 'processing',
+569: 
+570:             'processing',
+571:             'in progress',
+572:             'in_progress',
+573:             'progress' =>
+574:                 'in_progress',
+575: 
+576:             'completed',
+577:             'complete',
+578:             'done',
+579:             'success',
+580:             'successful' =>
+581:                 'completed',
+582: 
+583:             'partial',
+584:             'partially completed' =>
+585:                 'partial',
+586: 
+587:             'canceled',
+588:             'cancelled' =>
+589:                 'cancelled',
+590: 
+591:             'failed',
+592:             'error' =>
+593:                 'failed',
+594: 
+595:             default => null,
+596:         };
+597:     }
+598: }
+
+=================================================================
+noscam-backend/routes/console.php
+=================================================================
+1: <?php
+2: 
+3: use Illuminate\Foundation\Inspiring;
+4: use Illuminate\Support\Facades\Artisan;
+5: 
+6: Artisan::command('inspire', function () {
+7:     $this->comment(Inspiring::quote());
+8: })->purpose('Display an inspiring quote');
+9: 
+10: /*
+11: |--------------------------------------------------------------------------
+12: | NoScam Social Orders
+13: |--------------------------------------------------------------------------
+14: |
+15: | Tự gửi đơn mới và đồng bộ trạng thái provider.
+16: |
+17: */
+18: 
+19: use Illuminate\Support\Facades\Schedule;
+20: 
+21: Schedule::command('social:process-orders --limit=50')
+22:     ->everyMinute()
+23:     ->withoutOverlapping(5);
+24: 
+25: 
+26: /*
+27: |--------------------------------------------------------------------------
+28: | NoScam Exchange Auto Settlement
+29: |--------------------------------------------------------------------------
+30: |
+31: | Tự động duyệt nhiệm vụ sau 48 giờ hoặc hoàn xu hết hạn kháng nghị.
+32: |
+33: */
+34: 
+35: Schedule::command('exchange:process-expired --limit=50')
+36:     ->everyMinute()
+37:     ->withoutOverlapping(5);
+
+=================================================================
+noscam-backend/bootstrap/app.php
+=================================================================
+1: <?php
+2: 
+3: use App\Http\Middleware\EnsureUserCanModerate;
+4: use App\Http\Middleware\SecurityHeaders;
+5: use Illuminate\Cache\RateLimiting\Limit;
+6: use Illuminate\Foundation\Application;
+7: use Illuminate\Foundation\Configuration\Exceptions;
+8: use Illuminate\Foundation\Configuration\Middleware;
+9: use Illuminate\Http\Request;
+10: use Illuminate\Support\Facades\RateLimiter;
+11: 
+12: return Application::configure(
+13:     basePath: dirname(__DIR__)
+14: )
+15:     ->withRouting(
+16:         web: __DIR__.'/../routes/web.php',
+17:         api: __DIR__.'/../routes/api.php',
+18:         commands: __DIR__.'/../routes/console.php',
+19:         channels: __DIR__.'/../routes/channels.php',
+20:         health: '/up',
+21:         then: function (): void {
+22:             RateLimiter::for(
+23:                 'public-search',
+24:                 function (Request $request) {
+25:                     return Limit::perMinute(60)
+26:                         ->by(
+27:                             $request->ip()
+28:                         );
+29:                 }
+30:             );
+31: 
+32:             RateLimiter::for(
+33:                 'public-report',
+34:                 function (Request $request) {
+35:                     return Limit::perHour(10)
+36:                         ->by(
+37:                             $request->ip()
+38:                         );
+39:                 }
+40:             );
+41: 
+42:             RateLimiter::for(
+43:                 'customer-auth',
+44:                 function (Request $request) {
+45:                     $username = strtolower(
+46:                         (string) $request->input(
+47:                             'username',
+48:                             ''
+49:                         )
+50:                     );
+51: 
+52:                     return Limit::perMinute(10)
+53:                         ->by(
+54:                             $username.'|'.
+55:                             $request->ip()
+56:                         );
+57:                 }
+58:             );
+59: 
+60:             RateLimiter::for(
+61:                 'customer-api',
+62:                 function (Request $request) {
+63:                     $userId =
+64:                         $request->user()?->id;
+65: 
+66:                     return Limit::perMinute(120)
+67:                         ->by(
+68:                             $userId
+69:                                 ? 'customer:'.$userId
+70:                                 : 'ip:'.$request->ip()
+71:                         );
+72:                 }
+73:             );
+74: 
+75:             RateLimiter::for(
+76:                 'admin-login',
+77:                 function (Request $request) {
+78:                     $username = strtolower(
+79:                         (string) $request->input(
+80:                             'username',
+81:                             ''
+82:                         )
+83:                     );
+84: 
+85:                     return Limit::perMinute(5)
+86:                         ->by(
+87:                             $username.'|'.
+88:                             $request->ip()
+89:                         );
+90:                 }
+91:             );
+92: 
+93:             RateLimiter::for(
+94:                 'admin-api',
+95:                 function (Request $request) {
+96:                     $userId =
+97:                         $request->user()?->id;
+98: 
+99:                     return Limit::perMinute(120)
+100:                         ->by(
+101:                             $userId
+102:                                 ? 'user:'.$userId
+103:                                 : 'ip:'.$request->ip()
+104:                         );
+105:                 }
+106:             );
+107:         }
+108:     )
+109:     ->withMiddleware(
+110:         function (Middleware $middleware): void {
+111:             $middleware->append(
+112:                 SecurityHeaders::class
+113:             );
+114: 
+115:             $middleware->trustProxies(
+116:                 at: '*'
+117:             );
+118: 
+119:             $middleware->alias([
+120:                 'moderator' =>
+121:                     EnsureUserCanModerate::class,
+122:             ]);
+123:         }
+124:     )
+125:     ->withExceptions(
+126:         function (Exceptions $exceptions): void {
+127:             $exceptions->shouldRenderJsonWhen(
+128:                 fn (Request $request) =>
+129:                     $request->is('api/*') ||
+130:                     $request->expectsJson()
+131:             );
+132:         }
+133:     )
+134:     ->create();

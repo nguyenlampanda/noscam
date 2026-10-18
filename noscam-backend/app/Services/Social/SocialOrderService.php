@@ -81,6 +81,7 @@ class SocialOrderService
                     $service->id
                 )
                 ->where('is_active', true)
+                ->where('provider_availability', 'available')
                 ->whereHas(
                     'provider',
                     fn ($query) =>
@@ -104,6 +105,75 @@ class SocialOrderService
          * Không cho tạo đơn bán hòa vốn hoặc bán lỗ.
          * Không tự chuyển sang Provider khác.
          */
+        /*
+         * Validate actual provider limits before charging wallet.
+         * VietnamFB legacy channels may not publish numeric limits.
+         * Never treat their fallback 1/1000000 as verified.
+         */
+        $providerData = $providerService->provider_data ?? [];
+        $providerData = is_array($providerData) ? $providerData : [];
+        $rawChannel = $providerData['provider_data'] ?? [];
+        $rawChannel = is_array($rawChannel) ? $rawChannel : [];
+
+        $isVietnamFb =
+            strtolower((string) ($providerService->provider?->driver ?? ''))
+            === 'vietnamfb';
+
+        $validLimit = static fn ($value): bool =>
+            is_numeric($value) && (int) $value > 0;
+
+        $minVerified = !$isVietnamFb
+            || $validLimit($rawChannel['min'] ?? null);
+
+        $maxVerified = !$isVietnamFb
+            || $validLimit($rawChannel['max'] ?? null);
+
+        if ($isVietnamFb) {
+            $minVerified = $minVerified
+                || (
+                    ($providerData['min_verified'] ?? false) === true
+                    && $validLimit($providerData['min'] ?? null)
+                );
+
+            $maxVerified = $maxVerified
+                || (
+                    ($providerData['max_verified'] ?? false) === true
+                    && $validLimit($providerData['max'] ?? null)
+                );
+        }
+
+        $providerMin = $isVietnamFb
+            ? ($rawChannel['min'] ?? $providerData['min'] ?? null)
+            : $providerService->min_quantity;
+
+        $providerMax = $isVietnamFb
+            ? ($rawChannel['max'] ?? $providerData['max'] ?? null)
+            : $providerService->max_quantity;
+
+        if (
+            $minVerified
+            && $validLimit($providerMin)
+            && $quantity < (int) $providerMin
+        ) {
+            throw new RuntimeException(
+                'Số lượng tối thiểu của nhà cung cấp là '
+                .number_format((int) $providerMin, 0, ',', '.')
+                .'.'
+            );
+        }
+
+        if (
+            $maxVerified
+            && $validLimit($providerMax)
+            && $quantity > (int) $providerMax
+        ) {
+            throw new RuntimeException(
+                'Số lượng tối đa của nhà cung cấp là '
+                .number_format((int) $providerMax, 0, ',', '.')
+                .'.'
+            );
+        }
+
         $costPer1000 = $providerService->costPriceVnd();
 
         if (

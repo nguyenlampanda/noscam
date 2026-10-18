@@ -1,3 +1,4 @@
+import NoScamSelect from '../../components/ui/NoScamSelect'
 import {
   useCallback,
   useEffect,
@@ -306,7 +307,7 @@ export default function AdminSocialOrdersPage() {
             className="rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-blue-400"
           />
 
-          <select
+          <NoScamSelect
             value={status}
             onChange={(e) => {
               setStatus(e.target.value)
@@ -333,7 +334,7 @@ export default function AdminSocialOrdersPage() {
                 </option>
               ),
             )}
-          </select>
+          </NoScamSelect>
         </div>
 
         <div className="mt-4 flex flex-wrap items-center gap-3">

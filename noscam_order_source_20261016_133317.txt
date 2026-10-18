@@ -1,0 +1,5261 @@
+NOSCAM - ORDER SOURCE CODE
+
+
+======================================================================
+FILE: noscam-backend/app/Services/Social/SocialOrderService.php
+======================================================================
+<?php
+
+namespace App\Services\Social;
+
+use App\Models\SocialOrder;
+use App\Models\SocialProviderService;
+use App\Models\SocialService;
+use App\Models\User;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+use RuntimeException;
+
+class SocialOrderService
+{
+    public function __construct(
+        private WalletService $walletService
+    ) {
+    }
+
+    public function create(
+        User $user,
+        SocialService $service,
+        string $target,
+        int $quantity,
+        string $idempotencyKey
+    ): SocialOrder {
+        if (!$service->is_active) {
+            throw new RuntimeException(
+                'Dịch vụ hiện đang tạm ngưng.'
+            );
+        }
+
+        if (
+            $quantity < (int) $service->min_quantity ||
+            $quantity > (int) $service->max_quantity
+        ) {
+            throw new RuntimeException(
+                'Số lượng không nằm trong giới hạn dịch vụ.'
+            );
+        }
+
+        $existing = SocialOrder::query()
+            ->where(
+                'idempotency_key',
+                $idempotencyKey
+            )
+            ->first();
+
+        if ($existing) {
+            if (
+                (int) $existing->user_id !==
+                (int) $user->id
+            ) {
+                throw new RuntimeException(
+                    'Idempotency key không hợp lệ.'
+                );
+            }
+
+            return $existing;
+        }
+
+        /*
+         * Admin chưa thiết lập giá:
+         * không tạo đơn, không trừ ví.
+         * Khách chỉ nhận thông báo chung.
+         */
+        if (
+            $service->sell_price_per_1000 === null ||
+            (float) $service->sell_price_per_1000 <= 0
+        ) {
+            throw new RuntimeException(
+                'Dịch vụ hiện chưa thể xử lý. Vui lòng liên hệ Admin để được hỗ trợ.'
+            );
+        }
+
+        $providerService =
+            SocialProviderService::query()
+                ->with('provider')
+                ->where(
+                    'social_service_id',
+                    $service->id
+                )
+                ->where('is_active', true)
+                ->where('provider_availability', 'available')
+                ->whereHas(
+                    'provider',
+                    fn ($query) =>
+                        $query->where(
+                            'status',
+                            'active'
+                        )
+                )
+                ->orderBy('priority')
+                ->orderBy('id')
+                ->first();
+
+        if (!$providerService) {
+            throw new RuntimeException(
+                'Dịch vụ chưa có nguồn API khả dụng.'
+            );
+        }
+
+        /*
+         * Kiểm tra lại giá vốn tại thời điểm đặt.
+         * Không cho tạo đơn bán hòa vốn hoặc bán lỗ.
+         * Không tự chuyển sang Provider khác.
+         */
+        /*
+         * Validate actual provider limits before charging wallet.
+         * VietnamFB legacy channels may not publish numeric limits.
+         * Never treat their fallback 1/1000000 as verified.
+         */
+        $providerData = $providerService->provider_data ?? [];
+        $providerData = is_array($providerData) ? $providerData : [];
+        $rawChannel = $providerData['provider_data'] ?? [];
+        $rawChannel = is_array($rawChannel) ? $rawChannel : [];
+
+        $isVietnamFb =
+            strtolower((string) ($providerService->provider?->driver ?? ''))
+            === 'vietnamfb';
+
+        $validLimit = static fn ($value): bool =>
+            is_numeric($value) && (int) $value > 0;
+
+        $minVerified = !$isVietnamFb
+            || $validLimit($rawChannel['min'] ?? null);
+
+        $maxVerified = !$isVietnamFb
+            || $validLimit($rawChannel['max'] ?? null);
+
+        if ($isVietnamFb) {
+            $minVerified = $minVerified
+                || (
+                    ($providerData['min_verified'] ?? false) === true
+                    && $validLimit($providerData['min'] ?? null)
+                );
+
+            $maxVerified = $maxVerified
+                || (
+                    ($providerData['max_verified'] ?? false) === true
+                    && $validLimit($providerData['max'] ?? null)
+                );
+        }
+
+        $providerMin = $isVietnamFb
+            ? ($rawChannel['min'] ?? $providerData['min'] ?? null)
+            : $providerService->min_quantity;
+
+        $providerMax = $isVietnamFb
+            ? ($rawChannel['max'] ?? $providerData['max'] ?? null)
+            : $providerService->max_quantity;
+
+        if (
+            $minVerified
+            && $validLimit($providerMin)
+            && $quantity < (int) $providerMin
+        ) {
+            throw new RuntimeException(
+                'Số lượng tối thiểu của nhà cung cấp là '
+                .number_format((int) $providerMin, 0, ',', '.')
+                .'.'
+            );
+        }
+
+        if (
+            $maxVerified
+            && $validLimit($providerMax)
+            && $quantity > (int) $providerMax
+        ) {
+            throw new RuntimeException(
+                'Số lượng tối đa của nhà cung cấp là '
+                .number_format((int) $providerMax, 0, ',', '.')
+                .'.'
+            );
+        }
+
+        $costPer1000 = $providerService->costPriceVnd();
+
+        if (
+            (float) $service->sell_price_per_1000
+            <= $costPer1000
+        ) {
+            throw new RuntimeException(
+                'Dịch vụ hiện chưa thể xử lý. Vui lòng liên hệ Admin để được hỗ trợ.'
+            );
+        }
+
+        $sellAmount = round(
+            (
+                (float) $service
+                    ->sell_price_per_1000
+            ) *
+            $quantity /
+            1000,
+            4
+        );
+
+        $costAmount = round(
+            $providerService->costPriceVnd()
+            * $quantity /
+            1000,
+            4
+        );
+
+        return DB::transaction(
+            function () use (
+                $user,
+                $service,
+                $providerService,
+                $target,
+                $quantity,
+                $idempotencyKey,
+                $sellAmount,
+                $costAmount
+            ) {
+                $existing =
+                    SocialOrder::query()
+                        ->where(
+                            'idempotency_key',
+                            $idempotencyKey
+                        )
+                        ->lockForUpdate()
+                        ->first();
+
+                if ($existing) {
+                    return $existing;
+                }
+
+                $order = SocialOrder::create([
+                    'code' =>
+                        $this->orderCode(),
+
+                    'user_id' =>
+                        $user->id,
+
+                    'social_service_id' =>
+                        $service->id,
+
+                    'social_provider_id' =>
+                        $providerService
+                            ->social_provider_id,
+
+                    'social_provider_service_id' =>
+                        $providerService->id,
+
+                    'target' =>
+                        trim($target),
+
+                    'quantity' =>
+                        $quantity,
+
+                    'sell_amount' =>
+                        $sellAmount,
+
+                    'cost_amount' =>
+                        $costAmount,
+
+                    'profit_amount' =>
+                        round(
+                            $sellAmount -
+                            $costAmount,
+                            4
+                        ),
+
+                    'status' =>
+                        'pending',
+
+                    'remains' =>
+                        $quantity,
+
+                    'refunded_amount' =>
+                        0,
+
+                    'idempotency_key' =>
+                        $idempotencyKey,
+
+                    'attempts' =>
+                        0,
+                ]);
+
+                $order->code =
+                    'NS-' . str_pad(
+                        (string) $order->id,
+                        6,
+                        '0',
+                        STR_PAD_LEFT
+                    );
+
+                $order->save();
+
+                $this->walletService->debit(
+                    user: $user,
+                    amount: $sellAmount,
+                    type: 'order',
+                    referenceType:
+                        SocialOrder::class,
+                    referenceId:
+                        $order->id,
+                    description:
+                        'Thanh toán đơn '
+                        .$order->code,
+                    meta: [
+                        'order_code' =>
+                            $order->code,
+                        'service_id' =>
+                            $service->id,
+                        'quantity' =>
+                            $quantity,
+                    ]
+                );
+
+                return $order
+                    ->fresh()
+                    ->load([
+                        'service',
+                        'provider',
+                        'providerService',
+                    ]);
+            },
+            3
+        );
+    }
+
+    public function refund(
+        SocialOrder $order,
+        ?int $createdBy = null
+    ): SocialOrder {
+        if (!$order->user_id) {
+            throw new RuntimeException(
+                'Đơn hàng không có tài khoản để hoàn tiền.'
+            );
+        }
+
+        return DB::transaction(
+            function () use (
+                $order,
+                $createdBy
+            ) {
+                $locked = SocialOrder::query()
+                    ->lockForUpdate()
+                    ->findOrFail($order->id);
+
+                $sellAmount =
+                    (float) $locked->sell_amount;
+
+                $alreadyRefunded =
+                    (float) $locked->refunded_amount;
+
+                $refund =
+                    max(
+                        0,
+                        $sellAmount -
+                        $alreadyRefunded
+                    );
+
+                if ($refund <= 0) {
+                    return $locked;
+                }
+
+                $this->walletService->credit(
+                    user:
+                        $locked->user,
+                    amount:
+                        $refund,
+                    type:
+                        'refund',
+                    referenceType:
+                        SocialOrder::class,
+                    referenceId:
+                        $locked->id,
+                    description:
+                        'Hoàn tiền đơn '
+                        .$locked->code,
+                    createdBy:
+                        $createdBy,
+                    meta: [
+                        'order_code' =>
+                            $locked->code,
+                    ]
+                );
+
+                $locked->refunded_amount =
+                    $alreadyRefunded +
+                    $refund;
+
+                $locked->save();
+
+                return $locked->fresh();
+            },
+            3
+        );
+    }
+
+    public function refundPartial(
+        SocialOrder $order
+    ): SocialOrder {
+        if (!$order->user_id) {
+            throw new RuntimeException(
+                'Đơn hàng không có tài khoản để hoàn tiền.'
+            );
+        }
+
+        return DB::transaction(
+            function () use ($order) {
+                $locked =
+                    SocialOrder::query()
+                        ->lockForUpdate()
+                        ->findOrFail(
+                            $order->id
+                        );
+
+                $quantity =
+                    max(
+                        1,
+                        (int) $locked->quantity
+                    );
+
+                $remains =
+                    max(
+                        0,
+                        min(
+                            $quantity,
+                            (int) $locked->remains
+                        )
+                    );
+
+                $sellAmount =
+                    (float)
+                        $locked->sell_amount;
+
+                /*
+                 * Tiền tương ứng phần chưa chạy.
+                 */
+                $shouldRefund =
+                    round(
+                        $sellAmount
+                        * $remains
+                        / $quantity,
+                        4
+                    );
+
+                $alreadyRefunded =
+                    (float)
+                        $locked->refunded_amount;
+
+                $refund =
+                    max(
+                        0,
+                        $shouldRefund
+                        - $alreadyRefunded
+                    );
+
+                if ($refund <= 0) {
+                    return $locked;
+                }
+
+                $this->walletService->credit(
+                    user:
+                        $locked->user,
+                    amount:
+                        $refund,
+                    type:
+                        'refund',
+                    referenceType:
+                        SocialOrder::class,
+                    referenceId:
+                        $locked->id,
+                    description:
+                        'Hoàn phần còn lại đơn '
+                        .$locked->code,
+                    meta: [
+                        'order_code' =>
+                            $locked->code,
+                        'quantity' =>
+                            $quantity,
+                        'remains' =>
+                            $remains,
+                    ]
+                );
+
+                $locked->refunded_amount =
+                    $alreadyRefunded
+                    + $refund;
+
+                $locked->save();
+
+                return $locked->fresh();
+            },
+            3
+        );
+    }
+
+    private function orderCode(): string
+    {
+        return 'TMP-' . Str::uuid();
+    }
+}
+
+
+======================================================================
+FILE: noscam-backend/app/Http/Controllers/Api/SocialOrderController.php
+======================================================================
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use App\Http\Controllers\Controller;
+use App\Models\SocialOrder;
+use App\Models\SocialService;
+use App\Services\Social\SocialOrderService;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+
+class SocialOrderController extends Controller
+{
+    public function index(
+        Request $request
+    ): JsonResponse {
+        $orders = SocialOrder::query()
+            ->where(
+                'user_id',
+                $request->user()->id
+            )
+            ->with([
+                'service:id,code,name,platform,category',
+            ])
+            ->latest()
+            ->paginate(30);
+
+        return response()->json($orders);
+    }
+
+    public function show(
+        Request $request,
+        SocialOrder $order
+    ): JsonResponse {
+        abort_unless(
+            (int) $order->user_id ===
+            (int) $request->user()->id,
+            404
+        );
+
+        $order->load([
+            'service:id,code,name,platform,category',
+        ]);
+
+        return response()->json([
+            'data' => $order,
+        ]);
+    }
+
+
+    public function cancel(
+        Request $request,
+        SocialOrder $order,
+        \App\Services\Social\SocialOrderProviderService $providerService
+    ): JsonResponse {
+        abort_unless(
+            (int) $order->user_id === (int) $request->user()->id,
+            404
+        );
+
+        try {
+            $order = $providerService->cancel($order);
+
+            return response()->json([
+                'message' => $order->status === 'cancelled'
+                    ? 'Đơn đã được hủy và xử lý hoàn tiền.'
+                    : 'Đã gửi yêu cầu hủy tới nhà cung cấp. '
+                      .'Vui lòng chờ xác nhận.',
+                'data' => $order,
+            ]);
+        } catch (\RuntimeException $e) {
+            return response()->json([
+                'message' => $e->getMessage(),
+            ], 409);
+        }
+    }
+
+    public function store(
+        Request $request,
+        SocialOrderService $orderService
+    ): JsonResponse {
+        $data = $request->validate([
+            'service_id' => [
+                'required',
+                'integer',
+                'exists:social_services,id',
+            ],
+            'target' => [
+                'required',
+                'string',
+                'max:2000',
+            ],
+            'quantity' => [
+                'required',
+                'integer',
+                'min:1',
+                'max:100000000',
+            ],
+            'idempotency_key' => [
+                'required',
+                'string',
+                'min:16',
+                'max:100',
+            ],
+        ]);
+
+        $service =
+            SocialService::findOrFail(
+                $data['service_id']
+            );
+
+        $order = $orderService->create(
+            user: $request->user(),
+            service: $service,
+            target: $data['target'],
+            quantity: (int) $data['quantity'],
+            idempotencyKey:
+                $data['idempotency_key']
+        );
+
+        return response()->json([
+            'message' =>
+                'Đặt đơn thành công.',
+            'data' =>
+                $order,
+        ], 201);
+    }
+}
+
+
+======================================================================
+FILE: noscam-frontend/src/components/admin/social/SocialOrderAuditModal.jsx
+======================================================================
+import NoScamSelect from '../../ui/NoScamSelect'
+import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
+import { motion } from 'framer-motion'
+import adminService from '../../../services/adminService'
+import { useNoScamUI, Spinner, NoScamBrand } from '../../ui/NoScamUI' // noscam-audit-ui-v1
+
+const results = [
+  { value: 'uncertain', label: 'Chưa xác định kết quả' },
+  { value: 'provider_received', label: 'Provider đã nhận đơn' },
+  { value: 'provider_not_received', label: 'Provider xác nhận không nhận đơn' },
+]
+
+function unwrap(response) {
+  const value = response?.data ?? response
+  return value?.data ?? value
+}
+
+export default function SocialOrderAuditModal({ order, onClose }) {
+  const { notify } = useNoScamUI()
+  const [history, setHistory] = useState([])
+  const [preview, setPreview] = useState(null)
+  const [previewLoading, setPreviewLoading] = useState(true)
+  const [resolutions, setResolutions] = useState([])
+  const [resolutionLoading, setResolutionLoading] = useState(true)
+  const [resolutionError, setResolutionError] = useState('')
+  const [result, setResult] = useState('uncertain')
+  const [providerOrderId, setProviderOrderId] = useState('')
+  const [note, setNote] = useState('')
+  const [evidence, setEvidence] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
+
+  const eligible =
+    order?.status === 'pending' &&
+    !order?.provider_order_id &&
+    Number(order?.attempts || 0) >= 1
+
+  useEffect(() => {
+    let active = true
+
+    async function loadHistory() {
+      setLoading(true)
+      try {
+        const response = await adminService.getSocialOrderAudits(order.id)
+        const payload = unwrap(response)
+        if (active) {
+          setHistory(Array.isArray(payload?.data) ? payload.data : [])
+        }
+      } catch (err) {
+        if (active) setError(err?.data?.message || err?.message || 'Không tải được lịch sử.')
+      } finally {
+        if (active) setLoading(false)
+      }
+    }
+
+    loadHistory()
+    return () => { active = false }
+  }, [order.id])
+
+  useEffect(() => {
+    let active = true
+
+    async function loadResolutions() {
+      setResolutionLoading(true)
+      setResolutionError('')
+
+      try {
+        const response = await adminService.getSocialOrderResolutions(order.id)
+        const payload = unwrap(response)
+
+        if (active) {
+          setResolutions(Array.isArray(payload?.data) ? payload.data : [])
+        }
+      } catch (err) {
+        if (active) {
+          setResolutionError(
+            err?.response?.data?.message ||
+            err?.message ||
+            'Không tải được lịch sử xử lý.'
+          )
+        }
+      } finally {
+        if (active) setResolutionLoading(false)
+      }
+    }
+
+    loadResolutions()
+
+    return () => { active = false }
+  }, [order.id])
+
+  useEffect(() => {
+    let active = true
+
+    async function loadPreview() {
+      setPreviewLoading(true)
+
+      try {
+        const response =
+          await adminService.getSocialOrderReconciliationPreview(order.id)
+
+        if (active) {
+          setPreview(unwrap(response))
+        }
+      } catch {
+        if (active) setPreview(null)
+      } finally {
+        if (active) setPreviewLoading(false)
+      }
+    }
+
+    loadPreview()
+
+    return () => { active = false }
+  }, [order.id, history.length])
+
+  async function submit(event) {
+    event.preventDefault()
+    if (!eligible || saving) return
+
+    setSaving(true)
+    setError('')
+    setSuccess('')
+
+    try {
+      await adminService.createSocialOrderAudit(order.id, {
+        result,
+        provider_order_id: result === 'provider_received' ? providerOrderId.trim() : null,
+        note: note.trim(),
+        evidence: evidence.trim(),
+      })
+
+      const response = await adminService.getSocialOrderAudits(order.id)
+      const payload = unwrap(response)
+      setHistory(Array.isArray(payload?.data) ? payload.data : [])
+      setNote('')
+      setEvidence('')
+      setProviderOrderId('')
+      setResult('uncertain')
+      setSuccess('Đã lưu biên bản đối soát. Trạng thái đơn và ví không thay đổi.')
+      notify('Đã lưu biên bản đối soát.', 'success')
+    } catch (err) {
+      const message = err?.data?.message || err?.response?.data?.message || err?.message || 'Không lưu được biên bản.'
+      setError(message)
+      notify(message, 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return createPortal(
+    <div className="fixed inset-0 z-[100000] flex items-center justify-center bg-slate-950/65 p-4">
+      <motion.div
+        initial={{ opacity: 0, y: 18, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Đối soát đơn hàng"
+      >
+        <div className="mb-5 flex justify-center"><NoScamBrand /></div>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <div className="text-xs font-black uppercase tracking-widest text-blue-600">
+              NoScam · Social Services
+            </div>
+            <h2 className="mt-2 text-2xl font-black text-slate-950">
+              Đối soát đơn {order.code}
+            </h2>
+            <p className="mt-2 text-sm text-slate-500">
+              Provider: {order.provider?.name || '—'} · Lần thử gửi: {order.attempts || 0}
+            </p>
+          </div>
+          <button type="button" onClick={onClose} disabled={saving} className="rounded-xl bg-slate-100 px-3 py-2 font-black text-slate-600 disabled:opacity-50">
+            Đóng
+          </button>
+        </div>
+
+        <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-800">
+          Biên bản chỉ ghi nhận kết quả kiểm tra. Không tự gửi lại đơn, cập nhật trạng thái hoặc hoàn tiền.
+          {order.provider_error && (
+            <p className="mt-2 break-words font-semibold">
+              Lỗi API: {order.provider_error}
+            </p>
+          )}
+        </div>
+
+        {error && <div className="mt-4 rounded-xl bg-red-50 p-3 text-sm font-bold text-red-700">{error}</div>}
+        {success && <div className="mt-4 rounded-xl bg-emerald-50 p-3 text-sm font-bold text-emerald-700">{success}</div>}
+
+        {eligible ? (
+          <form onSubmit={submit} className="mt-6 space-y-4">
+            <h3 className="text-lg font-black text-slate-900">Ghi nhận kết quả</h3>
+
+            <label className="block text-sm font-bold text-slate-700">
+              Kết quả đối soát
+              <NoScamSelect value={result} onChange={(e) => setResult(e.target.value)}
+                className="mt-2 w-full rounded-xl border border-slate-200 p-3">
+                {results.map((item) => (
+                  <option key={item.value} value={item.value}>{item.label}</option>
+                ))}
+              </NoScamSelect>
+            </label>
+
+            {result === 'provider_received' && (
+              <label className="block text-sm font-bold text-slate-700">
+                Mã đơn Provider
+                <input required maxLength={191} value={providerOrderId}
+                  onChange={(e) => setProviderOrderId(e.target.value)}
+                  className="mt-2 w-full rounded-xl border border-slate-200 p-3"
+                  placeholder="Mã đơn đã xác minh từ Provider" />
+              </label>
+            )}
+
+            <label className="block text-sm font-bold text-slate-700">
+              Ghi chú kiểm tra
+              <textarea required minLength={10} maxLength={5000} rows={3}
+                value={note} onChange={(e) => setNote(e.target.value)}
+                className="mt-2 w-full rounded-xl border border-slate-200 p-3"
+                placeholder="Mô tả kết quả kiểm tra..." />
+            </label>
+
+            <label className="block text-sm font-bold text-slate-700">
+              Bằng chứng / tham chiếu
+              <textarea required minLength={10} maxLength={10000} rows={3}
+                value={evidence} onChange={(e) => setEvidence(e.target.value)}
+                className="mt-2 w-full rounded-xl border border-slate-200 p-3"
+                placeholder="Mã ticket, thời gian kiểm tra, nội dung phản hồi Provider..." />
+            </label>
+
+            <button type="submit" disabled={saving}
+              className="w-full rounded-xl bg-blue-600 px-5 py-3 font-black text-white transition hover:bg-blue-700 disabled:opacity-50">
+              {saving ? <span className="inline-flex items-center justify-center gap-2"><Spinner size="sm" /> Đang lưu...</span> : 'Lưu biên bản đối soát'}
+            </button>
+          </form>
+        ) : (
+          <p className="mt-5 text-sm font-semibold text-slate-500">
+            Đơn này không thuộc diện ghi biên bản đối soát chưa rõ kết quả gửi API.
+          </p>
+        )}
+
+        <div className="mt-6 rounded-2xl border border-blue-100 bg-blue-50 p-4">
+          <h3 className="font-black text-slate-900">
+            Xem trước quyết định đối soát
+          </h3>
+
+          {previewLoading ? (
+            <p className="mt-2 text-sm text-slate-500">
+              <span className="inline-flex items-center gap-2"><Spinner size="sm" /> Đang kiểm tra điều kiện...</span>
+            </p>
+          ) : !preview ? (
+            <p className="mt-2 text-sm text-red-600">
+              Không tải được thông tin đối soát.
+            </p>
+          ) : (
+            <div className="mt-3 space-y-2 text-sm">
+              <p className="font-bold text-slate-700">
+                {preview.message}
+              </p>
+
+              <p>
+                Trạng thái: <strong>{preview.status}</strong>
+              </p>
+
+              <p>
+                Kết quả: <strong>{preview.audit_result || 'Chưa có'}</strong>
+              </p>
+
+              {preview.action === 'refund_after_reconciliation' && (
+                <p className="font-black text-emerald-700">
+                  Dự kiến hoàn: {Number(preview.estimated_refund || 0).toLocaleString('vi-VN')}đ
+                </p>
+              )}
+
+              {preview.action === 'provider_order_recovered' && (
+                <p className="break-all font-bold text-blue-700">
+                  Mã Provider: {preview.provider_order_id}
+                </p>
+              )}
+
+              <p className="font-black text-amber-700">
+                Chức năng thực thi hiện đang khóa.
+              </p>
+            </div>
+          )}
+        </div>
+
+        <div className="mt-8 border-t border-slate-100 pt-5">
+          <h3 className="text-lg font-black text-slate-900">
+            Lịch sử xử lý cuối cùng
+          </h3>
+
+          {resolutionLoading ? (
+            <p className="mt-3 text-sm text-slate-400">
+              <span className="inline-flex items-center gap-2"><Spinner size="sm" /> Đang tải lịch sử xử lý...</span>
+            </p>
+          ) : resolutionError ? (
+            <p className="mt-3 text-sm font-semibold text-red-600">
+              {resolutionError}
+            </p>
+          ) : resolutions.length === 0 ? (
+            <p className="mt-3 text-sm text-slate-400">
+              Chưa có quyết định xử lý nào.
+            </p>
+          ) : (
+            <div className="mt-4 space-y-3">
+              {resolutions.map((entry) => (
+                <div
+                  key={entry.id}
+                  className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm"
+                >
+                  <div className="font-black text-slate-900">
+                    {entry.action}
+                  </div>
+
+                  <div className="mt-1 text-xs text-slate-500">
+                    {entry.admin?.name || 'Admin'} · {entry.created_at || ''}
+                  </div>
+
+                  <div className="mt-2 font-semibold text-slate-700">
+                    {entry.status_before} → {entry.status_after}
+                  </div>
+
+                  {entry.provider_order_id && (
+                    <p className="mt-2 break-all text-slate-600">
+                      Mã Provider: {entry.provider_order_id}
+                    </p>
+                  )}
+
+                  {Number(entry.refund_amount || 0) > 0 && (
+                    <p className="mt-2 font-black text-emerald-700">
+                      Hoàn tiền: {Number(entry.refund_amount).toLocaleString('vi-VN')}đ
+                    </p>
+                  )}
+
+                  {entry.note && (
+                    <p className="mt-2 whitespace-pre-wrap text-slate-600">
+                      {entry.note}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="mt-8 border-t border-slate-100 pt-5">
+          <h3 className="text-lg font-black text-slate-900">Lịch sử đối soát</h3>
+          {loading ? (
+            <div className="mt-3 flex items-center gap-2 text-sm text-slate-500"><Spinner size="sm" /> Đang tải lịch sử...</div>
+          ) : history.length === 0 ? (
+            <p className="mt-3 text-sm text-slate-400">Chưa có biên bản.</p>
+          ) : (
+            <div className="mt-4 space-y-3">
+              {history.map((entry) => (
+                <div key={entry.id} className="rounded-2xl border border-slate-200 p-4 text-sm">
+                  <div className="font-black text-slate-900">
+                    {results.find((item) => item.value === entry.result)?.label || entry.result}
+                  </div>
+                  <div className="mt-1 text-xs text-slate-500">
+                    {entry.admin?.name || 'Admin'} · {entry.created_at || ''}
+                  </div>
+                  {entry.provider_order_id && <p className="mt-2">Mã Provider: {entry.provider_order_id}</p>}
+                  <p className="mt-2 whitespace-pre-wrap">{entry.note}</p>
+                  <p className="mt-2 whitespace-pre-wrap text-slate-500">Bằng chứng: {entry.evidence}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </motion.div>
+    </div>,
+    document.body,
+  )
+}
+
+
+======================================================================
+FILE: noscam-frontend/src/pages/SocialServicesPage.jsx
+======================================================================
+import {
+  useEffect,
+  useMemo,
+  useState,
+} from 'react'
+import {
+  Link,
+  useNavigate,
+} from 'react-router-dom'
+import {
+  AnimatePresence,
+  motion,
+} from 'motion/react'
+import PlatformIcon from '../components/social/PlatformIcon'
+import customerService, {
+  getCustomerToken,
+} from '../services/customerService'
+
+function money(value) {
+  return `${Math.round(
+    Number(value || 0),
+  ).toLocaleString('vi-VN')}đ`
+}
+
+function moneyUnit(value) {
+  const amount = Number(value || 0)
+
+  if (!Number.isFinite(amount)) return '0đ'
+
+  return `${amount.toLocaleString('vi-VN', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 6,
+  })}đ`
+}
+
+function createKey() {
+  if (
+    typeof crypto !== 'undefined' &&
+    crypto.randomUUID
+  ) {
+    return crypto.randomUUID()
+  }
+
+  return `${Date.now()}-${Math.random()
+    .toString(36)
+    .slice(2)}`
+}
+
+function getOrderKey(serviceId, target, quantity) {
+  const fingerprint = JSON.stringify([
+    String(serviceId),
+    String(target).trim(),
+    Number(quantity),
+  ])
+
+  const storageKey = 'noscam-social-pending-order'
+
+  try {
+    const previous = JSON.parse(
+      sessionStorage.getItem(storageKey) || 'null',
+    )
+
+    if (
+      previous?.fingerprint === fingerprint &&
+      previous?.key
+    ) {
+      return previous.key
+    }
+
+    const key = createKey()
+
+    sessionStorage.setItem(
+      storageKey,
+      JSON.stringify({ fingerprint, key }),
+    )
+
+    return key
+  } catch {
+    return createKey()
+  }
+}
+
+const platformOptions = [
+  {
+    value: 'facebook',
+    label: 'Facebook',
+  },
+  {
+    value: 'instagram',
+    label: 'Instagram',
+  },
+  {
+    value: 'tiktok',
+    label: 'TikTok',
+  },
+]
+
+const categoryLabels = {
+  follow: 'Follow / Followers',
+  like: 'Like',
+  view: 'View',
+  comment: 'Comment',
+  share: 'Share',
+  reaction: 'Reaction',
+  member: 'Member',
+  save: 'Save',
+  other: 'Khác',
+}
+
+export default function SocialServicesPage() {
+  const navigate = useNavigate()
+
+  const [services, setServices] =
+    useState([])
+
+  const [platform, setPlatform] =
+    useState('')
+
+  const [category, setCategory] =
+    useState('')
+
+  const [categoryOpen, setCategoryOpen] =
+    useState(false)
+
+  const [selectedId, setSelectedId] =
+    useState('')
+
+  const [serviceOpen, setServiceOpen] =
+    useState(false)
+
+  const [target, setTarget] =
+    useState('')
+
+  const [comments, setComments] = useState('')
+
+  const [quantity, setQuantity] =
+    useState('')
+
+  const [balance, setBalance] =
+    useState(null)
+
+  const [loading, setLoading] =
+    useState(true)
+
+  const [submitting, setSubmitting] =
+    useState(false)
+
+  const [error, setError] =
+    useState('')
+
+  const [confirmOpen, setConfirmOpen] =
+    useState(false)
+
+  const isLoggedIn =
+    Boolean(getCustomerToken())
+
+  useEffect(() => {
+    let active = true
+
+    async function load() {
+      setLoading(true)
+      setError('')
+
+      try {
+        const response =
+          await customerService.services({})
+
+        if (!active) return
+
+        setServices(
+          response?.data || [],
+        )
+      } catch (err) {
+        if (active) {
+          setError(
+            err?.message ||
+              'Không tải được dịch vụ.',
+          )
+        }
+      } finally {
+        if (active) {
+          setLoading(false)
+        }
+      }
+    }
+
+    load()
+
+    return () => {
+      active = false
+    }
+  }, [])
+
+  useEffect(() => {
+    let active = true
+
+    if (!isLoggedIn) {
+      setBalance(null)
+      return undefined
+    }
+
+    customerService
+      .wallet()
+      .then((response) => {
+        if (!active) return
+
+        setBalance(
+          Number(
+            response?.data
+              ?.balance || 0,
+          ),
+        )
+      })
+      .catch(() => {
+        if (active) {
+          setBalance(null)
+        }
+      })
+
+    return () => {
+      active = false
+    }
+  }, [isLoggedIn])
+
+  const availablePlatforms =
+    useMemo(() => {
+      const values = new Set(
+        services.map(
+          (item) =>
+            item.platform,
+        ),
+      )
+
+      return platformOptions.filter(
+        (item) =>
+          values.has(item.value),
+      )
+    }, [services])
+
+  const platformServices =
+    useMemo(() => {
+      if (!platform) return []
+
+      return services.filter(
+        (item) =>
+          item.platform === platform,
+      )
+    }, [services, platform])
+
+  const availableCategories =
+    useMemo(() => {
+      return [
+        ...new Set(
+          platformServices
+            .map(
+              (item) =>
+                String(
+                  item.category ||
+                    'other',
+                ).toLowerCase(),
+            )
+            .filter(Boolean),
+        ),
+      ]
+    }, [platformServices])
+
+  const categoryServices =
+    useMemo(() => {
+      if (
+        !platform ||
+        !category
+      ) {
+        return []
+      }
+
+      return platformServices.filter(
+        (item) =>
+          String(
+            item.category ||
+              'other',
+          ).toLowerCase() ===
+          category,
+      )
+    }, [
+      platformServices,
+      platform,
+      category,
+    ])
+
+  const selected = useMemo(
+    () =>
+      services.find(
+        (item) =>
+          String(item.id) ===
+          String(selectedId),
+      ),
+    [services, selectedId],
+  )
+
+  const requiresComments =
+    String(selected?.category || '')
+      .trim()
+      .toLowerCase() === 'comment'
+
+  const commentLines = comments
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+
+  const numericQuantity = requiresComments
+    ? commentLines.length
+    : Number(quantity) || 0
+
+  const total = useMemo(() => {
+    if (
+      !selected ||
+      numericQuantity <= 0
+    ) {
+      return 0
+    }
+
+    return (
+      Number(
+        selected.sell_price_per_1000,
+      ) *
+      numericQuantity /
+      1000
+    )
+  }, [
+    selected,
+    numericQuantity,
+  ])
+
+  const insufficient =
+    isLoggedIn &&
+    balance !== null &&
+    total > balance
+
+  const missingAmount =
+    insufficient
+      ? total - balance
+      : 0
+
+  const categoryMeta = {
+    follow: {
+      label: 'Follow / Followers',
+      icon: '♟',
+      color: 'blue',
+      description:
+        'Tăng người theo dõi cho tài khoản, trang hoặc kênh.',
+    },
+    like: {
+      label: 'Like',
+      icon: '♥',
+      color: 'pink',
+      description:
+        'Tăng lượt thích cho bài viết, ảnh hoặc video.',
+    },
+    view: {
+      label: 'View',
+      icon: '▶',
+      color: 'purple',
+      description:
+        'Tăng lượt xem cho video, reel hoặc story.',
+    },
+    comment: {
+      label: 'Comment',
+      icon: '●',
+      color: 'cyan',
+      description:
+        'Tăng bình luận cho bài viết hoặc video.',
+    },
+    share: {
+      label: 'Share',
+      icon: '↗',
+      color: 'orange',
+      description:
+        'Tăng lượt chia sẻ.',
+    },
+    reaction: {
+      label: 'Reaction',
+      icon: '♥',
+      color: 'amber',
+      description:
+        'Tăng lượt cảm xúc.',
+    },
+    member: {
+      label: 'Member',
+      icon: '♙',
+      color: 'emerald',
+      description:
+        'Tăng thành viên cho nhóm hoặc cộng đồng.',
+    },
+    save: {
+      label: 'Save',
+      icon: '★',
+      color: 'violet',
+      description:
+        'Tăng lượt lưu nội dung.',
+    },
+    other: {
+      label: 'Khác',
+      icon: '＋',
+      color: 'slate',
+      description:
+        'Các dịch vụ tương tác khác.',
+    },
+  }
+
+  function categoryColors(value) {
+    const color =
+      getCategoryMeta(value).color
+
+    const colors = {
+      blue: {
+        icon: 'bg-blue-100 text-blue-600',
+        active: 'bg-blue-50',
+        text: 'text-blue-600',
+        badge: 'bg-blue-100 text-blue-600',
+        check: 'bg-blue-600',
+      },
+      pink: {
+        icon: 'bg-pink-100 text-pink-600',
+        active: 'bg-pink-50',
+        text: 'text-pink-600',
+        badge: 'bg-pink-100 text-pink-600',
+        check: 'bg-pink-500',
+      },
+      purple: {
+        icon: 'bg-purple-100 text-purple-600',
+        active: 'bg-purple-50',
+        text: 'text-purple-600',
+        badge: 'bg-purple-100 text-purple-600',
+        check: 'bg-purple-600',
+      },
+      cyan: {
+        icon: 'bg-cyan-100 text-cyan-600',
+        active: 'bg-cyan-50',
+        text: 'text-cyan-600',
+        badge: 'bg-cyan-100 text-cyan-600',
+        check: 'bg-cyan-600',
+      },
+      orange: {
+        icon: 'bg-orange-100 text-orange-600',
+        active: 'bg-orange-50',
+        text: 'text-orange-600',
+        badge: 'bg-orange-100 text-orange-600',
+        check: 'bg-orange-500',
+      },
+      amber: {
+        icon: 'bg-amber-100 text-amber-600',
+        active: 'bg-amber-50',
+        text: 'text-amber-600',
+        badge: 'bg-amber-100 text-amber-600',
+        check: 'bg-amber-500',
+      },
+      emerald: {
+        icon: 'bg-emerald-100 text-emerald-600',
+        active: 'bg-emerald-50',
+        text: 'text-emerald-600',
+        badge: 'bg-emerald-100 text-emerald-600',
+        check: 'bg-emerald-600',
+      },
+      violet: {
+        icon: 'bg-violet-100 text-violet-600',
+        active: 'bg-violet-50',
+        text: 'text-violet-600',
+        badge: 'bg-violet-100 text-violet-600',
+        check: 'bg-violet-600',
+      },
+      slate: {
+        icon: 'bg-slate-100 text-slate-600',
+        active: 'bg-slate-50',
+        text: 'text-slate-700',
+        badge: 'bg-slate-100 text-slate-600',
+        check: 'bg-slate-600',
+      },
+    }
+
+    return colors[color] || colors.slate
+  }
+
+  function getCategoryMeta(value) {
+    return (
+      categoryMeta[value] || {
+        label:
+          categoryLabels[value] ||
+          value,
+        icon: '＋',
+        description:
+          'Dịch vụ tương tác.',
+      }
+    )
+  }
+
+  function categoryCount(value) {
+    return platformServices.filter(
+      (item) =>
+        String(
+          item.category ||
+            'other',
+        ).toLowerCase() ===
+        value,
+    ).length
+  }
+
+  function changePlatform(value) {
+    setPlatform(value)
+    setCategory('')
+    setCategoryOpen(false)
+    setServiceOpen(false)
+    setSelectedId('')
+    setTarget('')
+    setComments('')
+    setQuantity('')
+    setError('')
+  }
+
+  function changeCategory(value) {
+    setCategory(value)
+    setCategoryOpen(false)
+    setServiceOpen(false)
+    setSelectedId('')
+    setTarget('')
+    setComments('')
+    setQuantity('')
+    setError('')
+  }
+
+  function changeService(value) {
+    setSelectedId(value)
+    setServiceOpen(false)
+    setTarget('')
+    setComments('')
+    setError('')
+
+    const service =
+      services.find(
+        (item) =>
+          String(item.id) ===
+          String(value),
+      )
+
+    setQuantity(
+      service
+        ? String(
+            service.min_quantity ||
+              1,
+          )
+        : '',
+    )
+  }
+
+  function prepareOrder(event) {
+    event.preventDefault()
+    setError('')
+
+    if (!isLoggedIn) {
+      navigate('/login')
+      return
+    }
+
+    if (!selected) {
+      setError(
+        'Vui lòng chọn dịch vụ.',
+      )
+      return
+    }
+
+    if (!target.trim()) {
+      setError(
+        'Vui lòng nhập link, username hoặc ID.',
+      )
+      return
+    }
+
+    if (requiresComments && commentLines.length === 0) {
+      setError('Vui lòng nhập nội dung bình luận.')
+      return
+    }
+
+    if (
+      numericQuantity <
+        Number(
+          selected.min_quantity,
+        ) ||
+      numericQuantity >
+        Number(
+          selected.max_quantity,
+        )
+    ) {
+      setError(
+        `Số lượng phải từ ${Number(
+          selected.min_quantity,
+        ).toLocaleString(
+          'vi-VN',
+        )} đến ${Number(
+          selected.max_quantity,
+        ).toLocaleString(
+          'vi-VN',
+        )}.`,
+      )
+      return
+    }
+
+    if (balance === null) {
+      setError(
+        'Không kiểm tra được số dư.',
+      )
+      return
+    }
+
+    if (insufficient) {
+      return
+    }
+
+    if (requiresComments) {
+      setError(
+        'Chức năng đặt Comment đang chờ kết nối Backend.'
+      )
+      return
+    }
+
+    setConfirmOpen(true)
+  }
+
+  const [adminNotice, setAdminNotice] =
+    useState(false)
+
+  async function confirmOrder() {
+    if (
+      submitting ||
+      !selected
+    ) {
+      return
+    }
+
+    setSubmitting(true)
+    setError('')
+
+    try {
+      await customerService.createOrder({
+        service_id: selected.id,
+        target: target.trim(),
+        quantity:
+          numericQuantity,
+        idempotency_key:
+          getOrderKey(
+            selected.id,
+            target,
+            numericQuantity,
+          ),
+      })
+
+      try {
+        sessionStorage.removeItem(
+          'noscam-social-pending-order',
+        )
+      } catch {
+        // Storage không khả dụng.
+      }
+
+      window.dispatchEvent(
+        new Event(
+          'noscam-customer-updated',
+        ),
+      )
+
+      setConfirmOpen(false)
+
+      navigate('/my-orders', {
+        state: {
+          orderCreated: true,
+        },
+      })
+    } catch (err) {
+      setConfirmOpen(false)
+
+      const message =
+        err?.message ||
+        'Không tạo được đơn.'
+
+      if (
+        message.includes(
+          'Vui lòng liên hệ Admin',
+        )
+      ) {
+        setError('')
+        setAdminNotice(true)
+      } else {
+        setError(message)
+      }
+
+      try {
+        const response =
+          await customerService.wallet()
+
+        setBalance(
+          Number(
+            response?.data
+              ?.balance || 0,
+          ),
+        )
+      } catch {
+        // Giữ lỗi đặt đơn.
+      }
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <>
+      <main className="min-h-screen bg-slate-50 px-5 py-10">
+        <div className="mx-auto max-w-5xl">
+          <motion.div
+            initial={{
+              opacity: 0,
+              y: 15,
+            }}
+            animate={{
+              opacity: 1,
+              y: 0,
+            }}
+            className="rounded-[32px] bg-slate-950 px-7 py-8 text-white md:px-10"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-6">
+              <div>
+                <div className="text-sm font-black uppercase tracking-[0.2em] text-blue-400">
+                  NoScam Social
+                </div>
+
+                <h1 className="mt-2 text-3xl font-black md:text-4xl">
+                  Tăng tương tác
+                </h1>
+
+                <p className="mt-3 text-sm text-slate-300">
+                  Chọn dịch vụ và tạo đơn nhanh chóng.
+                </p>
+              </div>
+
+              {isLoggedIn && (
+                <div className="rounded-2xl border border-white/10 bg-white/10 px-5 py-3">
+                  <div className="text-xs font-bold uppercase text-slate-400">
+                    Số dư
+                  </div>
+
+                  <div className="mt-1 text-2xl font-black">
+                    {balance === null
+                      ? '...'
+                      : money(balance)}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="mt-5 flex gap-2">
+              <Link
+                to="/wallet"
+                className="rounded-xl bg-white px-4 py-2.5 text-sm font-black text-slate-950"
+              >
+                Ví của tôi
+              </Link>
+
+              <Link
+                to="/my-orders"
+                className="rounded-xl border border-white/20 px-4 py-2.5 text-sm font-black"
+              >
+                Đơn của tôi
+              </Link>
+            </div>
+          </motion.div>
+
+          {error && (
+            <div className="mt-5 rounded-2xl border border-red-100 bg-red-50 p-4 font-semibold text-red-600">
+              {error}
+            </div>
+          )}
+
+          <motion.form
+            initial={{
+              opacity: 0,
+              y: 12,
+            }}
+            animate={{
+              opacity: 1,
+              y: 0,
+            }}
+            onSubmit={prepareOrder}
+            className="mt-6 rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm md:p-8"
+          >
+            <div className="mb-7 flex items-center justify-between gap-4">
+              <div>
+                <h2 className="text-2xl font-black text-slate-950">
+                  Tạo đơn mới
+                </h2>
+
+                <p className="mt-1 text-sm text-slate-400">
+                  Chọn lần lượt nền tảng và dịch vụ.
+                </p>
+              </div>
+
+              <div className="rounded-xl bg-blue-50 px-3 py-2 text-xs font-black text-blue-600">
+                NEW ORDER
+              </div>
+            </div>
+
+            {loading ? (
+              <div className="rounded-2xl bg-slate-50 p-10 text-center text-slate-400">
+                Đang tải dịch vụ...
+              </div>
+            ) : (
+              <div className="space-y-6">
+                <div>
+                  <label className="mb-3 block text-sm font-black text-slate-700">
+                    1. Chọn nền tảng
+                  </label>
+
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    {availablePlatforms.map(
+                      (item) => {
+                        const active =
+                          platform ===
+                          item.value
+
+                        const count =
+                          services.filter(
+                            (service) =>
+                              service.platform ===
+                              item.value,
+                          ).length
+
+                        return (
+                          <motion.button
+                            type="button"
+                            key={item.value}
+                            whileHover={{
+                              y: -2,
+                            }}
+                            whileTap={{
+                              scale: 0.98,
+                            }}
+                            onClick={() =>
+                              changePlatform(
+                                item.value,
+                              )
+                            }
+                            className={`relative flex items-center gap-4 rounded-2xl border p-4 text-left transition ${
+                              active
+                                ? 'border-blue-600 bg-blue-50 shadow-sm'
+                                : 'border-slate-200 bg-white hover:border-blue-200'
+                            }`}
+                          >
+                            <span
+                              className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${
+                                active
+                                  ? 'bg-white'
+                                  : 'bg-slate-50'
+                              }`}
+                            >
+                              <PlatformIcon
+                                platform={
+                                  item.value
+                                }
+                                className="h-7 w-7"
+                              />
+                            </span>
+
+                            <div className="min-w-0">
+                              <div
+                                className={`font-black ${
+                                  active
+                                    ? 'text-blue-600'
+                                    : 'text-slate-950'
+                                }`}
+                              >
+                                {item.label}
+                              </div>
+
+                              <div className="mt-0.5 text-xs font-semibold text-slate-400">
+                                {count}{' '}
+                                dịch vụ
+                              </div>
+                            </div>
+
+                            {active && (
+                              <span className="absolute right-3 top-3 flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-[10px] font-black text-white">
+                                ✓
+                              </span>
+                            )}
+                          </motion.button>
+                        )
+                      },
+                    )}
+                  </div>
+                </div>
+
+                <div className="relative z-30">
+                  <label className="mb-2 block text-sm font-black text-slate-700">
+                    2. Loại dịch vụ
+                  </label>
+
+                  <button
+                    type="button"
+                    disabled={!platform}
+                    onClick={() => {
+                      if (platform) {
+                        setCategoryOpen(
+                          (value) => !value,
+                        )
+                      }
+                    }}
+                    className={`flex w-full items-center justify-between rounded-2xl border bg-white p-4 text-left transition ${
+                      categoryOpen
+                        ? 'border-blue-500 ring-4 ring-blue-50'
+                        : 'border-slate-200 hover:border-blue-300'
+                    } ${
+                      !platform
+                        ? 'cursor-not-allowed bg-slate-50 opacity-60'
+                        : ''
+                    }`}
+                  >
+                    {category ? (
+                      <div className="flex min-w-0 items-center gap-3">
+                        <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-xl font-black ${categoryColors(category).icon}`}>
+                          {
+                            getCategoryMeta(
+                              category,
+                            ).icon
+                          }
+                        </span>
+
+                        <div className="min-w-0">
+                          <div className="font-black text-slate-950">
+                            {
+                              getCategoryMeta(
+                                category,
+                              ).label
+                            }
+                          </div>
+
+                          <div className="mt-0.5 truncate text-xs font-medium text-slate-400">
+                            {
+                              getCategoryMeta(
+                                category,
+                              ).description
+                            }
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-3">
+                        <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-50 text-lg text-slate-400">
+                          ◫
+                        </span>
+
+                        <div>
+                          <div className="font-bold text-slate-500">
+                            {platform
+                              ? 'Chọn loại dịch vụ'
+                              : 'Chọn nền tảng trước'}
+                          </div>
+
+                          {platform && (
+                            <div className="mt-0.5 text-xs text-slate-400">
+                              Follow, Like, View, Comment...
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    <motion.span
+                      animate={{
+                        rotate:
+                          categoryOpen
+                            ? 180
+                            : 0,
+                      }}
+                      className="ml-4 shrink-0 text-sm font-black text-slate-400"
+                    >
+                      ▼
+                    </motion.span>
+                  </button>
+
+                  <AnimatePresence>
+                    {categoryOpen &&
+                      platform && (
+                        <motion.div
+                          initial={{
+                            opacity: 0,
+                            y: -8,
+                            scale: 0.99,
+                          }}
+                          animate={{
+                            opacity: 1,
+                            y: 0,
+                            scale: 1,
+                          }}
+                          exit={{
+                            opacity: 0,
+                            y: -8,
+                            scale: 0.99,
+                          }}
+                          transition={{
+                            duration: 0.16,
+                          }}
+                          className="absolute left-0 right-0 top-[calc(100%+8px)] z-50 overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl"
+                        >
+                          <div className="max-h-80 overflow-y-auto">
+                            {availableCategories.map(
+                              (value) => {
+                                const meta =
+                                  getCategoryMeta(
+                                    value,
+                                  )
+
+                                const active =
+                                  category ===
+                                  value
+
+                                const colors =
+                                  categoryColors(
+                                    value,
+                                  )
+
+                                return (
+                                  <button
+                                    type="button"
+                                    key={
+                                      value
+                                    }
+                                    onClick={() =>
+                                      changeCategory(
+                                        value,
+                                      )
+                                    }
+                                    className={`flex w-full items-center gap-3 rounded-xl p-3 text-left transition ${
+                                      active
+                                        ? colors.active
+                                        : 'hover:bg-slate-50'
+                                    }`}
+                                  >
+                                    <span
+                                      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-lg font-black ${
+                                        active
+                                          ? `${colors.icon} shadow-sm`
+                                          : colors.icon
+                                      }`}
+                                    >
+                                      {
+                                        meta.icon
+                                      }
+                                    </span>
+
+                                    <div className="min-w-0 flex-1">
+                                      <div
+                                        className={`font-black ${
+                                          active
+                                            ? colors.text
+                                            : 'text-slate-900'
+                                        }`}
+                                      >
+                                        {
+                                          meta.label
+                                        }
+                                      </div>
+
+                                      <div className="mt-0.5 truncate text-xs text-slate-400">
+                                        {
+                                          meta.description
+                                        }
+                                      </div>
+                                    </div>
+
+                                    <div className="ml-3 flex shrink-0 items-center gap-3">
+                                      <span
+                                        className={`rounded-full px-2.5 py-1 text-xs font-black ${colors.badge}`}
+                                      >
+                                        {categoryCount(
+                                          value,
+                                        )}{' '}
+                                        dịch vụ
+                                      </span>
+
+                                      {active && (
+                                        <span className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-black text-white ${colors.check}`}>
+                                          ✓
+                                        </span>
+                                      )}
+                                    </div>
+                                  </button>
+                                )
+                              },
+                            )}
+                          </div>
+                        </motion.div>
+                      )}
+                  </AnimatePresence>
+                </div>
+
+                <div className="relative z-20">
+                  <label className="mb-2 block text-sm font-black text-slate-700">
+                    3. Dịch vụ
+                  </label>
+
+                  <button
+                    type="button"
+                    disabled={!category}
+                    onClick={() => {
+                      if (category) {
+                        setServiceOpen(
+                          (value) => !value,
+                        )
+                      }
+                    }}
+                    className={`flex w-full items-center justify-between gap-4 rounded-2xl border bg-white p-4 text-left transition ${
+                      serviceOpen
+                        ? 'border-blue-500 ring-4 ring-blue-50'
+                        : 'border-slate-200 hover:border-blue-300'
+                    } ${
+                      !category
+                        ? 'cursor-not-allowed bg-slate-50 opacity-60'
+                        : ''
+                    }`}
+                  >
+                    {selected ? (
+                      <>
+                        <div className="flex min-w-0 flex-1 items-center gap-3">
+                          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50">
+                            <PlatformIcon
+                              platform={
+                                selected.platform
+                              }
+                              className="h-6 w-6"
+                            />
+                          </span>
+
+                          <div className="min-w-0 flex-1">
+                            <div className="line-clamp-2 font-black leading-5 text-slate-950">
+                              {selected.name}
+                            </div>
+
+                            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-semibold text-slate-400">
+                              <span>
+                                Min:{' '}
+                                {Number(
+                                  selected.min_quantity,
+                                ).toLocaleString(
+                                  'vi-VN',
+                                )}
+                              </span>
+
+                              <span>
+                                Max:{' '}
+                                {Number(
+                                  selected.max_quantity,
+                                ).toLocaleString(
+                                  'vi-VN',
+                                )}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="shrink-0 text-right">
+                          <div className="font-black text-blue-600">
+                            {Number(selected.sell_price_per_1000) > 0
+                              ? moneyUnit(Number(selected.sell_price_per_1000) / 1000)
+                              : 'Liên hệ Admin'}
+                          </div>
+
+                          <div className="text-[11px] font-bold text-slate-400">
+                            / lượt
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="flex items-center gap-3">
+                        <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-50 text-lg text-slate-400">
+                          ☆
+                        </span>
+
+                        <div>
+                          <div className="font-bold text-slate-500">
+                            {category
+                              ? 'Chọn dịch vụ'
+                              : 'Chọn loại dịch vụ trước'}
+                          </div>
+
+                          {category && (
+                            <div className="mt-0.5 text-xs text-slate-400">
+                              Có{' '}
+                              {
+                                categoryServices.length
+                              }{' '}
+                              dịch vụ khả dụng
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    <motion.span
+                      animate={{
+                        rotate:
+                          serviceOpen
+                            ? 180
+                            : 0,
+                      }}
+                      className="ml-2 shrink-0 text-sm font-black text-slate-400"
+                    >
+                      ▼
+                    </motion.span>
+                  </button>
+
+                  <AnimatePresence>
+                    {serviceOpen &&
+                      category && (
+                        <motion.div
+                          initial={{
+                            opacity: 0,
+                            y: -8,
+                            scale: 0.99,
+                          }}
+                          animate={{
+                            opacity: 1,
+                            y: 0,
+                            scale: 1,
+                          }}
+                          exit={{
+                            opacity: 0,
+                            y: -8,
+                            scale: 0.99,
+                          }}
+                          transition={{
+                            duration: 0.16,
+                          }}
+                          className="absolute left-0 right-0 top-[calc(100%+8px)] z-50 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
+                        >
+                          <div className="border-b border-slate-100 bg-slate-50/80 px-4 py-3">
+                            <div className="flex items-center justify-between gap-3">
+                              <div>
+                                <div className="text-xs font-black uppercase tracking-wide text-slate-400">
+                                  Chọn dịch vụ
+                                </div>
+
+                                <div className="mt-0.5 text-sm font-bold text-slate-700">
+                                  {
+                                    getCategoryMeta(
+                                      category,
+                                    ).label
+                                  }
+                                </div>
+                              </div>
+
+                              <span
+                                className={`rounded-full px-3 py-1 text-xs font-black ${
+                                  categoryColors(
+                                    category,
+                                  ).badge
+                                }`}
+                              >
+                                {
+                                  categoryServices.length
+                                }{' '}
+                                dịch vụ
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="max-h-[380px] overflow-y-auto p-2">
+                            {categoryServices.map(
+                              (item) => {
+                                const active =
+                                  String(
+                                    selectedId,
+                                  ) ===
+                                  String(
+                                    item.id,
+                                  )
+
+                                const colors =
+                                  categoryColors(
+                                    category,
+                                  )
+
+                                return (
+                                  <button
+                                    type="button"
+                                    key={
+                                      item.id
+                                    }
+                                    onClick={() =>
+                                      changeService(
+                                        String(
+                                          item.id,
+                                        ),
+                                      )
+                                    }
+                                    className={`group flex w-full items-start gap-3 rounded-xl p-3 text-left transition ${
+                                      active
+                                        ? colors.active
+                                        : 'hover:bg-slate-50'
+                                    }`}
+                                  >
+                                    <span
+                                      className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+                                        active
+                                          ? colors.icon
+                                          : 'bg-slate-50'
+                                      }`}
+                                    >
+                                      <PlatformIcon
+                                        platform={
+                                          item.platform
+                                        }
+                                        className="h-5 w-5"
+                                      />
+                                    </span>
+
+                                    <div className="min-w-0 flex-1">
+                                      <div
+                                        className={`text-sm font-black leading-5 ${
+                                          active
+                                            ? colors.text
+                                            : 'text-slate-900'
+                                        }`}
+                                      >
+                                        {
+                                          item.name
+                                        }
+                                      </div>
+
+                                      <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] font-semibold text-slate-400">
+                                        <span className="rounded-md bg-slate-100 px-2 py-1">
+                                          Min{' '}
+                                          {Number(
+                                            item.min_quantity,
+                                          ).toLocaleString(
+                                            'vi-VN',
+                                          )}
+                                        </span>
+
+                                        <span className="rounded-md bg-slate-100 px-2 py-1">
+                                          Max{' '}
+                                          {Number(
+                                            item.max_quantity,
+                                          ).toLocaleString(
+                                            'vi-VN',
+                                          )}
+                                        </span>
+                                      </div>
+                                    </div>
+
+                                    <div className="ml-3 shrink-0 text-right">
+                                      <div
+                                        className={`text-sm font-black ${
+                                          active
+                                            ? colors.text
+                                            : 'text-blue-600'
+                                        }`}
+                                      >
+                                        {Number(item.sell_price_per_1000) > 0
+                                          ? moneyUnit(Number(item.sell_price_per_1000) / 1000)
+                                          : 'Liên hệ Admin'}
+                                      </div>
+
+                                      <div className="text-[10px] font-bold text-slate-400">
+                                        / lượt
+                                      </div>
+
+                                      {active && (
+                                        <span
+                                          className={`mt-2 ml-auto flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-black text-white ${colors.check}`}
+                                        >
+                                          ✓
+                                        </span>
+                                      )}
+                                    </div>
+                                  </button>
+                                )
+                              },
+                            )}
+                          </div>
+                        </motion.div>
+                      )}
+                  </AnimatePresence>
+                </div>
+
+                {selected && (
+                  <>
+                    <div>
+                      <label className="mb-2 block text-sm font-black text-slate-700">
+                        4. Link / Username / ID
+                      </label>
+
+                      <input
+                        required
+                        value={target}
+                        onChange={(e) =>
+                          setTarget(
+                            e.target.value,
+                          )
+                        }
+                        placeholder="Nhập link, username hoặc ID..."
+                        className="w-full rounded-2xl border border-slate-200 px-4 py-4 outline-none transition focus:border-blue-500"
+                      />
+                    </div>
+                    {requiresComments && (
+                      <div>
+                        <label className="mb-2 block text-sm font-black text-slate-700">
+                          5. Nội dung bình luận
+                        </label>
+
+                        <textarea
+                          value={comments}
+                          onChange={(e) => setComments(e.target.value)}
+                          rows={6}
+                          placeholder={"Mỗi dòng là một bình luận..."}
+                          className="w-full rounded-2xl border border-slate-200 px-4 py-4 outline-none transition focus:border-blue-500"
+                        />
+
+                        <p className="mt-2 text-sm font-semibold text-blue-600">
+                          Đã nhập: {commentLines.length} bình luận
+                        </p>
+                      </div>
+                    )}
+
+
+
+                    {selected?.description?.trim() && (
+                      <div className="rounded-2xl border border-blue-100 bg-blue-50/70 p-4">
+                        <div className="mb-2 text-sm font-black text-blue-800">
+                          Ghi chú dịch vụ
+                        </div>
+
+                        <p className="whitespace-pre-wrap break-words text-sm leading-6 text-slate-700">
+                          {selected.description}
+                        </p>
+                      </div>
+                    )}
+
+                    <div>
+                      <label className="mb-2 block text-sm font-black text-slate-700">
+                        5. Số lượng
+                      </label>
+
+                      <input
+                        required
+                        type="number"
+                        min={
+                          selected.min_quantity
+                        }
+                        max={
+                          selected.max_quantity
+                        }
+                        value={
+                            requiresComments
+                              ? numericQuantity
+                              : quantity
+                          }
+                          readOnly={requiresComments}
+                        onChange={(e) =>
+                          setQuantity(
+                            e.target.value,
+                          )
+                        }
+                        className="w-full rounded-2xl border border-slate-200 px-4 py-4 text-lg font-black outline-none transition focus:border-blue-500"
+                      />
+
+                      <div className="mt-2 flex justify-between text-xs font-semibold text-slate-400">
+                        <span>
+                          Min:{' '}
+                          {Number(
+                            selected.min_quantity,
+                          ).toLocaleString(
+                            'vi-VN',
+                          )}
+                        </span>
+
+                        <span>
+                          Max:{' '}
+                          {Number(
+                            selected.max_quantity,
+                          ).toLocaleString(
+                            'vi-VN',
+                          )}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                      <div className="flex items-center justify-between gap-4">
+                        <span className="font-bold text-slate-500">
+                          Đơn giá / 1 lượt
+                        </span>
+
+                        <span className="font-black">
+                          {Number(selected.sell_price_per_1000) > 0
+                            ? moneyUnit(Number(selected.sell_price_per_1000) / 1000)
+                            : 'Liên hệ Admin'}
+                        </span>
+                      </div>
+
+                      <div className="mt-3 flex items-center justify-between gap-4">
+                        <span className="font-bold text-slate-500">
+                          Số lượng
+                        </span>
+
+                        <span className="font-black">
+                          {numericQuantity.toLocaleString(
+                            'vi-VN',
+                          )}
+                        </span>
+                      </div>
+
+                      <div className="mt-4 border-t border-slate-200 pt-4">
+                        <div className="flex items-center justify-between gap-4">
+                          <span className="text-lg font-black">
+                            Tổng tiền
+                          </span>
+
+                          <span className="text-3xl font-black text-blue-600">
+                            {money(total)}
+                          </span>
+                        </div>
+                      </div>
+
+                      {isLoggedIn &&
+                        balance !==
+                          null && (
+                          <div className="mt-4 flex items-center justify-between border-t border-slate-200 pt-4">
+                            <span className="text-sm font-semibold text-slate-500">
+                              Số dư hiện tại
+                            </span>
+
+                            <span className="font-black">
+                              {money(
+                                balance,
+                              )}
+                            </span>
+                          </div>
+                        )}
+                    </div>
+
+                    {insufficient && (
+                      <div className="rounded-2xl border border-red-100 bg-red-50 p-5">
+                        <div className="font-black text-red-600">
+                          Số dư không đủ
+                        </div>
+
+                        <div className="mt-1 text-sm text-red-500">
+                          Bạn còn thiếu{' '}
+                          <strong>
+                            {money(
+                              missingAmount,
+                            )}
+                          </strong>
+                          .
+                        </div>
+
+                        <Link
+                          to="/wallet"
+                          className="mt-3 inline-flex rounded-xl bg-red-600 px-4 py-2.5 text-sm font-black text-white"
+                        >
+                          Nạp tiền
+                        </Link>
+                      </div>
+                    )}
+
+                    {!isLoggedIn ? (
+                      <button
+                        type="submit"
+                        className="w-full rounded-2xl bg-blue-600 px-5 py-4 font-black text-white transition hover:bg-blue-700"
+                      >
+                        Đăng nhập để đặt đơn
+                      </button>
+                    ) : insufficient ? (
+                      <Link
+                        to="/wallet"
+                        className="flex w-full items-center justify-center rounded-2xl bg-slate-950 px-5 py-4 font-black text-white"
+                      >
+                        Nạp thêm{' '}
+                        {money(
+                          missingAmount,
+                        )}
+                      </Link>
+                    ) : (
+                      <button
+                        type="submit"
+                        disabled={
+                          balance ===
+                            null ||
+                          total <= 0
+                        }
+                        className="w-full rounded-2xl bg-blue-600 px-5 py-4 text-base font-black text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        Tiếp tục đặt đơn
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+          </motion.form>
+        </div>
+      {adminNotice && (
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-slate-950/60 p-4">
+          <div className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl">
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-50 text-2xl font-black text-amber-600">
+              !
+            </div>
+
+            <h2 className="mt-5 text-2xl font-black text-slate-950">
+              Không thể đặt hàng
+            </h2>
+
+            <p className="mt-2 text-sm font-medium leading-6 text-slate-500">
+              Dịch vụ hiện chưa thể xử lý.
+              Vui lòng liên hệ Admin để được hỗ trợ.
+            </p>
+
+            <button
+              type="button"
+              onClick={() =>
+                setAdminNotice(false)
+              }
+              className="mt-6 w-full rounded-2xl bg-slate-950 px-4 py-3 font-black text-white transition hover:bg-slate-800"
+            >
+              Đã hiểu
+            </button>
+          </div>
+        </div>
+      )}
+
+      </main>
+
+      <AnimatePresence>
+        {confirmOpen &&
+          selected && (
+            <motion.div
+              initial={{
+                opacity: 0,
+              }}
+              animate={{
+                opacity: 1,
+              }}
+              exit={{
+                opacity: 0,
+              }}
+              className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/60 p-5 backdrop-blur-sm"
+              onClick={() => {
+                if (!submitting) {
+                  setConfirmOpen(
+                    false,
+                  )
+                }
+              }}
+            >
+              <motion.div
+                initial={{
+                  opacity: 0,
+                  scale: 0.96,
+                  y: 15,
+                }}
+                animate={{
+                  opacity: 1,
+                  scale: 1,
+                  y: 0,
+                }}
+                exit={{
+                  opacity: 0,
+                  scale: 0.96,
+                  y: 15,
+                }}
+                onClick={(e) =>
+                  e.stopPropagation()
+                }
+                className="w-full max-w-lg rounded-[28px] bg-white p-6 shadow-2xl"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50">
+                    <PlatformIcon
+                      platform={
+                        selected.platform
+                      }
+                      className="h-7 w-7"
+                    />
+                  </span>
+
+                  <div>
+                    <div className="text-xs font-black uppercase text-blue-600">
+                      Xác nhận đơn hàng
+                    </div>
+
+                    <div className="mt-1 text-xl font-black">
+                      Kiểm tra thông tin
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-5 space-y-3">
+                  <div className="rounded-2xl bg-slate-50 p-4">
+                    <div className="text-xs font-bold text-slate-400">
+                      DỊCH VỤ
+                    </div>
+
+                    <div className="mt-1 font-black">
+                      {selected.name}
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl bg-slate-50 p-4">
+                    <div className="text-xs font-bold text-slate-400">
+                      LINK / USERNAME / ID
+                    </div>
+
+                    <div className="mt-1 break-all font-bold">
+                      {target}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="rounded-2xl bg-slate-50 p-4">
+                      <div className="text-xs font-bold text-slate-400">
+                        SỐ LƯỢNG
+                      </div>
+
+                      <div className="mt-1 text-lg font-black">
+                        {numericQuantity.toLocaleString(
+                          'vi-VN',
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl bg-blue-50 p-4">
+                      <div className="text-xs font-bold text-blue-400">
+                        THANH TOÁN
+                      </div>
+
+                      <div className="mt-1 text-lg font-black text-blue-600">
+                        {money(total)}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-6 grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    disabled={
+                      submitting
+                    }
+                    onClick={() =>
+                      setConfirmOpen(
+                        false,
+                      )
+                    }
+                    className="rounded-2xl border border-slate-200 px-4 py-3.5 font-black"
+                  >
+                    Quay lại
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={
+                      submitting
+                    }
+                    onClick={
+                      confirmOrder
+                    }
+                    className="rounded-2xl bg-blue-600 px-4 py-3.5 font-black text-white disabled:opacity-50"
+                  >
+                    {submitting
+                      ? 'Đang đặt...'
+                      : 'Xác nhận đặt'}
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+      </AnimatePresence>
+    </>
+  )
+}
+
+
+======================================================================
+FILE: noscam-frontend/src/pages/Admin/AdminSocialServicesPage.jsx
+======================================================================
+
+
+function getProviderDescriptionForSale(item) {
+  const descriptionKeys = [
+    'description',
+    'service_description',
+    'channel_description',
+    'desc',
+    'service_desc',
+    'details',
+    'detail',
+    'note',
+    'notes',
+    'content',
+    'info',
+    'information',
+    'instructions',
+    'instruction',
+  ]
+  function parseJSON(value) {
+    if (typeof value !== 'string') return value
+
+    const text = value.trim()
+
+    if (!text.startsWith('{') && !text.startsWith('[')) {
+      return value
+    }
+
+    try {
+      return JSON.parse(text)
+    } catch {
+      return value
+    }
+  }
+
+  function findDescription(root) {
+    const queue = [root]
+    const visited = new Set()
+    let inspected = 0
+
+    while (queue.length && inspected < 100) {
+      inspected += 1
+      const current = parseJSON(queue.shift())
+
+      if (!current || typeof current !== 'object') continue
+      if (visited.has(current)) continue
+
+      visited.add(current)
+
+      for (const key of descriptionKeys) {
+        const value = current[key]
+
+        if (typeof value === 'string' && value.trim()) {
+          return value.trim()
+        }
+      }
+
+      for (const [key, value] of Object.entries(current)) {
+        if (/key|token|secret|password|credential|authorization/i.test(key)) {
+          continue
+        }
+
+        if (value && typeof value === 'object') {
+          queue.push(value)
+        } else if (
+          typeof value === 'string' &&
+          /^[\s]*[\[{]/.test(value)
+        ) {
+          queue.push(parseJSON(value))
+        }
+      }
+    }
+
+    return ''
+  }
+
+  const description = findDescription({
+    provider_description: item?.provider_description,
+    provider_data: item?.provider_data,
+  })
+
+  function formatDescription(value) {
+    if (typeof value !== 'string') return ''
+
+    const withBreaks = value
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/(?:p|div|li)>/gi, '\n')
+      .replace(/<li\b[^>]*>/gi, '- ')
+      .replace(/<[^>]*>/g, '')
+
+    const textarea = document.createElement('textarea')
+    textarea.innerHTML = withBreaks
+
+    return textarea.value
+      .replace(/\n{3,}/g, '\n\n')
+      .trim()
+  }
+
+  return formatDescription(description).slice(0, 5000)
+}
+
+function ProviderDescription({ item }) {
+  const descriptionKeys = [
+    'description',
+    'service_description',
+    'channel_description',
+    'desc',
+    'service_desc',
+    'details',
+    'detail',
+    'note',
+    'notes',
+    'content',
+    'info',
+    'information',
+    'instructions',
+    'instruction',
+  ]
+
+  function parseJSON(value) {
+    if (typeof value !== 'string') return value
+
+    const text = value.trim()
+
+    if (!text.startsWith('{') && !text.startsWith('[')) {
+      return value
+    }
+
+    try {
+      return JSON.parse(text)
+    } catch {
+      return value
+    }
+  }
+
+  function findDescription(root) {
+    const queue = [root]
+    const visited = new Set()
+    let inspected = 0
+
+    while (queue.length && inspected < 100) {
+      inspected += 1
+      const current = parseJSON(queue.shift())
+
+      if (!current || typeof current !== 'object') continue
+      if (visited.has(current)) continue
+
+      visited.add(current)
+
+      for (const key of descriptionKeys) {
+        const value = current[key]
+
+        if (typeof value === 'string' && value.trim()) {
+          return value.trim()
+        }
+      }
+
+      for (const [key, value] of Object.entries(current)) {
+        if (/key|token|secret|password|credential|authorization/i.test(key)) {
+          continue
+        }
+
+        if (value && typeof value === 'object') {
+          queue.push(value)
+        } else if (
+          typeof value === 'string' &&
+          /^[\s]*[\[{]/.test(value)
+        ) {
+          queue.push(parseJSON(value))
+        }
+      }
+    }
+
+    return ''
+  }
+
+  const description = findDescription({
+    provider_description: item.provider_description,
+    provider_data: item.provider_data,
+  })
+
+
+  function formatDescription(value) {
+    if (typeof value !== 'string') return ''
+
+    const withBreaks = value
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/(?:p|div|li)>/gi, '\n')
+      .replace(/<li\b[^>]*>/gi, '- ')
+      .replace(/<[^>]*>/g, '')
+
+    const textarea = document.createElement('textarea')
+    textarea.innerHTML = withBreaks
+
+    return textarea.value
+      .replace(/\n{3,}/g, '\n\n')
+      .trim()
+  }
+
+  const readableDescription = formatDescription(description)
+
+  if (!description) {
+    return (
+      <div className="text-xs leading-5 text-slate-400">
+        Chưa có mô tả
+      </div>
+    )
+  }
+
+  return (
+    
+    <div className="w-full whitespace-pre-wrap break-words text-xs leading-5 text-slate-700">
+      {readableDescription}
+    </div>
+
+  )
+}
+
+
+import NoScamSelect from '../../components/ui/NoScamSelect'
+import { useNoScamUI } from '../../components/ui/NoScamUI'
+import {
+  useCallback,
+  useEffect,
+  useState,
+} from 'react'
+
+import {
+  motion,
+  AnimatePresence,
+} from 'framer-motion'
+
+import AdminNav from '../../components/admin/AdminNav'
+import SocialAdminNav from '../../components/admin/social/SocialAdminNav'
+import adminService from '../../services/adminService'
+
+function money(value) {
+  return new Intl.NumberFormat(
+    'vi-VN',
+    {
+      maximumFractionDigits: 4,
+    },
+  ).format(
+    Number(value || 0),
+  )
+}
+
+
+function vnd(value) {
+  return `${new Intl.NumberFormat(
+    'vi-VN',
+    {
+      maximumFractionDigits: 0,
+    },
+  ).format(Number(value || 0))}đ`
+}
+
+function profitAmount(
+  sellPrice,
+  costPrice,
+) {
+  return (
+    Number(sellPrice || 0) -
+    Number(costPrice || 0)
+  )
+}
+
+function profitPercent(
+  sellPrice,
+  costPrice,
+) {
+  const cost =
+    Number(costPrice || 0)
+
+  if (cost <= 0) {
+    return 0
+  }
+
+  return (
+    profitAmount(
+      sellPrice,
+      cost,
+    ) /
+    cost *
+    100
+  )
+}
+
+function ProviderBadge({
+  provider,
+}) {
+  const names = {
+    vietnamfb: 'VietnamFB',
+    nganhangsub: 'NganHangSub',
+    hacklike17: 'HackLike17',
+  }
+
+  return (
+    <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">
+      {names[provider?.driver] ||
+        provider?.name ||
+        'Provider'}
+    </span>
+  )
+}
+
+function MapModal({ item, onClose, onDone }) {
+  const sourceName = item.provider_service_name || ''
+  const source = sourceName.toLowerCase()
+
+  const detectedPlatform =
+    /instagram|\big\b/i.test(source) ? 'instagram' :
+    /tiktok|tik tok/i.test(source) ? 'tiktok' :
+    /facebook|\bfb\b/i.test(source) ? 'facebook' :
+    'other'
+
+  const detectedCategory =
+    /follow|follower/i.test(source) ? 'follow' :
+    /comment/i.test(source) ? 'comment' :
+    /share/i.test(source) ? 'share' :
+    /view|watch/i.test(source) ? 'view' :
+    /reaction|react/i.test(source) ? 'reaction' :
+    /like/i.test(source) ? 'like' :
+    /member/i.test(source) ? 'member' :
+    /save|favorite|favourite/i.test(source) ? 'save' :
+    'other'
+
+  const [platform, setPlatform] = useState(detectedPlatform)
+  const [category, setCategory] = useState(detectedCategory)
+  const [name, setName] = useState(sourceName)
+  const [description, setDescription] = useState(() => getProviderDescriptionForSale(item))
+  const [price, setPrice] = useState('')
+
+  const [noscamManualLimitMin, setNoscamManualLimitMin] = useState(
+    String(item.min_quantity ?? '')
+  )
+  const [noscamManualLimitMax, setNoscamManualLimitMax] = useState(
+    String(item.max_quantity ?? '')
+  )
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+
+  const cost1000 = Number(
+    item.cost_price_vnd ?? item.cost_price_per_1000 ?? 0
+  )
+  const cost1 = cost1000 / 1000
+  const sell1 = Number(price)
+  const profit1 = sell1 - cost1
+
+  const format = (value) =>
+    new Intl.NumberFormat('vi-VN', {
+      maximumFractionDigits: 7,
+    }).format(Number(value || 0))
+
+  async function submit() {
+    setError('')
+
+    if (item.social_service_id || item.service?.id) {
+      setError('Dịch vụ API này đã được đưa lên bán.')
+      return
+    }
+
+    if (!name.trim()) {
+      setError('Vui lòng nhập tên dịch vụ.')
+      return
+    }
+
+    if (platform === 'other' || category === 'other') {
+      setError('Vui lòng xác nhận nền tảng và loại dịch vụ.')
+      return
+    }
+
+    if (
+      price.trim() === '' ||
+      !Number.isFinite(sell1) ||
+      sell1 <= cost1
+    ) {
+      setError(
+        `Giá bán phải cao hơn giá vốn ${format(cost1)}đ/lượt.`
+      )
+      return
+    }
+
+    const min = Number(noscamManualLimitMin)
+    const max = Number(noscamManualLimitMax)
+
+    if (
+      noscamManualLimitMin.trim() === '' ||
+      noscamManualLimitMax.trim() === '' ||
+      !Number.isSafeInteger(min) ||
+      !Number.isSafeInteger(max) ||
+      min < 1 ||
+      max < min
+    ) {
+      setError('Vui lòng nhập Min và Max hợp lệ (Min ≥ 1, Max ≥ Min).')
+      return
+    }
+
+    setBusy(true)
+
+    try {
+      await adminService.mapSocialProviderService(item.id, {
+        platform,
+        category,
+        name: name.trim(),
+        description: description.trim() || null,
+        sell_price_per_1000: Number((sell1 * 1000).toFixed(4)),
+        min_quantity: min,
+        max_quantity: max,
+        priority: Number(item.priority ?? 100),
+        is_active: true,
+      })
+
+      await onDone()
+      onClose()
+    } catch (err) {
+      setError(
+        err?.data?.message ||
+        err?.message ||
+        'Không thể đưa dịch vụ lên bán.'
+      )
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const fieldClass =
+    'w-full rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-blue-400'
+
+  return (
+    <motion.div
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+    >
+      <motion.div
+        className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl"
+        initial={{ opacity: 0, y: 15 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: 15 }}
+      >
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-xl font-black text-slate-950">
+              Đưa lên bán
+            </h2>
+            <div className="mt-2">
+              <ProviderBadge provider={item.provider} />
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={busy}
+            className="rounded-xl bg-slate-100 px-4 py-2 font-bold"
+          >
+            ×
+          </button>
+        </div>
+
+        <div className="mt-5 rounded-xl bg-slate-50 p-4">
+          <div className="text-xs font-bold text-slate-500">
+            Tên dịch vụ gốc từ API
+          </div>
+          <div className="mt-1 break-words font-semibold">
+            {sourceName}
+          </div>
+          <div className="mt-1 text-xs text-slate-500">
+            ID: {item.provider_service_id}
+          </div>
+        </div>
+
+        <div className="mt-5 grid gap-4 sm:grid-cols-2">
+          <label className="grid gap-2">
+            <span className="text-sm font-bold">Nền tảng</span>
+            <NoScamSelect
+              value={platform}
+              onChange={(e) => setPlatform(e.target.value)}
+              className={fieldClass}
+            >
+              <option value="other">Chưa xác định</option>
+              <option value="facebook">Facebook</option>
+              <option value="instagram">Instagram</option>
+              <option value="tiktok">TikTok</option>
+            </NoScamSelect>
+          </label>
+
+          <label className="grid gap-2">
+            <span className="text-sm font-bold">Loại dịch vụ</span>
+            <NoScamSelect
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              className={fieldClass}
+            >
+              <option value="other">Chưa xác định</option>
+              <option value="follow">Follow</option>
+              <option value="like">Like</option>
+              <option value="comment">Comment</option>
+              <option value="view">View</option>
+              <option value="share">Share</option>
+              <option value="reaction">Reaction</option>
+              <option value="member">Member</option>
+              <option value="save">Save</option>
+            </NoScamSelect>
+          </label>
+        </div>
+
+        <p className="mt-2 text-xs text-slate-500">
+          Tự nhận diện từ tên API. Có thể chỉnh lại nếu cần.
+        </p>
+
+        <label className="mt-5 grid gap-2">
+          <span className="text-sm font-bold">
+            Tên khách hàng nhìn thấy
+          </span>
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            maxLength={255}
+            className={fieldClass}
+          />
+        </label>
+
+        <div className="mt-5 grid gap-3 sm:grid-cols-2">
+          <div className="rounded-xl bg-blue-50 p-4">
+            <div className="text-xs font-bold text-blue-600">
+              Giá vốn / 1 lượt
+            </div>
+            <div className="mt-1 text-xl font-black text-blue-800">
+              {format(cost1)}đ
+            </div>
+          </div>
+
+          <div className="rounded-xl bg-slate-50 p-4">
+            <div className="text-xs font-bold text-slate-500">
+              Min / Max từ API
+            </div>
+            <div className="mt-1 font-bold">
+              {format(item.min_quantity || 1)}
+              {' – '}
+              {format(item.max_quantity || 1000000)}
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <label className="grid gap-2">
+            <span className="text-sm font-bold">Min bán cho khách</span>
+            <input
+              type="number"
+              min="1"
+              step="1"
+              value={noscamManualLimitMin}
+              onChange={(e) => setNoscamManualLimitMin(e.target.value)}
+              placeholder="Nhập Min"
+              className={fieldClass}
+            />
+          </label>
+          <label className="grid gap-2">
+            <span className="text-sm font-bold">Max bán cho khách</span>
+            <input
+              type="number"
+              min="1"
+              step="1"
+              value={noscamManualLimitMax}
+              onChange={(e) => setNoscamManualLimitMax(e.target.value)}
+              placeholder="Nhập Max"
+              className={fieldClass}
+            />
+          </label>
+        </div>
+        <p className="mt-2 text-xs text-amber-700">
+          Nếu API không cung cấp Min/Max, hãy xác minh với
+          nhà cung cấp trước khi nhập giới hạn bán.
+        </p>
+
+        <label className="mt-5 grid gap-2">
+          <span className="text-sm font-bold">
+            Giá bán / 1 lượt (VND)
+          </span>
+          <input
+            type="number"
+            min="0"
+            step="any"
+            value={price}
+            onChange={(e) => setPrice(e.target.value)}
+            placeholder="Ví dụ: 0.5 hoặc 2"
+            className={fieldClass}
+          />
+        </label>
+
+        {price !== '' && Number.isFinite(sell1) && (
+          <div className={`mt-3 rounded-xl p-3 text-sm font-bold ${
+            profit1 > 0
+              ? 'bg-emerald-50 text-emerald-700'
+              : 'bg-red-50 text-red-700'
+          }`}>
+            Lãi dự kiến: {format(profit1)}đ/lượt
+            {' · '}
+            {cost1 > 0
+              ? `${format((profit1 / cost1) * 100)}%`
+              : 'Chưa có tỷ lệ'}
+          </div>
+        )}
+
+        <label className="mt-5 grid gap-2">
+          <span className="text-sm font-bold">
+            Ghi chú hiển thị cho khách
+          </span>
+          <textarea
+            rows={4}
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            maxLength={5000}
+            placeholder="Tỷ lệ tụt, tốc độ, bảo hành, lưu ý..."
+            className={fieldClass}
+          />
+        </label>
+
+        {error && (
+          <div className="mt-4 rounded-xl bg-red-50 p-3 text-sm font-semibold text-red-600">
+            {error}
+          </div>
+        )}
+
+        <button
+          type="button"
+          disabled={busy}
+          onClick={submit}
+          className="mt-6 w-full rounded-xl bg-blue-600 px-5 py-3.5 font-black text-white disabled:opacity-50"
+        >
+          {busy ? 'Đang lưu...' : 'Đưa lên bán'}
+        </button>
+      </motion.div>
+    </motion.div>
+  )
+}
+
+
+function PriceModal({ item, onClose, onDone }) {
+  const service = item.service || {}
+  const cost1000 = Number(
+    item.cost_price_vnd ?? item.cost_price_per_1000 ?? 0
+  )
+  const cost1 = cost1000 / 1000
+
+  const [name, setName] = useState(service.name || '')
+  const [platform, setPlatform] = useState(service.platform || 'other')
+  const [category, setCategory] = useState(service.category || 'other')
+  const [description, setDescription] = useState(service.description || '')
+  const [price, setPrice] = useState(
+    service.sell_price_per_1000 == null
+      ? ''
+      : String(Number(service.sell_price_per_1000) / 1000)
+  )
+  const [min, setMin] = useState(
+    String(service.min_quantity ?? item.min_quantity ?? 1)
+  )
+  const [max, setMax] = useState(
+    String(service.max_quantity ?? item.max_quantity ?? 1000000)
+  )
+  const [active, setActive] = useState(Boolean(service.is_active))
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+
+  const field =
+    'w-full rounded-xl border border-slate-200 px-4 py-3 ' +
+    'outline-none focus:border-blue-500 bg-white'
+
+  const price1 = Number(price)
+  const providerMin = Number(item.min_quantity ?? 1)
+  const providerMax = Number(item.max_quantity ?? 1000000)
+
+  async function save() {
+    setError('')
+
+    if (!service.id || !service.code) {
+      setError('Thiếu ID hoặc mã dịch vụ. Không thể lưu.')
+      return
+    }
+
+    if (!name.trim() || !category.trim()) {
+      setError('Vui lòng nhập tên và loại dịch vụ.')
+      return
+    }
+
+    if (
+      price.trim() === '' ||
+      !Number.isFinite(price1) ||
+      price1 <= cost1
+    ) {
+      setError(
+        'Giá bán / 1 phải lớn hơn giá vốn ' +
+        cost1.toLocaleString('vi-VN', {
+          maximumFractionDigits: 6
+        }) + 'đ.'
+      )
+      return
+    }
+
+    const minNumber = Number(min)
+    const maxNumber = Number(max)
+
+    if (
+      !Number.isInteger(minNumber) ||
+      !Number.isInteger(maxNumber) ||
+      minNumber < providerMin ||
+      maxNumber > providerMax ||
+      maxNumber < minNumber
+    ) {
+      setError(
+        'Min/Max phải nằm trong giới hạn Provider: ' +
+        providerMin.toLocaleString('vi-VN') +
+        ' – ' +
+        providerMax.toLocaleString('vi-VN')
+      )
+      return
+    }
+
+    setBusy(true)
+    try {
+      await adminService.updateSocialService(service.id, {
+        code: service.code,
+        platform,
+        category: category.trim(),
+        name: name.trim(),
+        description: description.trim() || null,
+        min_quantity: minNumber,
+        max_quantity: maxNumber,
+        sell_price_per_1000: Number((price1 * 1000).toFixed(4)),
+        is_active: active,
+        sort_order: Number(service.sort_order ?? 0)
+      })
+      await onDone()
+      onClose()
+    } catch (err) {
+      setError(
+        err?.data?.message ||
+        err?.message ||
+        'Không thể cập nhật dịch vụ.'
+      )
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <motion.div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+    >
+      <motion.div
+        className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: 20 }}
+      >
+        <div className="mb-5 flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-xl font-black text-slate-950">
+              Chỉnh sửa dịch vụ
+            </h2>
+            <p className="mt-1 text-xs text-slate-500">
+              Dịch vụ nguồn: {item.provider_service_name}
+            </p>
+            <p className="text-xs text-slate-400">
+              ID nguồn: {item.provider_service_id}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={busy}
+            className="rounded-xl border px-3 py-2"
+          >
+            Đóng
+          </button>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="sm:col-span-2 space-y-1">
+            <span className="text-sm font-bold">Tên hiển thị cho khách</span>
+            <input
+              className={field}
+              value={name}
+              maxLength={255}
+              onChange={(e) => setName(e.target.value)}
+            />
+          </label>
+
+          <label className="space-y-1">
+            <span className="text-sm font-bold">Nền tảng</span>
+            <NoScamSelect
+              className={field}
+              value={platform}
+              onChange={(e) => setPlatform(e.target.value)}
+            >
+              <option value="facebook">Facebook</option>
+              <option value="instagram">Instagram</option>
+              <option value="tiktok">TikTok</option>
+              <option value="other">Khác</option>
+            </NoScamSelect>
+          </label>
+
+          <label className="space-y-1">
+            <span className="text-sm font-bold">Loại dịch vụ</span>
+            <NoScamSelect
+              className={field}
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+            >
+              {![
+                'follow', 'like', 'view', 'comment', 'share',
+                'reaction', 'member', 'save', 'other'
+              ].includes(category) && (
+                <option value={category}>{category}</option>
+              )}
+              <option value="follow">Follow</option>
+              <option value="like">Like</option>
+              <option value="view">View</option>
+              <option value="comment">Comment</option>
+              <option value="share">Share</option>
+              <option value="reaction">Reaction</option>
+              <option value="member">Member</option>
+              <option value="save">Save</option>
+              <option value="other">Khác</option>
+            </NoScamSelect>
+          </label>
+
+          <label className="space-y-1">
+            <span className="text-sm font-bold">Giá bán / 1 (VND)</span>
+            <input
+              type="number"
+              min="0"
+              step="any"
+              className={field}
+              value={price}
+              onChange={(e) => setPrice(e.target.value)}
+            />
+            <span className="block text-xs text-slate-500">
+              Giá vốn: {cost1.toLocaleString('vi-VN', {
+                maximumFractionDigits: 6
+              })}đ / 1
+            </span>
+          </label>
+
+          <label className="space-y-1">
+            <span className="text-sm font-bold">Trạng thái</span>
+            <NoScamSelect
+              className={field}
+              value={active ? '1' : '0'}
+              onChange={(e) => setActive(e.target.value === '1')}
+            >
+              <option value="1">Đang bán</option>
+              <option value="0">Tạm ngừng bán</option>
+            </NoScamSelect>
+          </label>
+
+          <label className="space-y-1">
+            <span className="text-sm font-bold">Số lượng tối thiểu</span>
+            <input
+              type="number"
+              step="1"
+              className={field}
+              value={min}
+              onChange={(e) => setMin(e.target.value)}
+            />
+          </label>
+
+          <label className="space-y-1">
+            <span className="text-sm font-bold">Số lượng tối đa</span>
+            <input
+              type="number"
+              step="1"
+              className={field}
+              value={max}
+              onChange={(e) => setMax(e.target.value)}
+            />
+          </label>
+
+          <label className="sm:col-span-2 space-y-1">
+            <span className="text-sm font-bold">
+              Mô tả / Ghi chú hiển thị cho khách
+            </span>
+            <textarea
+              rows={5}
+              maxLength={5000}
+              className={field}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Thông tin tốc độ, bảo hành, tỷ lệ tụt..."
+            />
+          </label>
+        </div>
+
+        {error && (
+          <div className="mt-4 rounded-xl bg-red-50 p-3 text-sm text-red-700">
+            {error}
+          </div>
+        )}
+
+        <button
+          type="button"
+          disabled={busy}
+          onClick={save}
+          className="mt-5 w-full rounded-xl bg-blue-600 px-5 py-3 font-bold text-white disabled:opacity-50"
+        >
+          {busy ? 'Đang lưu...' : 'Lưu thay đổi'}
+        </button>
+      </motion.div>
+    </motion.div>
+  )
+}
+
+export default function AdminSocialServicesPage() {
+  const { confirm } = useNoScamUI()
+  const [items, setItems] =
+    useState([])
+
+  const [services, setServices] =
+    useState([])
+
+  const [providers, setProviders] =
+    useState([])
+
+  const [meta, setMeta] =
+    useState({})
+
+  const [loading, setLoading] =
+    useState(true)
+
+  const [error, setError] =
+    useState('')
+
+  const [selected, setSelected] =
+    useState(null)
+
+  const [priceSelected, setPriceSelected] =
+    useState(null)
+
+  const [search, setSearch] =
+    useState('')
+
+  const [providerId, setProviderId] =
+    useState('')
+
+  const [mapped, setMapped] =
+    useState('')
+
+  const [availability, setAvailability] =
+    useState('')
+
+  const [page, setPage] =
+    useState(1)
+
+  const load = useCallback(
+    async () => {
+      setLoading(true)
+      setError('')
+
+      try {
+        const [
+          sourceResponse,
+          serviceResponse,
+          providerResponse,
+        ] = await Promise.all([
+          adminService
+            .getSocialProviderServices({
+              providerId,
+              mapped,
+              providerAvailability: availability,
+              search,
+              page,
+              perPage: 50,
+            }),
+
+          adminService
+            .getSocialServices(),
+
+          adminService
+            .getSocialProviders(),
+        ])
+
+        const source =
+          sourceResponse?.data?.data
+            ? sourceResponse.data
+            : sourceResponse
+
+        const servicePayload =
+          serviceResponse?.data?.data
+            ? serviceResponse.data
+            : serviceResponse
+
+        const providerPayload =
+          Array.isArray(
+            providerResponse?.data,
+          )
+            ? providerResponse.data
+            : providerResponse
+
+        setItems(
+          Array.isArray(source?.data)
+            ? source.data
+            : [],
+        )
+
+        setMeta({
+          current_page:
+            source?.current_page || 1,
+          last_page:
+            source?.last_page || 1,
+          total:
+            source?.total || 0,
+        })
+
+        setServices(
+          Array.isArray(
+            servicePayload?.data,
+          )
+            ? servicePayload.data
+            : Array.isArray(
+                servicePayload,
+              )
+              ? servicePayload
+              : [],
+        )
+
+        setProviders(
+          Array.isArray(
+            providerPayload,
+          )
+            ? providerPayload
+            : Array.isArray(
+                providerPayload?.data,
+              )
+              ? providerPayload.data
+              : [],
+        )
+      } catch (err) {
+        setError(
+          err?.data?.message ||
+            err?.message ||
+            'Không tải được dịch vụ.',
+        )
+      } finally {
+        setLoading(false)
+      }
+    },
+    [
+      mapped,
+      page,
+      providerId,
+      search,
+      availability,
+    ],
+  )
+
+  useEffect(() => {
+    const timer =
+      setTimeout(load, 250)
+
+    return () =>
+      clearTimeout(timer)
+  }, [load])
+
+  async function toggle(item) {
+    try {
+      await adminService
+        .updateSocialProviderService(
+          item.id,
+          {
+            is_active:
+              !item.is_active,
+          },
+        )
+
+      await load()
+    } catch (err) {
+      setError(
+        err?.data?.message ||
+          err?.message ||
+          'Không cập nhật được.',
+      )
+    }
+  }
+
+  async function unmap(item) {
+    if (
+      !await confirm(
+        'Bỏ dịch vụ nguồn này khỏi dịch vụ đang bán?',
+      )
+    ) {
+      return
+    }
+
+    try {
+      await adminService
+        .unmapSocialProviderService(
+          item.id,
+        )
+
+      await load()
+    } catch (err) {
+      setError(
+        err?.data?.message ||
+          err?.message ||
+          'Không bỏ map được.',
+      )
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-slate-50">
+      <AdminNav />
+
+      <main className="mx-auto max-w-7xl px-5 py-8 lg:px-8">
+        <div>
+          <div className="text-sm font-bold uppercase tracking-[0.18em] text-blue-600">
+            Social Services
+          </div>
+
+          <h1 className="mt-2 text-3xl font-black tracking-tight text-slate-950">
+            Quản lý dịch vụ
+          </h1>
+
+          <p className="mt-2 text-sm leading-6 text-slate-500">
+            Quản lý catalog nguồn,
+            giá vốn và map thành dịch vụ
+            bán trên NoScam.
+          </p>
+        </div>
+
+        <SocialAdminNav />
+
+        <div className="mt-6 grid gap-3 md:grid-cols-3">
+          <input
+            value={search}
+            onChange={(e) => {
+              setSearch(
+                e.target.value,
+              )
+              setPage(1)
+            }}
+            placeholder="Tìm tên hoặc ID dịch vụ..."
+            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-blue-400"
+          />
+
+          <NoScamSelect
+            value={providerId}
+            onChange={(e) => {
+              setProviderId(
+                e.target.value,
+              )
+              setPage(1)
+            }}
+            className="rounded-2xl border border-slate-200 bg-white px-4 py-3"
+          >
+            <option value="">
+              Tất cả nhà cung cấp
+            </option>
+
+            {providers.map(
+              (provider) => (
+                <option
+                  key={provider.id}
+                  value={provider.id}
+                >
+                  {provider.name}
+                </option>
+              ),
+            )}
+          </NoScamSelect>
+
+          <NoScamSelect
+            value={mapped}
+            onChange={(e) => {
+              setMapped(
+                e.target.value,
+              )
+              setPage(1)
+            }}
+            className="rounded-2xl border border-slate-200 bg-white px-4 py-3"
+          >
+            <option value="">
+              Tất cả trạng thái
+            </option>
+            <option value="false">
+              Chưa map
+            </option>
+            <option value="true">
+              Đã map
+            </option>
+          </NoScamSelect>
+
+          <NoScamSelect
+            value={availability}
+            onChange={(e) => {
+              setAvailability(e.target.value)
+              setPage(1)
+            }}
+            className="rounded-2xl border border-slate-200 bg-white px-4 py-3"
+          >
+            <option value="">Tất cả trạng thái API</option>
+            <option value="available">Đang cung cấp</option>
+            <option value="unavailable">Ngưng cung cấp</option>
+            <option value="unknown">Chưa xác minh</option>
+          </NoScamSelect>
+        </div>
+
+        <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
+          <div className="text-sm font-semibold text-slate-500">
+            Tìm thấy{' '}
+            <strong className="text-slate-950">
+              {meta.total || 0}
+            </strong>{' '}
+            dịch vụ nguồn
+          </div>
+
+          <div className="text-sm font-semibold text-slate-400">
+            Trang {meta.current_page || 1}
+            {' / '}
+            {meta.last_page || 1}
+          </div>
+        </div>
+
+        {error && (
+          <div className="mt-5 rounded-2xl border border-red-100 bg-red-50 p-4 text-sm font-semibold text-red-600">
+            {error}
+          </div>
+        )}
+
+        <div className="mt-5 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full table-fixed text-left text-xs lg:text-sm">
+              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-400">
+                <tr>
+                  <th className="px-2 py-4 w-[9%] ">Provider</th>
+                  <th className="px-2 py-4 w-[19%] ">Dịch vụ nguồn</th>
+                  <th className="px-2 py-4 w-[15%] ">Mô tả</th>
+                  <th className="px-2 py-4 w-[8%] ">Giá API</th>
+
+                  <th className="px-2 py-4 w-[9%] ">Giá vốn VND</th>
+                  <th className="px-2 py-4 w-[11%] ">Min / Max</th>
+                  <th className="px-2 py-4 w-[6%] ">Map</th>
+                  <th className="px-2 py-4 w-[8%] ">Admin bật/tắt</th>
+                  <th className="px-2 py-4 w-[8%] ">Trạng thái API</th>
+                  <th className="px-2 py-4 w-[7%] text-right">Thao tác</th>
+                </tr>
+              </thead>
+
+              <tbody className="divide-y divide-slate-100">
+                {loading ? (
+                  <tr>
+                    <td
+                      colSpan="10"
+                      className="px-5 py-16 text-center font-semibold text-slate-400"
+                    >
+                      Đang tải...
+                    </td>
+                  </tr>
+                ) : items.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan="10"
+                      className="px-5 py-16 text-center font-semibold text-slate-400"
+                    >
+                      Không có dịch vụ.
+                    </td>
+                  </tr>
+                ) : (
+                  items.map((item) => (
+                    <tr
+                      key={item.id}
+                      className="hover:bg-slate-50/70"
+                    >
+                      <td className="px-2 py-4 align-middle break-words">
+                        <ProviderBadge
+                          provider={item.provider}
+                        />
+                      </td>
+
+                      <td className="px-2 py-4 align-middle break-words">
+                        <div className="max-w-sm font-bold text-slate-900">
+                          {item.provider_service_name}
+                        </div>
+
+                        <div className="mt-1 text-xs font-semibold text-slate-400">
+                          ID {item.provider_service_id}
+                        </div>
+
+                        
+                      </td>
+
+                      
+                      <td className="px-2 py-4 align-middle break-words">
+                        <div className="min-w-0 break-words"><ProviderDescription item={item} /></div>
+                      </td>
+
+                      <td className="px-2 py-4 align-middle break-words">
+                        <div className="font-black text-slate-900">
+                          {money(
+                            item.cost_price_per_1000,
+                          )}{' '}
+                          <span className="text-xs text-slate-400">
+                            {item.cost_currency ||
+                              item.provider?.currency}
+                          </span>
+                        </div>
+
+                        {Number(
+                          item.price_multiplier || 1,
+                        ) !== 1 && (
+                          <div className="mt-1 text-xs font-semibold text-slate-400">
+                            Hệ số ×
+                            {Number(
+                              item.price_multiplier,
+                            ).toLocaleString(
+                              'vi-VN',
+                            )}
+                          </div>
+                        )}
+                      </td>
+
+                      <td className="px-2 py-4 align-middle break-words">
+                        <div className="font-black text-blue-700">
+                          {vnd(
+                            item.cost_price_vnd ??
+                              item.cost_price_per_1000,
+                          )}
+                        </div>
+
+                        {Number(
+                          item.exchange_rate_to_vnd || 1,
+                        ) !== 1 && (
+                          <div className="mt-1 text-xs font-semibold text-slate-400">
+                            Rate{' '}
+                            {money(
+                              item.exchange_rate_to_vnd,
+                            )}
+                          </div>
+                        )}
+                      </td>
+
+                      <td className="px-5 py-4 text-sm font-semibold text-slate-600">
+                        {money(item.min_quantity)}
+                        {' / '}
+                        {money(item.max_quantity)}
+                      </td>
+
+                      <td className="px-2 py-4 align-middle break-words">
+                        {item.is_mapped ? (
+                          <div>
+                            <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700">
+                              Đã map
+                            </span>
+
+                            <div className="mt-2 max-w-[180px] text-xs font-semibold text-slate-500">
+                              {item.service?.name}
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-500">
+                            Chưa map
+                          </span>
+                        )}
+                      </td>
+
+                      <td className="px-2 py-4 align-middle break-words">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            toggle(item)
+                          }
+                          className={`rounded-full px-3 py-1.5 text-xs font-bold ${
+                            item.is_active
+                              ? 'bg-emerald-50 text-emerald-700'
+                              : 'bg-red-50 text-red-600'
+                          }`}
+                        >
+                          {item.is_active
+                            ? 'Đang bật'
+                            : 'Đang tắt'}
+                        </button>
+                      </td>
+
+                      <td className="px-2 py-4 align-middle break-words">
+                        <span
+                          className={`rounded-full px-3 py-1.5 text-xs font-bold ${
+                            item.provider_availability === 'available'
+                              ? 'bg-emerald-50 text-emerald-700'
+                              : item.provider_availability === 'unavailable'
+                                ? 'bg-red-50 text-red-600'
+                                : 'bg-slate-100 text-slate-600'
+                          }`}
+                        >
+                          {item.provider_availability === 'available'
+                            ? 'Đang cung cấp'
+                            : item.provider_availability === 'unavailable'
+                              ? 'Ngưng cung cấp'
+                              : 'Chưa xác minh'}
+                        </span>
+                        <div className="mt-2 text-xs text-slate-400">
+                          {item.last_synced_at
+                            ? new Date(item.last_synced_at).toLocaleString('vi-VN')
+                            : 'Chưa đồng bộ'}
+                        </div>
+                      </td>
+
+                      <td className="px-2 py-4 align-middle break-words">
+                        <div className="flex justify-end gap-2">
+                          {!item.is_mapped && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setSelected(
+                                  item,
+                                )
+                              }
+                              className="rounded-xl bg-blue-600 px-3 py-2 text-xs font-bold text-white"
+                            >
+                              Đưa lên bán
+                            </button>
+                          )}
+
+                          {item.is_mapped && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setPriceSelected(
+                                    item,
+                                  )
+                                }
+                                className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white transition hover:bg-emerald-700"
+                              >
+                                Chỉnh sửa
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  unmap(item)
+                                }
+                                className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600"
+                              >
+                                Bỏ map
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="mt-5 flex justify-end gap-2">
+          <button
+            type="button"
+            disabled={
+              Number(meta.current_page) <=
+              1
+            }
+            onClick={() =>
+              setPage((value) =>
+                Math.max(
+                  1,
+                  value - 1,
+                ),
+              )
+            }
+            className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold disabled:opacity-40"
+          >
+            Trước
+          </button>
+
+          <button
+            type="button"
+            disabled={
+              Number(meta.current_page) >=
+              Number(meta.last_page)
+            }
+            onClick={() =>
+              setPage(
+                (value) =>
+                  value + 1,
+              )
+            }
+            className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold disabled:opacity-40"
+          >
+            Sau
+          </button>
+        </div>
+      </main>
+
+      <AnimatePresence>
+        {selected && (
+          <MapModal
+            item={selected}
+            services={services}
+            onClose={() =>
+              setSelected(null)
+            }
+            onDone={load}
+          />
+        )}
+
+        {priceSelected && (
+          <PriceModal
+            item={priceSelected}
+            onClose={() =>
+              setPriceSelected(null)
+            }
+            onDone={load}
+          />
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
+
+======================================================================
+FILE: noscam-frontend/src/pages/Admin/AdminSocialOrdersPage.jsx
+======================================================================
+import NoScamSelect from '../../components/ui/NoScamSelect'
+import {
+  useCallback,
+  useEffect,
+  useState,
+} from 'react'
+import { createPortal } from 'react-dom'
+import { motion } from 'framer-motion'
+import AdminNav from '../../components/admin/AdminNav'
+import SocialAdminNav from '../../components/admin/social/SocialAdminNav'
+import PlatformIcon from '../../components/social/PlatformIcon'
+import adminService from '../../services/adminService'
+import SocialOrderAuditModal from '../../components/admin/social/SocialOrderAuditModal'
+
+function money(value) {
+  return `${Math.round(
+    Number(value || 0),
+  ).toLocaleString('vi-VN')}đ`
+}
+
+function number(value) {
+  return Number(
+    value || 0,
+  ).toLocaleString('vi-VN')
+}
+
+function margin(item) {
+  const sell = Number(
+    item.sell_amount || 0,
+  )
+
+  const profit = Number(
+    item.profit_amount || 0,
+  )
+
+  if (sell <= 0) return 0
+
+  return profit / sell * 100
+}
+
+function safeTarget(target) {
+  if (!target) return ''
+
+  const value = String(target).trim()
+
+  if (
+    value.startsWith('http://') ||
+    value.startsWith('https://')
+  ) {
+    return value
+  }
+
+  return `https://${value}`
+}
+
+const statusMap = {
+  pending: [
+    'Chờ xử lý',
+    'bg-amber-50 text-amber-700',
+  ],
+  processing: [
+    'Đang xử lý',
+    'bg-blue-50 text-blue-700',
+  ],
+  in_progress: [
+    'Đang chạy',
+    'bg-indigo-50 text-indigo-700',
+  ],
+  completed: [
+    'Hoàn thành',
+    'bg-emerald-50 text-emerald-700',
+  ],
+  partial: [
+    'Hoàn thành một phần',
+    'bg-violet-50 text-violet-700',
+  ],
+  cancelled: [
+    'Đã hủy',
+    'bg-slate-100 text-slate-600',
+  ],
+  failed: [
+    'Thất bại',
+    'bg-red-50 text-red-600',
+  ],
+}
+
+function StatusBadge({ status }) {
+  const [
+    label,
+    className,
+  ] =
+    statusMap[status] || [
+      status || '—',
+      'bg-slate-100 text-slate-600',
+    ]
+
+  return (
+    <span
+      className={`inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-black ${className}`}
+    >
+      {label}
+    </span>
+  )
+}
+
+function ApiBadge({ item }) {
+  if (item.provider_order_id) {
+    return (
+      <span className="inline-flex whitespace-nowrap rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-black text-emerald-600">
+        Đã gửi API
+      </span>
+    )
+  }
+
+  if (item.provider_error) {
+    return (
+      <span className="inline-flex whitespace-nowrap rounded-full bg-red-50 px-2.5 py-1 text-[11px] font-black text-red-600">
+        Lỗi API
+      </span>
+    )
+  }
+
+  return (
+    <span className="inline-flex whitespace-nowrap rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-black text-slate-500">
+      Chưa gửi API
+    </span>
+  )
+}
+
+function canCancel(item) {
+  return [
+    'pending',
+    'processing',
+    'in_progress',
+  ].includes(item.status)
+}
+
+export default function AdminSocialOrdersPage() {
+  const [items, setItems] =
+    useState([])
+
+  const [meta, setMeta] =
+    useState({})
+
+  const [loading, setLoading] =
+    useState(true)
+
+  const [error, setError] =
+    useState('')
+
+  const [search, setSearch] =
+    useState('')
+
+  const [status, setStatus] =
+    useState('')
+
+  const [page, setPage] =
+    useState(1)
+
+  const [auditOnly, setAuditOnly] =
+    useState(false)
+
+  const [auditCount, setAuditCount] =
+    useState(0)
+
+  const [auditOrder, setAuditOrder] = useState(null)
+
+  const [busyId, setBusyId] =
+    useState(null)
+
+  const [
+    cancelOrder,
+    setCancelOrder,
+  ] = useState(null)
+
+  const loadAuditCount = useCallback(async () => {
+    try {
+      const response =
+        await adminService.getSocialAuditOrders()
+
+      const payload = response?.data?.data
+        ? response.data
+        : response
+
+      setAuditCount(Number(payload?.total || 0))
+    } catch {
+      setAuditCount(0)
+    }
+  }, [])
+
+  const load = useCallback(
+    async () => {
+      setLoading(true)
+      setError('')
+
+      try {
+        const response =
+          await (auditOnly
+            ? adminService.getSocialAuditOrders({ page })
+            : adminService.getSocialOrders({
+                search,
+                status,
+                page,
+              }))
+
+        const payload =
+          response?.data?.data
+            ? response.data
+            : response
+
+        setItems(
+          Array.isArray(payload?.data)
+            ? payload.data
+            : [],
+        )
+
+        setMeta({
+          current_page:
+            payload?.current_page || 1,
+          last_page:
+            payload?.last_page || 1,
+          total:
+            payload?.total || 0,
+        })
+      } catch (err) {
+        setError(
+          err?.data?.message ||
+            err?.message ||
+            'Không tải được đơn hàng.',
+        )
+      } finally {
+        setLoading(false)
+      }
+    },
+    [auditOnly, page, search, status],
+  )
+
+  useEffect(() => {
+    const timer =
+      setTimeout(load, 250)
+
+    return () =>
+      clearTimeout(timer)
+  }, [load])
+
+  useEffect(() => {
+    loadAuditCount()
+  }, [loadAuditCount])
+
+  async function confirmCancel() {
+    if (!cancelOrder?.id) return
+
+    setBusyId(cancelOrder.id)
+    setError('')
+
+    try {
+      await adminService
+        .cancelSocialOrder(
+          cancelOrder.id,
+        )
+
+      setCancelOrder(null)
+
+      await load()
+      await loadAuditCount()
+    } catch (err) {
+      setError(
+        err?.data?.message ||
+          err?.message ||
+          'Không hủy được đơn hàng.',
+      )
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-slate-50">
+      <AdminNav />
+
+      <main className="mx-auto max-w-[1600px] px-5 py-8 lg:px-8">
+        <div>
+          <div className="text-sm font-bold uppercase tracking-[0.18em] text-blue-600">
+            Social Services
+          </div>
+
+          <h1 className="mt-2 text-3xl font-black tracking-tight text-slate-950">
+            Đơn hàng
+          </h1>
+
+          <p className="mt-2 text-sm text-slate-500">
+            Theo dõi đơn hàng, giá vốn,
+            giá bán, lợi nhuận và tiến độ xử lý.
+          </p>
+        </div>
+
+        <SocialAdminNav />
+
+        <div className="mt-6 grid gap-3 md:grid-cols-[1fr_240px]">
+          <input
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value)
+              setPage(1)
+            }}
+            placeholder="Tìm mã đơn, link, Provider Order ID..."
+            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-blue-400"
+          />
+
+          <NoScamSelect
+            value={status}
+            onChange={(e) => {
+              setStatus(e.target.value)
+              setPage(1)
+            }}
+            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 font-bold outline-none"
+          >
+            <option value="">
+              Tất cả trạng thái
+            </option>
+
+            {Object.entries(
+              statusMap,
+            ).map(
+              ([
+                value,
+                [label],
+              ]) => (
+                <option
+                  key={value}
+                  value={value}
+                >
+                  {label}
+                </option>
+              ),
+            )}
+          </NoScamSelect>
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={() => {
+              setAuditOnly((value) => !value)
+              setPage(1)
+            }}
+            className={`rounded-2xl border px-5 py-3 text-sm font-black transition ${
+              auditOnly
+                ? 'border-amber-500 bg-amber-500 text-white shadow-lg shadow-amber-100'
+                : 'border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100'
+            }`}
+          >
+            Cần đối soát ({auditCount})
+          </button>
+
+          {auditOnly && (
+            <span className="text-xs font-semibold text-amber-700">
+              Các đơn đã thử gửi API nhưng chưa xác định kết quả.
+              Không tự gửi lại hoặc hoàn tiền.
+            </span>
+          )}
+        </div>
+
+        <div className="mt-5 flex items-center justify-between">
+          <div className="text-sm font-semibold text-slate-500">
+            <strong className="text-slate-950">
+              {meta.total || 0}
+            </strong>{' '}
+            đơn hàng
+          </div>
+
+          <div className="text-sm font-semibold text-slate-400">
+            Trang{' '}
+            {meta.current_page || 1}
+            {' / '}
+            {meta.last_page || 1}
+          </div>
+        </div>
+
+        {error && (
+          <div className="mt-5 rounded-2xl bg-red-50 p-4 text-sm font-bold text-red-600">
+            {error}
+          </div>
+        )}
+
+        <motion.div
+          initial={{
+            opacity: 0,
+            y: 10,
+          }}
+          animate={{
+            opacity: 1,
+            y: 0,
+          }}
+          className="mt-5 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm"
+        >
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[1750px] text-left">
+              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-400">
+                <tr>
+                  <th className="px-5 py-4">
+                    Đơn
+                  </th>
+
+                  <th className="px-5 py-4">
+                    Dịch vụ
+                  </th>
+
+                  <th className="px-5 py-4">
+                    Link
+                  </th>
+
+                  <th className="px-5 py-4">
+                    SL
+                  </th>
+
+                  <th className="px-5 py-4">
+                    Giá vốn
+                  </th>
+
+                  <th className="px-5 py-4">
+                    Giá bán
+                  </th>
+
+                  <th className="px-5 py-4">
+                    Lợi nhuận
+                  </th>
+
+                  <th className="px-5 py-4">
+                    Nguồn API
+                  </th>
+
+                  <th className="px-5 py-4">
+                    API Order
+                  </th>
+
+                  <th className="px-5 py-4">
+                    Trạng thái
+                  </th>
+
+                  <th className="px-5 py-4">
+                    Hành động
+                  </th>
+                </tr>
+              </thead>
+
+              <tbody className="divide-y divide-slate-100">
+                {loading ? (
+                  <tr>
+                    <td
+                      colSpan="11"
+                      className="px-5 py-16 text-center font-semibold text-slate-400"
+                    >
+                      Đang tải...
+                    </td>
+                  </tr>
+                ) : items.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan="11"
+                      className="px-5 py-16 text-center font-semibold text-slate-400"
+                    >
+                      Chưa có đơn hàng.
+                    </td>
+                  </tr>
+                ) : (
+                  items.map((item) => {
+                    const profitMargin =
+                      margin(item)
+
+                    return (
+                      <tr
+                        key={item.id}
+                        className="align-top transition hover:bg-slate-50/70"
+                      >
+                        <td className="px-5 py-4">
+                          <div className="font-black text-slate-900">
+                            {item.code}
+                          </div>
+
+                          <div className="mt-1 text-xs text-slate-400">
+                            #{item.id}
+                          </div>
+
+                          {item.user?.username && (
+                            <div className="mt-2 text-xs font-bold text-blue-600">
+                              @{item.user.username}
+                            </div>
+                          )}
+                        </td>
+
+                        <td className="px-5 py-4">
+                          <div className="flex max-w-[260px] gap-3">
+                            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-50">
+                              <PlatformIcon
+                                platform={
+                                  item.service
+                                    ?.platform ||
+                                  'other'
+                                }
+                                className="h-5 w-5"
+                              />
+                            </span>
+
+                            <div className="min-w-0">
+                              <div className="font-bold leading-5 text-slate-800">
+                                {item.service
+                                  ?.name || '—'}
+                              </div>
+
+                              <div className="mt-1 text-xs font-black uppercase text-slate-400">
+                                {item.service
+                                  ?.category || ''}
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+
+                        <td className="px-5 py-4">
+                          {item.target ? (
+                            <a
+                              href={safeTarget(
+                                item.target,
+                              )}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title={item.target}
+                              className="block max-w-[230px] truncate text-sm font-bold text-blue-600 underline decoration-blue-200 underline-offset-4 transition hover:text-blue-800"
+                            >
+                              {item.target}
+                            </a>
+                          ) : (
+                            <span className="text-slate-400">
+                              —
+                            </span>
+                          )}
+
+                          <div className="mt-1 text-[11px] font-semibold text-slate-400">
+                            Mở liên kết ↗
+                          </div>
+                        </td>
+
+                        <td className="px-5 py-4 font-black text-slate-800">
+                          {number(
+                            item.quantity,
+                          )}
+                        </td>
+
+                        <td className="px-5 py-4">
+                          <div className="font-bold text-slate-500">
+                            {money(
+                              item.cost_amount,
+                            )}
+                          </div>
+                        </td>
+
+                        <td className="px-5 py-4">
+                          <div className="font-black text-slate-950">
+                            {money(
+                              item.sell_amount,
+                            )}
+                          </div>
+                        </td>
+
+                        <td className="px-5 py-4">
+                          <div
+                            className={`font-black ${
+                              Number(
+                                item.profit_amount,
+                              ) >= 0
+                                ? 'text-emerald-600'
+                                : 'text-red-600'
+                            }`}
+                          >
+                            {money(
+                              item.profit_amount,
+                            )}
+                          </div>
+
+                          <div className="mt-1 text-xs font-black text-slate-400">
+                            {profitMargin.toLocaleString(
+                              'vi-VN',
+                              {
+                                maximumFractionDigits: 1,
+                              },
+                            )}
+                            %
+                          </div>
+                        </td>
+
+                        <td className="px-5 py-4">
+                          <div className="font-black text-slate-800">
+                            {item.provider
+                              ?.name || '—'}
+                          </div>
+
+                          {item.providerService && (
+                            <>
+                              <div className="mt-1 text-xs font-bold text-blue-600">
+                                #
+                                {
+                                  item
+                                    .providerService
+                                    .provider_service_id
+                                }
+                              </div>
+
+                              <div className="mt-1 max-w-[220px] text-xs leading-4 text-slate-400">
+                                {item
+                                  .providerService
+                                  .provider_service_name ||
+                                  ''}
+                              </div>
+                            </>
+                          )}
+                        </td>
+
+                        <td className="px-5 py-4">
+                          <ApiBadge
+                            item={item}
+                          />
+
+                          {item.provider_order_id && (
+                            <div className="mt-2 max-w-[150px] break-all text-xs font-black text-slate-700">
+                              {
+                                item.provider_order_id
+                              }
+                            </div>
+                          )}
+
+                          {item.provider_error && (
+                            <div
+                              title={
+                                item.provider_error
+                              }
+                              className="mt-2 max-w-[180px] truncate text-xs font-semibold text-red-500"
+                            >
+                              {
+                                item.provider_error
+                              }
+                            </div>
+                          )}
+                        </td>
+
+                        <td className="px-5 py-4">
+                          <StatusBadge
+                            status={
+                              item.status
+                            }
+                          />
+
+                          {item.provider_order_id ? (
+                            <div className="mt-2 text-[11px] font-semibold text-slate-400">
+                              Đồng bộ từ API
+                            </div>
+                          ) : (
+                            <div className="mt-2 text-[11px] font-semibold text-slate-400">
+                              Chờ gửi API
+                            </div>
+                          )}
+                        </td>
+
+                        <td className="px-5 py-4">
+                          <div className="flex flex-col items-start gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setAuditOrder(item)}
+                              className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-2 text-xs font-black text-blue-700 transition hover:bg-blue-600 hover:text-white"
+                            >
+                              Đối soát
+                            </button>
+                          {canCancel(item) ? (
+                            <button
+                              type="button"
+                              disabled={
+                                busyId ===
+                                item.id
+                              }
+                              onClick={() =>
+                                setCancelOrder(
+                                  item,
+                                )
+                              }
+                              className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-xs font-black text-red-600 transition hover:border-red-600 hover:bg-red-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              Hủy
+                            </button>
+                          ) : (
+                            <span className="text-xs font-bold text-slate-300">
+                              —
+                            </span>
+                          )}
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </motion.div>
+
+        <div className="mt-5 flex justify-end gap-2">
+          <button
+            type="button"
+            disabled={
+              Number(
+                meta.current_page,
+              ) <= 1
+            }
+            onClick={() =>
+              setPage((value) =>
+                Math.max(
+                  1,
+                  value - 1,
+                ),
+              )
+            }
+            className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold disabled:opacity-40"
+          >
+            Trước
+          </button>
+
+          <button
+            type="button"
+            disabled={
+              Number(
+                meta.current_page,
+              ) >=
+              Number(
+                meta.last_page,
+              )
+            }
+            onClick={() =>
+              setPage(
+                (value) =>
+                  value + 1,
+              )
+            }
+            className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold disabled:opacity-40"
+          >
+            Sau
+          </button>
+        </div>
+      </main>
+
+      {auditOrder && (
+        <SocialOrderAuditModal
+          order={auditOrder}
+          onClose={() => setAuditOrder(null)}
+        />
+      )}
+
+      {cancelOrder &&
+        createPortal(
+          <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-slate-950/60 p-4">
+            <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-red-50 text-2xl font-black text-red-600">
+                ×
+              </div>
+
+              <h2 className="mt-5 text-2xl font-black text-slate-950">
+                {(cancelOrder.provider_order_id || Number(cancelOrder.attempts || 0) >= 1)
+                  ? 'Kiểm tra trạng thái trước khi hủy?'
+                  : 'Hủy đơn & hoàn tiền?'}
+              </h2>
+
+              <p className="mt-2 text-sm leading-6 text-slate-500">
+                {(cancelOrder.provider_order_id || Number(cancelOrder.attempts || 0) >= 1)
+                  ? 'Đơn đã thử gửi API. Không được hoàn tiền trước khi xác minh kết quả với Provider.'
+                  : 'Đơn chưa được gửi đến nhà cung cấp. Khi hủy, toàn bộ số tiền của đơn sẽ được hoàn lại vào ví khách hàng.'}
+              </p>
+
+              <div className="mt-5 overflow-hidden rounded-2xl border border-slate-200">
+                <div className="flex items-center justify-between gap-4 border-b border-slate-100 px-4 py-3">
+                  <span className="text-sm font-semibold text-slate-400">
+                    Mã đơn
+                  </span>
+
+                  <span className="text-right text-sm font-black text-slate-900">
+                    {cancelOrder.code}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between gap-4 border-b border-slate-100 px-4 py-3">
+                  <span className="text-sm font-semibold text-slate-400">
+                    Số lượng
+                  </span>
+
+                  <span className="font-black text-slate-900">
+                    {number(
+                      cancelOrder.quantity,
+                    )}
+                  </span>
+                </div>
+
+                <div
+                  className={`flex items-center justify-between gap-4 px-4 py-3 ${
+                    !cancelOrder.provider_order_id
+                      ? 'border-b border-slate-100'
+                      : ''
+                  }`}
+                >
+                  <span className="text-sm font-semibold text-slate-400">
+                    Giá bán
+                  </span>
+
+                  <span className="font-black text-slate-900">
+                    {money(
+                      cancelOrder.sell_amount,
+                    )}
+                  </span>
+                </div>
+
+                {!cancelOrder.provider_order_id && Number(cancelOrder.attempts || 0) === 0 && (
+                  <div className="flex items-center justify-between gap-4 bg-emerald-50 px-4 py-4">
+                    <div>
+                      <div className="text-sm font-black text-emerald-700">
+                        Hoàn lại khách
+                      </div>
+
+                      <div className="mt-0.5 text-xs font-semibold text-emerald-600">
+                        Cộng lại vào số dư ví
+                      </div>
+                    </div>
+
+                    <span className="text-lg font-black text-emerald-700">
+                      {money(
+                        Math.max(
+                          0,
+                          Number(
+                            cancelOrder.sell_amount ||
+                              0,
+                          ) -
+                            Number(
+                              cancelOrder.refunded_amount ||
+                                0,
+                            ),
+                        ),
+                      )}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {(cancelOrder.provider_order_id || Number(cancelOrder.attempts || 0) >= 1) && (
+                <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                  <div className="text-sm font-black text-amber-800">
+                    Chưa hoàn tiền ngay
+                  </div>
+
+                  <p className="mt-1 text-sm font-semibold leading-6 text-amber-700">
+                    NoScam sẽ gửi yêu cầu hủy đến nhà cung cấp.
+                    Chỉ khi nhà cung cấp xác nhận đơn đã hủy,
+                    hệ thống mới hoàn tiền cho khách.
+                  </p>
+                </div>
+              )}
+
+              <div className="mt-6 grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  disabled={
+                    busyId ===
+                    cancelOrder.id
+                  }
+                  onClick={() =>
+                    setCancelOrder(null)
+                  }
+                  className="rounded-2xl border border-slate-200 bg-white px-4 py-3 font-black text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
+                >
+                  Quay lại
+                </button>
+
+                <button
+                  type="button"
+                  disabled={
+                    busyId ===
+                    cancelOrder.id
+                  }
+                  onClick={
+                    confirmCancel
+                  }
+                  className="rounded-2xl bg-red-600 px-4 py-3 font-black text-white transition hover:bg-red-700 disabled:opacity-50"
+                >
+                  {busyId ===
+                  cancelOrder.id
+                    ? 'Đang xử lý...'
+                    : cancelOrder.provider_order_id
+                      ? 'Gửi yêu cầu hủy'
+                      : `Hủy & hoàn ${money(
+                          Math.max(
+                            0,
+                            Number(
+                              cancelOrder.sell_amount ||
+                                0,
+                            ) -
+                              Number(
+                                cancelOrder.refunded_amount ||
+                                  0,
+                              ),
+                          ),
+                        )}`}
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body,
+        )}
+    </div>
+  )
+}
+
