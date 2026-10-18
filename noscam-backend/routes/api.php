@@ -678,6 +678,16 @@ Route::prefix('admin')
         );
 
         Route::post(
+            '/mediators/{mediator}/avatar',
+            [AdminMediatorController::class, 'uploadAvatar']
+        );
+
+        Route::delete(
+            '/mediators/{mediator}/avatar',
+            [AdminMediatorController::class, 'deleteAvatar']
+        );
+
+        Route::post(
             '/mediators/{mediator}/deposits',
             [
                 AdminMediatorController::class,
@@ -990,3 +1000,35 @@ Route::prefix('admin')
     'auth:sanctum',
     'throttle:customer-api',
 ]);
+
+
+/* NOSCAM_SITE_POPUPS_V1 */
+Route::get(
+    '/site-popups',
+    [\App\Http\Controllers\Api\SitePopupController::class, 'publicIndex']
+)->middleware('throttle:public-search');
+
+
+Route::middleware([
+    'auth:sanctum',
+    'moderator',
+    'throttle:admin-api',
+])->prefix('admin')->group(function () {
+    Route::get(
+        '/site-popups',
+        [\App\Http\Controllers\Api\SitePopupController::class, 'index']
+    );
+    Route::post(
+        '/site-popups',
+        [\App\Http\Controllers\Api\SitePopupController::class, 'store']
+    );
+    Route::put(
+        '/site-popups/{popup}',
+        [\App\Http\Controllers\Api\SitePopupController::class, 'update']
+    )->whereNumber('popup');
+    Route::delete(
+        '/site-popups/{popup}',
+        [\App\Http\Controllers\Api\SitePopupController::class, 'destroy']
+    )->whereNumber('popup');
+});
+

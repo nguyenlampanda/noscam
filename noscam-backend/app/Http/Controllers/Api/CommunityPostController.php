@@ -17,10 +17,38 @@ class CommunityPostController extends Controller
         $validated = $request->validate([
             'page' => ['nullable', 'integer', 'min:1'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:20'],
+            'q' => ['nullable', 'string', 'max:150'],
+            'category' => ['nullable', Rule::in([
+                'discussion', 'question', 'experience', 'warning',
+                'job_offer', 'job_seeking', 'service_offer', 'partnership',
+            ])],
+            'work_mode' => ['nullable', Rule::in(['remote', 'onsite', 'hybrid'])],
+            'city' => ['nullable', 'string', 'max:100'],
         ]);
+
+        $search = trim((string) ($validated['q'] ?? ''));
 
         $posts = CommunityPost::query()
             ->where('status', 'approved')
+            ->when($search !== '', function ($query) use ($search) {
+                $query->where(function ($inner) use ($search) {
+                    $inner->where('title', 'like', '%'.$search.'%')
+                        ->orWhere('content', 'like', '%'.$search.'%')
+                        ->orWhere('city', 'like', '%'.$search.'%');
+                });
+            })
+            ->when(
+                !empty($validated['category']),
+                fn ($query) => $query->where('category', $validated['category'])
+            )
+            ->when(
+                !empty($validated['work_mode']),
+                fn ($query) => $query->where('work_mode', $validated['work_mode'])
+            )
+            ->when(
+                !empty($validated['city']),
+                fn ($query) => $query->where('city', 'like', '%'.$validated['city'].'%')
+            )
             ->with(['user:id,name,username'])
             ->withCount([
                 'comments' => fn ($query) =>
@@ -56,8 +84,21 @@ class CommunityPostController extends Controller
                     'question',
                     'experience',
                     'warning',
+                    'job_offer',
+                    'job_seeking',
+                    'service_offer',
+                    'partnership',
                 ]),
             ],
+            'work_mode' => ['nullable', Rule::in(['remote', 'onsite', 'hybrid'])],
+            'city' => ['nullable', 'string', 'max:100'],
+            'address' => ['nullable', 'string', 'max:250'],
+            'salary' => ['nullable', 'string', 'max:100'],
+            'salary_unit' => ['nullable', Rule::in([
+                'hour', 'day', 'month', 'project', 'negotiable',
+            ])],
+            'deadline' => ['nullable', 'date', 'after_or_equal:today'],
+            'contact' => ['nullable', 'string', 'max:250'],
             'is_anonymous' => ['required', 'boolean'],
             'images' => ['sometimes', 'array', 'max:10'],
             'images.*' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
@@ -71,6 +112,32 @@ class CommunityPostController extends Controller
             return response()->json([
                 'message' => 'Vui lòng nhập nội dung bài viết.',
             ], 422);
+        }
+
+        $isMmo = in_array($validated['category'], [
+            'job_offer', 'job_seeking', 'service_offer', 'partnership',
+        ], true);
+
+        if ($isMmo) {
+            if (
+                trim((string) ($validated['title'] ?? '')) === '' ||
+                trim((string) ($validated['content'] ?? '')) === '' ||
+                trim((string) ($validated['contact'] ?? '')) === ''
+            ) {
+                return response()->json([
+                    'message' => 'Job cần tiêu đề, mô tả và cách liên hệ.',
+                ], 422);
+            }
+
+            $mode = $validated['work_mode'] ?? 'remote';
+            if ($mode !== 'remote' && (
+                empty(trim((string) ($validated['city'] ?? ''))) ||
+                empty(trim((string) ($validated['address'] ?? '')))
+            )) {
+                return response()->json([
+                    'message' => 'Công việc trực tiếp/hybrid cần địa điểm.',
+                ], 422);
+            }
         }
 
         $imagePaths = [];
@@ -88,6 +155,13 @@ class CommunityPostController extends Controller
             'status' => 'pending',
             'published_at' => null,
             'images' => $imagePaths,
+            'work_mode' => $isMmo ? ($validated['work_mode'] ?? 'remote') : null,
+            'city' => $isMmo ? ($validated['city'] ?? null) : null,
+            'address' => $isMmo ? ($validated['address'] ?? null) : null,
+            'salary' => $isMmo ? ($validated['salary'] ?? null) : null,
+            'salary_unit' => $isMmo ? ($validated['salary_unit'] ?? null) : null,
+            'deadline' => $isMmo ? ($validated['deadline'] ?? null) : null,
+            'contact' => $isMmo ? ($validated['contact'] ?? null) : null,
             ]);
         } catch (\Throwable $e) {
             foreach ($imagePaths as $path) {
@@ -113,6 +187,13 @@ class CommunityPostController extends Controller
             'content' => $post->content,
             'images' => collect($post->images ?? [])->map(fn ($path) => url('storage/'.$path))->values(),
             'category' => $post->category,
+            'work_mode' => $post->work_mode,
+            'city' => $post->city,
+            'address' => $post->address,
+            'salary' => $post->salary,
+            'salary_unit' => $post->salary_unit,
+            'deadline' => $post->deadline?->format('Y-m-d'),
+            'contact' => $post->contact,
             'author' => $post->is_anonymous
                 ? 'Thành viên ẩn danh'
                 : ($post->user?->username

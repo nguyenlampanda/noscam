@@ -1,0 +1,445 @@
+import {
+  lazy,
+  Suspense,
+} from 'react'
+import {
+  Route,
+  Routes,
+} from 'react-router-dom'
+
+import ProtectedAdminRoute from '../components/admin/ProtectedAdminRoute'
+import { PageLoading } from '../components/ui/NoScamUI'
+import AppLayout from '../layouts/AppLayout'
+
+const CommunityPage = lazy(() =>
+  import('../pages/Community/CommunityPage')
+)
+
+const AdminCommunityPage = lazy(() =>
+  import('../pages/Admin/AdminCommunityPage')
+)
+
+const HomePage = lazy(() =>
+  import(
+    '../pages/Home/HomePage'
+  ),
+)
+
+const SearchPage = lazy(() =>
+  import(
+    '../pages/Search/SearchPage'
+  ),
+)
+
+const ReportPage = lazy(() =>
+  import(
+    '../pages/Report/ReportPage'
+  ),
+)
+
+const AlertsPage = lazy(() =>
+  import(
+    '../pages/Alerts/AlertsPage'
+  ),
+)
+
+const GuidePage = lazy(() =>
+  import(
+    '../pages/Guide/GuidePage'
+  ),
+)
+
+const AboutPage = lazy(() =>
+  import(
+    '../pages/About/AboutPage'
+  ),
+)
+
+const MediatorsPage = lazy(() =>
+  import(
+    '../pages/Mediators/MediatorsPage'
+  ),
+)
+
+const MediatorDetailPage = lazy(() =>
+  import(
+    '../pages/Mediators/MediatorDetailPage'
+  ),
+)
+
+const AdminMediatorsPage = lazy(() =>
+  import(
+    '../pages/Admin/AdminMediatorsPage'
+  ),
+)
+
+const AdminDashboardPage = lazy(() =>
+  import(
+    '../pages/Admin/AdminDashboardPage'
+  ),
+)
+
+const AdminLoginPage = lazy(() =>
+  import(
+    '../pages/Admin/AdminLoginPage'
+  ),
+)
+
+const AdminExchangePage = lazy(() =>
+  import('../pages/Admin/AdminExchangePage'),
+)
+
+const AdminSocialPage = lazy(() =>
+  import(
+    '../pages/Admin/AdminSocialPage'
+  ),
+)
+
+const AdminSocialServicesPage = lazy(() =>
+  import(
+    '../pages/Admin/AdminSocialServicesPage'
+  ),
+)
+
+const AdminReportsPage = lazy(() =>
+  import(
+    '../pages/Admin/AdminReportsPage'
+  ),
+)
+
+const AdminReportDetailPage =
+  lazy(() =>
+    import(
+      '../pages/Admin/AdminReportDetailPage'
+    ),
+  )
+
+function RouteLoading() {
+  return <PageLoading message="Đang tải NoScam.vn..." />
+}
+
+const AdminSocialOrdersPage = lazy(() =>
+  import('../pages/Admin/AdminSocialOrdersPage')
+)
+
+const AdminSocialTopupsPage = lazy(() =>
+  import('../pages/Admin/AdminSocialTopupsPage')
+)
+
+const AdminSocialCustomersPage = lazy(() =>
+  import('../pages/Admin/AdminSocialCustomersPage'),
+)
+
+
+const LoginPage = lazy(() =>
+  import('../pages/LoginPage')
+)
+
+const RegisterPage = lazy(() =>
+  import('../pages/RegisterPage')
+)
+
+const SocialServicesPage = lazy(() =>
+  import('../pages/SocialServicesPage')
+)
+
+const DigitalServicesPage = lazy(() =>
+  import('../pages/DigitalServicesPage')
+)
+
+const DigitalServiceDetailPage = lazy(() =>
+  import('../pages/DigitalServiceDetailPage')
+)
+
+const MyDigitalOrdersPage = lazy(() =>
+  import('../pages/MyDigitalOrdersPage')
+)
+
+const GuestDigitalOrderLookupPage = lazy(() =>
+  import('../pages/GuestDigitalOrderLookupPage')
+)
+
+const ExchangePage = lazy(() =>
+  import('../pages/Exchange/ExchangePage')
+)
+
+const WalletPage = lazy(() =>
+  import('../pages/WalletPage')
+)
+
+const MyOrdersPage = lazy(() =>
+  import('../pages/MyOrdersPage')
+)
+
+const ProfilePage = lazy(() =>
+  import('../pages/ProfilePage')
+)
+
+const AdminDigitalServicesPage = lazy(() =>
+  import('../pages/Admin/AdminDigitalServicesPage')
+)
+
+const AdminDigitalOrdersPage = lazy(() =>
+  import('../pages/Admin/AdminDigitalOrdersPage')
+)
+
+const AdminChatPage = lazy(() =>
+  import('../pages/Admin/AdminChatPage')
+)
+
+function AppRoutes() {
+  return (
+    <Suspense
+      fallback={<RouteLoading />}
+    >
+      <Routes>
+        <Route
+          element={<AppLayout />}
+        >
+          <Route
+            path="/"
+            element={<HomePage />}
+          />
+
+          <Route
+            path="/search"
+            element={<SearchPage />}
+          />
+
+          <Route
+            path="/community"
+            element={<CommunityPage />}
+          />
+
+          <Route
+            path="/report"
+            element={<ReportPage />}
+          />
+
+          <Route
+            path="/alerts"
+            element={<AlertsPage />}
+          />
+
+          <Route
+            path="/mediators"
+            element={<MediatorsPage />}
+          />
+
+          <Route
+            path="/mediators/:code"
+            element={<MediatorDetailPage />}
+          />
+
+          <Route
+            path="/guide"
+            element={<GuidePage />}
+          />
+
+          <Route
+            path="/about"
+            element={<AboutPage />}
+          />
+
+          <Route
+            path="/social-services"
+            element={<SocialServicesPage />}
+          />
+
+          <Route
+            path="/digital-services"
+            element={<DigitalServicesPage />}
+          />
+
+          <Route
+            path="/digital-services/:id"
+            element={<DigitalServiceDetailPage />}
+          />
+
+          <Route
+            path="/digital/guest/lookup"
+            element={<GuestDigitalOrderLookupPage />}
+          />
+        <Route
+            path="/my-digital-orders"
+            element={<MyDigitalOrdersPage />}
+          />
+
+          <Route
+            path="/exchange"
+            element={<ExchangePage />}
+          />
+
+          <Route
+            path="/wallet"
+            element={<WalletPage />}
+          />
+
+          <Route
+            path="/profile"
+            element={<ProfilePage />}
+          />
+
+          <Route
+            path="/my-orders"
+            element={<MyOrdersPage />}
+          />
+
+          <Route
+            path="/login"
+            element={<LoginPage />}
+          />
+
+          <Route
+            path="/register"
+            element={<RegisterPage />}
+          />
+        </Route>
+
+        <Route
+          path="/admin/login"
+          element={
+            <AdminLoginPage />
+          }
+        />
+
+        <Route
+          path="/admin"
+          element={
+            <ProtectedAdminRoute>
+              <AdminDashboardPage />
+            </ProtectedAdminRoute>
+          }
+        />
+
+        <Route
+          path="/admin/mediators"
+          element={
+            <ProtectedAdminRoute>
+              <AdminMediatorsPage />
+            </ProtectedAdminRoute>
+          }
+        />
+
+        <Route
+          path="/admin/exchange"
+          element={
+            <ProtectedAdminRoute>
+              <AdminExchangePage />
+            </ProtectedAdminRoute>
+          }
+        />
+
+        <Route
+          path="/admin/social"
+          element={
+            <ProtectedAdminRoute>
+              <AdminSocialPage />
+            </ProtectedAdminRoute>
+          }
+        />
+
+        <Route
+          path="/admin/social/providers"
+          element={
+            <ProtectedAdminRoute>
+              <AdminSocialPage />
+            </ProtectedAdminRoute>
+          }
+        />
+
+        <Route
+          path="/admin/social/services"
+          element={
+            <ProtectedAdminRoute>
+              <AdminSocialServicesPage />
+            </ProtectedAdminRoute>
+          }
+        />
+
+        <Route
+          path="/admin/social/orders"
+          element={
+            <ProtectedAdminRoute>
+              <AdminSocialOrdersPage />
+            </ProtectedAdminRoute>
+          }
+        />
+
+        <Route
+          path="/admin/social/customers"
+          element={
+            <ProtectedAdminRoute>
+              <AdminSocialCustomersPage />
+            </ProtectedAdminRoute>
+          }
+        />
+
+        <Route
+          path="/admin/social/topups"
+          element={
+            <ProtectedAdminRoute>
+              <AdminSocialTopupsPage />
+            </ProtectedAdminRoute>
+          }
+        />
+
+        <Route
+          path="/admin/community"
+          element={
+            <ProtectedAdminRoute>
+              <AdminCommunityPage />
+            </ProtectedAdminRoute>
+          }
+        />
+
+        <Route
+          path="/admin/reports"
+          element={
+            <ProtectedAdminRoute>
+              <AdminReportsPage />
+            </ProtectedAdminRoute>
+          }
+        />
+
+        <Route
+          path="/admin/reports/:id"
+          element={
+            <ProtectedAdminRoute>
+              <AdminReportDetailPage />
+            </ProtectedAdminRoute>
+          }
+        />
+        <Route
+          path="/admin/digital/services"
+          element={
+            <ProtectedAdminRoute>
+              <AdminDigitalServicesPage />
+            </ProtectedAdminRoute>
+          }
+        />
+
+        <Route
+          path="/admin/digital/orders"
+          element={
+            <ProtectedAdminRoute>
+              <AdminDigitalOrdersPage />
+            </ProtectedAdminRoute>
+          }
+        />
+
+        <Route
+          path="/admin/chat"
+          element={
+            <ProtectedAdminRoute>
+              <AdminChatPage />
+            </ProtectedAdminRoute>
+          }
+        />
+
+      </Routes>
+    </Suspense>
+  )
+}
+
+export default AppRoutes

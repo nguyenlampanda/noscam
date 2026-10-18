@@ -1,3 +1,4 @@
+import AvatarLightbox from '../../components/AvatarLightbox'
 import NoScamSelect from '../../components/ui/NoScamSelect'
 import {
   useCallback,
@@ -61,6 +62,13 @@ function money(value) {
 }
 
 function AdminMediatorsPage() {
+  // NOSCAM_MEDIATOR_ACTIONS_V1
+  const [removeTarget, setRemoveTarget] = useState(null)
+  const [removing, setRemoving] = useState(false)
+
+  // NOSCAM_MEDIATOR_TABS_V1
+  const [activeTab, setActiveTab] = useState('manage')
+
   const navigate = useNavigate()
 
   const [items, setItems] =
@@ -80,6 +88,9 @@ function AdminMediatorsPage() {
 
   const [editing, setEditing] =
     useState(null)
+
+  const [avatarFile, setAvatarFile] = useState(null)
+  const [avatarPreview, setAvatarPreview] = useState('')
 
   const [form, setForm] =
     useState(EMPTY_FORM)
@@ -166,7 +177,53 @@ function AdminMediatorsPage() {
     }
   }, [])
 
+  useEffect(() => {
+    if (!avatarFile) {
+      setAvatarPreview('')
+      return
+    }
+    const url = URL.createObjectURL(avatarFile)
+    setAvatarPreview(url)
+    return () => URL.revokeObjectURL(url)
+  }, [avatarFile])
+
+
+  async function removeMediator() {
+    if (!removeTarget || removing) return
+    setRemoving(true)
+    setError('')
+    try {
+      await adminService.updateMediator(removeTarget.id, {
+        name: removeTarget.name,
+        description: removeTarget.description || '',
+        status: 'removed',
+        is_public: false,
+        admin_note: removeTarget.admin_note || '',
+        tag_ids: (removeTarget.tags || []).map(tag => tag.id),
+        identifiers: (removeTarget.identifiers || []).map(item => ({
+          type: item.type,
+          value: item.value,
+          label: item.label || '',
+          bank_id: item.bank_id || null,
+          bank_name: item.bank_name || '',
+          account_holder: item.account_holder || '',
+          is_public: item.is_public ?? true,
+        })),
+      })
+      if (editing?.id === removeTarget.id) resetForm()
+      setRemoveTarget(null)
+      setActiveTab('manage')
+      await load()
+    } catch (err) {
+      setError(err?.message || 'Không thể gỡ hồ sơ.')
+      setRemoveTarget(null)
+    } finally {
+      setRemoving(false)
+    }
+  }
+
   function resetForm() {
+    setAvatarFile(null)
     setEditing(null)
     setForm({
       ...EMPTY_FORM,
@@ -177,6 +234,8 @@ function AdminMediatorsPage() {
   }
 
   function edit(item) {
+    setAvatarFile(null)
+    setActiveTab('create')
     setEditing(item)
 
     setForm({
@@ -370,20 +429,17 @@ function AdminMediatorsPage() {
     }
 
     try {
-      if (editing) {
-        await adminService
-          .updateMediator(
-            editing.id,
-            payload,
-          )
-      } else {
-        await adminService
-          .createMediator(
-            payload,
-          )
+      const response = editing
+        ? await adminService.updateMediator(editing.id, payload)
+        : await adminService.createMediator(payload)
+      const id = editing?.id || response?.data?.id
+      if (avatarFile) {
+        if (!id) throw new Error('Đã lưu hồ sơ nhưng không xác định được ID để tải avatar.')
+        await adminService.uploadMediatorAvatar(id, avatarFile)
       }
 
       resetForm()
+      setActiveTab('manage')
       await load()
     } catch (err) {
       setError(
@@ -475,7 +531,10 @@ function AdminMediatorsPage() {
           {editing && (
             <button
               type="button"
-              onClick={resetForm}
+              onClick={() => {
+                resetForm()
+                setActiveTab('create')
+              }}
               className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold"
             >
               + Thêm hồ sơ mới
@@ -489,7 +548,45 @@ function AdminMediatorsPage() {
           </div>
         )}
 
-        <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
+        
+        <div className="mb-7 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
+          <div className="grid grid-cols-2 gap-2" role="tablist" aria-label="Quản lý trung gian">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === 'manage'}
+              onClick={() => setActiveTab('manage')}
+              className={`rounded-xl px-4 py-4 text-sm font-bold transition sm:text-base ${
+                activeTab === 'manage'
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-100'
+                  : 'text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              Quản lý trung gian
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === 'create'}
+              onClick={() => {
+                resetForm()
+                setActiveTab('create')
+              }}
+              className={`rounded-xl px-4 py-4 text-sm font-bold transition sm:text-base ${
+                activeTab === 'create'
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-100'
+                  : 'text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              + Tạo trung gian
+            </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-6">
+
+          {activeTab === 'create' && (
+
           <motion.section
             layout
             className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7"
@@ -504,6 +601,46 @@ function AdminMediatorsPage() {
               onSubmit={submit}
               className="mt-6 space-y-5"
             >
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <p className="mb-3 text-sm font-bold text-slate-800">Ảnh đại diện trung gian</p>
+                <div className="flex flex-wrap items-center gap-4">
+                  {avatarPreview || editing?.avatar_url ? (
+                    <AvatarLightbox src={avatarPreview || editing.avatar_url} alt="Avatar trung gian" className="h-20 w-20 rounded-full border-2 border-white object-cover shadow-sm" />
+                  ) : (
+                    <div className="flex h-20 w-20 items-center justify-center rounded-full bg-blue-100 text-2xl font-black text-blue-700">
+                      {(form.name || 'N').slice(0, 1).toUpperCase()}
+                    </div>
+                  )}
+                  <div className="flex-1 space-y-2">
+                    <input type="file" accept="image/jpeg,image/png,image/webp"
+                      onChange={event => {
+                        const file = event.target.files?.[0] || null
+                        if (file && file.size > 5 * 1024 * 1024) {
+                          setError('Avatar không được vượt quá 5 MB.')
+                          event.target.value = ''
+                          return
+                        }
+                        setAvatarFile(file)
+                      }}
+                      className="block w-full max-w-xs text-xs text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-blue-600 file:px-3 file:py-2 file:font-bold file:text-white" />
+                    <p className="text-xs text-slate-500">JPG, PNG, WebP · tối đa 5 MB</p>
+                    {editing?.avatar_url && !avatarFile && (
+                      <button type="button" disabled={saving} className="text-xs font-bold text-red-600 hover:underline"
+                        onClick={async () => {
+                          if (!window.confirm('Xóa ảnh đại diện hiện tại?')) return
+                          setSaving(true)
+                          try {
+                            const result = await adminService.deleteMediatorAvatar(editing.id)
+                            setEditing(result.data)
+                            await load()
+                          } catch (err) { setError(err.message || 'Không thể xóa avatar.') }
+                          finally { setSaving(false) }
+                        }}>Xóa ảnh hiện tại</button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
               <Field
                 label="Tên hiển thị"
                 value={form.name}
@@ -943,6 +1080,9 @@ function AdminMediatorsPage() {
               </form>
             )}
           </motion.section>
+          )}
+
+          {activeTab === 'manage' && (
 
           <section>
             <div className="mb-4 flex gap-3">
@@ -970,20 +1110,17 @@ function AdminMediatorsPage() {
               <div className="space-y-3">
                 {items.map(
                   (item) => (
-                    <motion.button
+                    <motion.div
                       layout
                       whileHover={{
                         y: -2,
                       }}
-                      type="button"
                       key={item.id}
-                      onClick={() =>
-                        edit(item)
-                      }
                       className="w-full rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm"
                     >
                       <div className="flex items-start justify-between gap-4">
                         <div>
+                          {item.avatar_url && <AvatarLightbox src={item.avatar_url} alt="" className="mb-3 h-12 w-12 rounded-full object-cover" />}
                           <div className="flex flex-wrap items-center gap-2">
                             <h3 className="font-black text-slate-950">
                               {item.name}
@@ -1048,13 +1185,71 @@ function AdminMediatorsPage() {
                           </p>
                         </div>
                       </div>
-                    </motion.button>
+                      <div className="mt-5 flex flex-wrap gap-2 border-t border-slate-100 pt-4">
+                        <button
+                          type="button"
+                          onClick={() => edit(item)}
+                          className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-blue-700"
+                        >
+                          Chỉnh sửa
+                        </button>
+                        {item.status !== 'removed' && (
+                          <button
+                            type="button"
+                            onClick={() => setRemoveTarget(item)}
+                            className="rounded-xl border border-red-200 bg-red-50 px-5 py-2.5 text-sm font-bold text-red-700 transition hover:bg-red-100"
+                          >
+                            Gỡ hồ sơ
+                          </button>
+                        )}
+                      </div>
+                    </motion.div>
                   ),
                 )}
               </div>
             )}
           </section>
+          )}
         </div>
+
+        {removeTarget && (
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/60 p-4">
+            <div
+              role="alertdialog"
+              aria-modal="true"
+              aria-labelledby="remove-mediator-title"
+              className="w-full max-w-md rounded-3xl bg-white p-7 shadow-2xl"
+            >
+              <h2 id="remove-mediator-title" className="text-xl font-black text-slate-950">
+                Gỡ hồ sơ trung gian?
+              </h2>
+              <p className="mt-3 text-sm leading-6 text-slate-600">
+                Bạn đang gỡ <strong>{removeTarget.name}</strong>
+                {' '}({removeTarget.code}).
+                Hồ sơ sẽ bị ẩn khỏi website công khai.
+                Lịch sử tiền cọc vẫn được lưu.
+              </p>
+              <div className="mt-6 flex justify-end gap-3">
+                <button
+                  type="button"
+                  disabled={removing}
+                  onClick={() => setRemoveTarget(null)}
+                  className="rounded-xl border border-slate-200 px-5 py-3 text-sm font-bold"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="button"
+                  disabled={removing}
+                  onClick={removeMediator}
+                  className="rounded-xl bg-red-600 px-5 py-3 text-sm font-bold text-white disabled:opacity-50"
+                >
+                  {removing ? 'Đang xử lý...' : 'Xác nhận gỡ'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   )

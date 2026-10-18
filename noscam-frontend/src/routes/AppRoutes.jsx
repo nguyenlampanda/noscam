@@ -10,6 +10,7 @@ import {
 import ProtectedAdminRoute from '../components/admin/ProtectedAdminRoute'
 import { PageLoading } from '../components/ui/NoScamUI'
 import AppLayout from '../layouts/AppLayout'
+import SitePopupViewer from '../components/popups/SitePopupViewer'
 
 const CommunityPage = lazy(() =>
   import('../pages/Community/CommunityPage')
@@ -187,6 +188,19 @@ const AdminChatPage = lazy(() =>
   import('../pages/Admin/AdminChatPage')
 )
 
+const AdminPopupsPage = lazy(() =>
+  import('../pages/Admin/AdminPopupsPage')
+)
+
+function PublicLayout() {
+  return (
+    <>
+      <AppLayout />
+      <SitePopupViewer />
+    </>
+  )
+}
+
 function AppRoutes() {
   return (
     <Suspense
@@ -194,7 +208,7 @@ function AppRoutes() {
     >
       <Routes>
         <Route
-          element={<AppLayout />}
+          element={<PublicLayout />}
         >
           <Route
             path="/"
@@ -380,6 +394,15 @@ function AppRoutes() {
           element={
             <ProtectedAdminRoute>
               <AdminSocialTopupsPage />
+            </ProtectedAdminRoute>
+          }
+        />
+
+        <Route
+          path="/admin/popups"
+          element={
+            <ProtectedAdminRoute>
+              <AdminPopupsPage />
             </ProtectedAdminRoute>
           }
         />

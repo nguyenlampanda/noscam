@@ -240,6 +240,7 @@ class MediatorController extends Controller
             'id' => $mediator->id,
             'code' => $mediator->code,
             'name' => $mediator->name,
+            'avatar_url' => $mediator->avatar_url,
 
             'description' =>
                 $mediator->description,

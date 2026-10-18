@@ -1,0 +1,2708 @@
+
+======================================================================
+FILE: noscam-frontend/src/routes/AppRoutes.jsx
+======================================================================
+   1: import {
+   2:   lazy,
+   3:   Suspense,
+   4: } from 'react'
+   5: import {
+   6:   Route,
+   7:   Routes,
+   8: } from 'react-router-dom'
+   9: 
+  10: import ProtectedAdminRoute from '../components/admin/ProtectedAdminRoute'
+  11: import { PageLoading } from '../components/ui/NoScamUI'
+  12: import AppLayout from '../layouts/AppLayout'
+  13: 
+  14: const CommunityPage = lazy(() =>
+  15:   import('../pages/Community/CommunityPage')
+  16: )
+  17: 
+  18: const AdminCommunityPage = lazy(() =>
+  19:   import('../pages/Admin/AdminCommunityPage')
+  20: )
+  21: 
+  22: const HomePage = lazy(() =>
+  23:   import(
+  24:     '../pages/Home/HomePage'
+  25:   ),
+  26: )
+  27: 
+  28: const SearchPage = lazy(() =>
+  29:   import(
+  30:     '../pages/Search/SearchPage'
+  31:   ),
+  32: )
+  33: 
+  34: const ReportPage = lazy(() =>
+  35:   import(
+  36:     '../pages/Report/ReportPage'
+  37:   ),
+  38: )
+  39: 
+  40: const AlertsPage = lazy(() =>
+  41:   import(
+  42:     '../pages/Alerts/AlertsPage'
+  43:   ),
+  44: )
+  45: 
+  46: const GuidePage = lazy(() =>
+  47:   import(
+  48:     '../pages/Guide/GuidePage'
+  49:   ),
+  50: )
+  51: 
+  52: const AboutPage = lazy(() =>
+  53:   import(
+  54:     '../pages/About/AboutPage'
+  55:   ),
+  56: )
+  57: 
+  58: const MediatorsPage = lazy(() =>
+  59:   import(
+  60:     '../pages/Mediators/MediatorsPage'
+  61:   ),
+  62: )
+  63: 
+  64: const MediatorDetailPage = lazy(() =>
+  65:   import(
+  66:     '../pages/Mediators/MediatorDetailPage'
+  67:   ),
+  68: )
+  69: 
+  70: const AdminMediatorsPage = lazy(() =>
+  71:   import(
+  72:     '../pages/Admin/AdminMediatorsPage'
+  73:   ),
+  74: )
+  75: 
+  76: const AdminDashboardPage = lazy(() =>
+  77:   import(
+  78:     '../pages/Admin/AdminDashboardPage'
+  79:   ),
+  80: )
+  81: 
+  82: const AdminLoginPage = lazy(() =>
+  83:   import(
+  84:     '../pages/Admin/AdminLoginPage'
+  85:   ),
+  86: )
+  87: 
+  88: const AdminExchangePage = lazy(() =>
+  89:   import('../pages/Admin/AdminExchangePage'),
+  90: )
+  91: 
+  92: const AdminSocialPage = lazy(() =>
+  93:   import(
+  94:     '../pages/Admin/AdminSocialPage'
+  95:   ),
+  96: )
+  97: 
+  98: const AdminSocialServicesPage = lazy(() =>
+  99:   import(
+ 100:     '../pages/Admin/AdminSocialServicesPage'
+ 101:   ),
+ 102: )
+ 103: 
+ 104: const AdminReportsPage = lazy(() =>
+ 105:   import(
+ 106:     '../pages/Admin/AdminReportsPage'
+ 107:   ),
+ 108: )
+ 109: 
+ 110: const AdminReportDetailPage =
+ 111:   lazy(() =>
+ 112:     import(
+ 113:       '../pages/Admin/AdminReportDetailPage'
+ 114:     ),
+ 115:   )
+ 116: 
+ 117: function RouteLoading() {
+ 118:   return <PageLoading message="Đang tải NoScam.vn..." />
+ 119: }
+ 120: 
+ 121: const AdminSocialOrdersPage = lazy(() =>
+ 122:   import('../pages/Admin/AdminSocialOrdersPage')
+ 123: )
+ 124: 
+ 125: const AdminSocialTopupsPage = lazy(() =>
+ 126:   import('../pages/Admin/AdminSocialTopupsPage')
+ 127: )
+ 128: 
+ 129: const AdminSocialCustomersPage = lazy(() =>
+ 130:   import('../pages/Admin/AdminSocialCustomersPage'),
+ 131: )
+ 132: 
+ 133: 
+ 134: const LoginPage = lazy(() =>
+ 135:   import('../pages/LoginPage')
+ 136: )
+ 137: 
+ 138: const RegisterPage = lazy(() =>
+ 139:   import('../pages/RegisterPage')
+ 140: )
+ 141: 
+ 142: const SocialServicesPage = lazy(() =>
+ 143:   import('../pages/SocialServicesPage')
+ 144: )
+ 145: 
+ 146: const DigitalServicesPage = lazy(() =>
+ 147:   import('../pages/DigitalServicesPage')
+ 148: )
+ 149: 
+ 150: const DigitalServiceDetailPage = lazy(() =>
+ 151:   import('../pages/DigitalServiceDetailPage')
+ 152: )
+ 153: 
+ 154: const MyDigitalOrdersPage = lazy(() =>
+ 155:   import('../pages/MyDigitalOrdersPage')
+ 156: )
+ 157: 
+ 158: const GuestDigitalOrderLookupPage = lazy(() =>
+ 159:   import('../pages/GuestDigitalOrderLookupPage')
+ 160: )
+ 161: 
+ 162: const ExchangePage = lazy(() =>
+ 163:   import('../pages/Exchange/ExchangePage')
+ 164: )
+ 165: 
+ 166: const WalletPage = lazy(() =>
+ 167:   import('../pages/WalletPage')
+ 168: )
+ 169: 
+ 170: const MyOrdersPage = lazy(() =>
+ 171:   import('../pages/MyOrdersPage')
+ 172: )
+ 173: 
+ 174: const ProfilePage = lazy(() =>
+ 175:   import('../pages/ProfilePage')
+ 176: )
+ 177: 
+ 178: const AdminDigitalServicesPage = lazy(() =>
+ 179:   import('../pages/Admin/AdminDigitalServicesPage')
+ 180: )
+ 181: 
+ 182: const AdminDigitalOrdersPage = lazy(() =>
+ 183:   import('../pages/Admin/AdminDigitalOrdersPage')
+ 184: )
+ 185: 
+ 186: const AdminChatPage = lazy(() =>
+ 187:   import('../pages/Admin/AdminChatPage')
+ 188: )
+ 189: 
+ 190: function AppRoutes() {
+ 191:   return (
+ 192:     <Suspense
+ 193:       fallback={<RouteLoading />}
+ 194:     >
+ 195:       <Routes>
+ 196:         <Route
+ 197:           element={<AppLayout />}
+ 198:         >
+ 199:           <Route
+ 200:             path="/"
+ 201:             element={<HomePage />}
+ 202:           />
+ 203: 
+ 204:           <Route
+ 205:             path="/search"
+ 206:             element={<SearchPage />}
+ 207:           />
+ 208: 
+ 209:           <Route
+ 210:             path="/community"
+ 211:             element={<CommunityPage />}
+ 212:           />
+ 213: 
+ 214:           <Route
+ 215:             path="/report"
+ 216:             element={<ReportPage />}
+ 217:           />
+ 218: 
+ 219:           <Route
+ 220:             path="/alerts"
+ 221:             element={<AlertsPage />}
+ 222:           />
+ 223: 
+ 224:           <Route
+ 225:             path="/mediators"
+ 226:             element={<MediatorsPage />}
+ 227:           />
+ 228: 
+ 229:           <Route
+ 230:             path="/mediators/:code"
+ 231:             element={<MediatorDetailPage />}
+ 232:           />
+ 233: 
+ 234:           <Route
+ 235:             path="/guide"
+ 236:             element={<GuidePage />}
+ 237:           />
+ 238: 
+ 239:           <Route
+ 240:             path="/about"
+ 241:             element={<AboutPage />}
+ 242:           />
+ 243: 
+ 244:           <Route
+ 245:             path="/social-services"
+ 246:             element={<SocialServicesPage />}
+ 247:           />
+ 248: 
+ 249:           <Route
+ 250:             path="/digital-services"
+ 251:             element={<DigitalServicesPage />}
+ 252:           />
+ 253: 
+ 254:           <Route
+ 255:             path="/digital-services/:id"
+ 256:             element={<DigitalServiceDetailPage />}
+ 257:           />
+ 258: 
+ 259:           <Route
+ 260:             path="/digital/guest/lookup"
+ 261:             element={<GuestDigitalOrderLookupPage />}
+ 262:           />
+ 263:         <Route
+ 264:             path="/my-digital-orders"
+ 265:             element={<MyDigitalOrdersPage />}
+ 266:           />
+ 267: 
+ 268:           <Route
+ 269:             path="/exchange"
+ 270:             element={<ExchangePage />}
+ 271:           />
+ 272: 
+ 273:           <Route
+ 274:             path="/wallet"
+ 275:             element={<WalletPage />}
+ 276:           />
+ 277: 
+ 278:           <Route
+ 279:             path="/profile"
+ 280:             element={<ProfilePage />}
+ 281:           />
+ 282: 
+ 283:           <Route
+ 284:             path="/my-orders"
+ 285:             element={<MyOrdersPage />}
+ 286:           />
+ 287: 
+ 288:           <Route
+ 289:             path="/login"
+ 290:             element={<LoginPage />}
+ 291:           />
+ 292: 
+ 293:           <Route
+ 294:             path="/register"
+ 295:             element={<RegisterPage />}
+ 296:           />
+ 297:         </Route>
+ 298: 
+ 299:         <Route
+ 300:           path="/admin/login"
+ 301:           element={
+ 302:             <AdminLoginPage />
+ 303:           }
+ 304:         />
+ 305: 
+ 306:         <Route
+ 307:           path="/admin"
+ 308:           element={
+ 309:             <ProtectedAdminRoute>
+ 310:               <AdminDashboardPage />
+ 311:             </ProtectedAdminRoute>
+ 312:           }
+ 313:         />
+ 314: 
+ 315:         <Route
+ 316:           path="/admin/mediators"
+ 317:           element={
+ 318:             <ProtectedAdminRoute>
+ 319:               <AdminMediatorsPage />
+ 320:             </ProtectedAdminRoute>
+ 321:           }
+ 322:         />
+ 323: 
+ 324:         <Route
+ 325:           path="/admin/exchange"
+ 326:           element={
+ 327:             <ProtectedAdminRoute>
+ 328:               <AdminExchangePage />
+ 329:             </ProtectedAdminRoute>
+ 330:           }
+ 331:         />
+ 332: 
+ 333:         <Route
+ 334:           path="/admin/social"
+ 335:           element={
+ 336:             <ProtectedAdminRoute>
+ 337:               <AdminSocialPage />
+ 338:             </ProtectedAdminRoute>
+ 339:           }
+ 340:         />
+ 341: 
+ 342:         <Route
+ 343:           path="/admin/social/providers"
+ 344:           element={
+ 345:             <ProtectedAdminRoute>
+ 346:               <AdminSocialPage />
+ 347:             </ProtectedAdminRoute>
+ 348:           }
+ 349:         />
+ 350: 
+ 351:         <Route
+ 352:           path="/admin/social/services"
+ 353:           element={
+ 354:             <ProtectedAdminRoute>
+ 355:               <AdminSocialServicesPage />
+ 356:             </ProtectedAdminRoute>
+ 357:           }
+ 358:         />
+ 359: 
+ 360:         <Route
+ 361:           path="/admin/social/orders"
+ 362:           element={
+ 363:             <ProtectedAdminRoute>
+ 364:               <AdminSocialOrdersPage />
+ 365:             </ProtectedAdminRoute>
+ 366:           }
+ 367:         />
+ 368: 
+ 369:         <Route
+ 370:           path="/admin/social/customers"
+ 371:           element={
+ 372:             <ProtectedAdminRoute>
+ 373:               <AdminSocialCustomersPage />
+ 374:             </ProtectedAdminRoute>
+ 375:           }
+ 376:         />
+ 377: 
+ 378:         <Route
+ 379:           path="/admin/social/topups"
+ 380:           element={
+ 381:             <ProtectedAdminRoute>
+ 382:               <AdminSocialTopupsPage />
+ 383:             </ProtectedAdminRoute>
+ 384:           }
+ 385:         />
+ 386: 
+ 387:         <Route
+ 388:           path="/admin/community"
+ 389:           element={
+ 390:             <ProtectedAdminRoute>
+ 391:               <AdminCommunityPage />
+ 392:             </ProtectedAdminRoute>
+ 393:           }
+ 394:         />
+ 395: 
+ 396:         <Route
+ 397:           path="/admin/reports"
+ 398:           element={
+ 399:             <ProtectedAdminRoute>
+ 400:               <AdminReportsPage />
+ 401:             </ProtectedAdminRoute>
+ 402:           }
+ 403:         />
+ 404: 
+ 405:         <Route
+ 406:           path="/admin/reports/:id"
+ 407:           element={
+ 408:             <ProtectedAdminRoute>
+ 409:               <AdminReportDetailPage />
+ 410:             </ProtectedAdminRoute>
+ 411:           }
+ 412:         />
+ 413:         <Route
+ 414:           path="/admin/digital/services"
+ 415:           element={
+ 416:             <ProtectedAdminRoute>
+ 417:               <AdminDigitalServicesPage />
+ 418:             </ProtectedAdminRoute>
+ 419:           }
+ 420:         />
+ 421: 
+ 422:         <Route
+ 423:           path="/admin/digital/orders"
+ 424:           element={
+ 425:             <ProtectedAdminRoute>
+ 426:               <AdminDigitalOrdersPage />
+ 427:             </ProtectedAdminRoute>
+ 428:           }
+ 429:         />
+ 430: 
+ 431:         <Route
+ 432:           path="/admin/chat"
+ 433:           element={
+ 434:             <ProtectedAdminRoute>
+ 435:               <AdminChatPage />
+ 436:             </ProtectedAdminRoute>
+ 437:           }
+ 438:         />
+ 439: 
+ 440:       </Routes>
+ 441:     </Suspense>
+ 442:   )
+ 443: }
+ 444: 
+ 445: export default AppRoutes
+
+======================================================================
+FILE: noscam-frontend/src/services/apiClient.js
+======================================================================
+   1: export const API_BASE_URL = (
+   2:   import.meta.env.VITE_API_BASE_URL ||
+   3:   'http://127.0.0.1:8000/api'
+   4: ).replace(/\/+$/, '')
+   5: 
+   6: async function request(
+   7:   endpoint,
+   8:   {
+   9:     method = 'GET',
+  10:     body,
+  11:     headers = {},
+  12:     signal,
+  13:   } = {},
+  14: ) {
+  15:   const url =
+  16:     `${API_BASE_URL}${endpoint}`
+  17: 
+  18:   const isFormData =
+  19:     typeof FormData !==
+  20:       'undefined' &&
+  21:     body instanceof FormData
+  22: 
+  23:   const config = {
+  24:     method,
+  25: 
+  26:     headers: {
+  27:       Accept:
+  28:         'application/json',
+  29: 
+  30:       ...headers,
+  31:     },
+  32: 
+  33:     signal,
+  34:   }
+  35: 
+  36:   if (body !== undefined) {
+  37:     if (isFormData) {
+  38:       config.body = body
+  39:     } else {
+  40:       config.headers[
+  41:         'Content-Type'
+  42:       ] = 'application/json'
+  43: 
+  44:       config.body =
+  45:         JSON.stringify(body)
+  46:     }
+  47:   }
+  48: 
+  49:   let response
+  50: 
+  51:   try {
+  52:     response =
+  53:       await fetch(
+  54:         url,
+  55:         config,
+  56:       )
+  57:   } catch (error) {
+  58:     if (
+  59:       error.name ===
+  60:       'AbortError'
+  61:     ) {
+  62:       throw error
+  63:     }
+  64: 
+  65:     throw new Error(
+  66:       'Không thể kết nối tới máy chủ. Vui lòng kiểm tra kết nối và thử lại.',
+  67:     )
+  68:   }
+  69: 
+  70:   let data = null
+  71: 
+  72:   const contentType =
+  73:     response.headers.get(
+  74:       'content-type',
+  75:     )
+  76: 
+  77:   if (
+  78:     contentType?.includes(
+  79:       'application/json',
+  80:     )
+  81:   ) {
+  82:     try {
+  83:       data =
+  84:         await response.json()
+  85:     } catch {
+  86:       data = null
+  87:     }
+  88:   }
+  89: 
+  90:   if (!response.ok) {
+  91:     let message =
+  92:       data?.message ||
+  93:       `Yêu cầu thất bại với mã ${response.status}.`
+  94: 
+  95:     if (response.status === 429) {
+  96:       message =
+  97:         'Bạn đang gửi quá nhiều yêu cầu. Vui lòng chờ một lúc rồi thử lại.'
+  98:     }
+  99: 
+ 100:     if (data?.errors) {
+ 101:       const validationMessages =
+ 102:         Object.values(
+ 103:           data.errors,
+ 104:         )
+ 105:           .flat()
+ 106:           .filter(Boolean)
+ 107: 
+ 108:       if (
+ 109:         validationMessages.length >
+ 110:         0
+ 111:       ) {
+ 112:         message =
+ 113:           validationMessages.join(
+ 114:             ' ',
+ 115:           )
+ 116:       }
+ 117:     }
+ 118: 
+ 119:     const error =
+ 120:       new Error(message)
+ 121: 
+ 122:     error.status =
+ 123:       response.status
+ 124: 
+ 125:     error.data =
+ 126:       data
+ 127: 
+ 128:     throw error
+ 129:   }
+ 130: 
+ 131:   return data
+ 132: }
+ 133: 
+ 134: export const apiClient = {
+ 135:   get(
+ 136:     endpoint,
+ 137:     options = {},
+ 138:   ) {
+ 139:     return request(
+ 140:       endpoint,
+ 141:       {
+ 142:         ...options,
+ 143:         method: 'GET',
+ 144:       },
+ 145:     )
+ 146:   },
+ 147: 
+ 148:   post(
+ 149:     endpoint,
+ 150:     body,
+ 151:     options = {},
+ 152:   ) {
+ 153:     return request(
+ 154:       endpoint,
+ 155:       {
+ 156:         ...options,
+ 157:         method: 'POST',
+ 158:         body,
+ 159:       },
+ 160:     )
+ 161:   },
+ 162: 
+ 163:   put(
+ 164:     endpoint,
+ 165:     body,
+ 166:     options = {},
+ 167:   ) {
+ 168:     return request(
+ 169:       endpoint,
+ 170:       {
+ 171:         ...options,
+ 172:         method: 'PUT',
+ 173:         body,
+ 174:       },
+ 175:     )
+ 176:   },
+ 177: 
+ 178:   patch(
+ 179:     endpoint,
+ 180:     body,
+ 181:     options = {},
+ 182:   ) {
+ 183:     return request(
+ 184:       endpoint,
+ 185:       {
+ 186:         ...options,
+ 187:         method: 'PATCH',
+ 188:         body,
+ 189:       },
+ 190:     )
+ 191:   },
+ 192: 
+ 193:   delete(
+ 194:     endpoint,
+ 195:     options = {},
+ 196:   ) {
+ 197:     return request(
+ 198:       endpoint,
+ 199:       {
+ 200:         ...options,
+ 201:         method: 'DELETE',
+ 202:       },
+ 203:     )
+ 204:   },
+ 205: }
+ 206: 
+ 207: export default apiClient
+
+======================================================================
+FILE: noscam-frontend/src/services/adminService.js
+======================================================================
+   1: import apiClient, {
+   2:   API_BASE_URL,
+   3: } from './apiClient'
+   4: 
+   5: const TOKEN_KEY =
+   6:   'noscam_admin_token'
+   7: 
+   8: export function getAdminToken() {
+   9:   return localStorage.getItem(
+  10:     TOKEN_KEY,
+  11:   )
+  12: }
+  13: 
+  14: export function setAdminToken(
+  15:   token,
+  16: ) {
+  17:   localStorage.setItem(
+  18:     TOKEN_KEY,
+  19:     token,
+  20:   )
+  21: }
+  22: 
+  23: export function removeAdminToken() {
+  24:   localStorage.removeItem(
+  25:     TOKEN_KEY,
+  26:   )
+  27: }
+  28: 
+  29: function authOptions() {
+  30:   const token =
+  31:     getAdminToken()
+  32: 
+  33:   return {
+  34:     headers: {
+  35:       Authorization:
+  36:         `Bearer ${token}`,
+  37:     },
+  38:   }
+  39: }
+  40: 
+  41: async function adminRequest(
+  42:   callback,
+  43: ) {
+  44:   try {
+  45:     return await callback()
+  46:   } catch (error) {
+  47:     if (
+  48:       error?.status === 401 ||
+  49:       error?.status === 403
+  50:     ) {
+  51:       removeAdminToken()
+  52:     }
+  53: 
+  54:     throw error
+  55:   }
+  56: }
+  57: 
+  58: export const adminService = {
+  59:   async login(
+  60:     email,
+  61:     password,
+  62:   ) {
+  63:     const response =
+  64:       await apiClient.post(
+  65:         '/admin/login',
+  66:         {
+  67:           email:
+  68:             email.trim(),
+  69: 
+  70:           password,
+  71:         },
+  72:       )
+  73: 
+  74:     const token =
+  75:       response?.data?.token
+  76: 
+  77:     if (!token) {
+  78:       throw new Error(
+  79:         'Máy chủ không trả về token đăng nhập.',
+  80:       )
+  81:     }
+  82: 
+  83:     setAdminToken(token)
+  84: 
+  85:     return response.data
+  86:   },
+  87: 
+  88:   async me() {
+  89:     return adminRequest(
+  90:       () =>
+  91:         apiClient.get(
+  92:           '/admin/me',
+  93:           authOptions(),
+  94:         ),
+  95:     )
+  96:   },
+  97: 
+  98:   async logout() {
+  99:     try {
+ 100:       if (getAdminToken()) {
+ 101:         await apiClient.post(
+ 102:           '/admin/logout',
+ 103:           undefined,
+ 104:           authOptions(),
+ 105:         )
+ 106:       }
+ 107:     } catch {
+ 108:       // Vẫn xóa token local nếu server
+ 109:       // không còn nhận phiên hiện tại.
+ 110:     } finally {
+ 111:       removeAdminToken()
+ 112:     }
+ 113:   },
+ 114: 
+ 115:   async getDashboard() {
+ 116:     return adminRequest(
+ 117:       () =>
+ 118:         apiClient.get(
+ 119:           '/admin/dashboard',
+ 120:           authOptions(),
+ 121:         ),
+ 122:     )
+ 123:   },
+ 124: 
+ 125:   async getReports(
+ 126:     status = 'pending',
+ 127:     search = '',
+ 128:     page = 1,
+ 129:   ) {
+ 130:     const params =
+ 131:       new URLSearchParams()
+ 132: 
+ 133:     params.set(
+ 134:       'status',
+ 135:       status,
+ 136:     )
+ 137: 
+ 138:     params.set(
+ 139:       'page',
+ 140:       String(page),
+ 141:     )
+ 142: 
+ 143:     if (search.trim()) {
+ 144:       params.set(
+ 145:         'search',
+ 146:         search.trim(),
+ 147:       )
+ 148:     }
+ 149: 
+ 150:     return adminRequest(
+ 151:       () =>
+ 152:         apiClient.get(
+ 153:           `/admin/reports?${params.toString()}`,
+ 154:           authOptions(),
+ 155:         ),
+ 156:     )
+ 157:   },
+ 158: 
+ 159:   async getReport(id) {
+ 160:     return adminRequest(
+ 161:       () =>
+ 162:         apiClient.get(
+ 163:           `/admin/reports/${id}`,
+ 164:           authOptions(),
+ 165:         ),
+ 166:     )
+ 167:   },
+ 168: 
+ 169:   async updateReportStatus(
+ 170:     id,
+ 171:     status,
+ 172:   ) {
+ 173:     return adminRequest(
+ 174:       () =>
+ 175:         apiClient.patch(
+ 176:           `/admin/reports/${id}/status`,
+ 177:           { status },
+ 178:           authOptions(),
+ 179:         ),
+ 180:     )
+ 181:   },
+ 182: 
+ 183:   async getMediators(
+ 184:     search = '',
+ 185:     page = 1,
+ 186:     status = '',
+ 187:   ) {
+ 188:     const params =
+ 189:       new URLSearchParams()
+ 190: 
+ 191:     params.set(
+ 192:       'page',
+ 193:       String(page),
+ 194:     )
+ 195: 
+ 196:     if (search.trim()) {
+ 197:       params.set(
+ 198:         'search',
+ 199:         search.trim(),
+ 200:       )
+ 201:     }
+ 202: 
+ 203:     if (status) {
+ 204:       params.set(
+ 205:         'status',
+ 206:         status,
+ 207:       )
+ 208:     }
+ 209: 
+ 210:     return adminRequest(
+ 211:       () =>
+ 212:         apiClient.get(
+ 213:           `/admin/mediators?${params.toString()}`,
+ 214:           authOptions(),
+ 215:         ),
+ 216:     )
+ 217:   },
+ 218: 
+ 219:   async getMediator(id) {
+ 220:     return adminRequest(
+ 221:       () =>
+ 222:         apiClient.get(
+ 223:           `/admin/mediators/${id}`,
+ 224:           authOptions(),
+ 225:         ),
+ 226:     )
+ 227:   },
+ 228: 
+ 229:   async createMediator(data) {
+ 230:     return adminRequest(
+ 231:       () =>
+ 232:         apiClient.post(
+ 233:           '/admin/mediators',
+ 234:           data,
+ 235:           authOptions(),
+ 236:         ),
+ 237:     )
+ 238:   },
+ 239: 
+ 240:   async updateMediator(
+ 241:     id,
+ 242:     data,
+ 243:   ) {
+ 244:     return adminRequest(
+ 245:       () =>
+ 246:         apiClient.put(
+ 247:           `/admin/mediators/${id}`,
+ 248:           data,
+ 249:           authOptions(),
+ 250:         ),
+ 251:     )
+ 252:   },
+ 253: 
+ 254:   async uploadMediatorAvatar(id, file) {
+ 255:     const body = new FormData()
+ 256:     body.append('avatar', file)
+ 257:     return adminRequest(() => apiClient.post(
+ 258:       `/admin/mediators/${id}/avatar`, body, authOptions()
+ 259:     ))
+ 260:   },
+ 261: 
+ 262:   async deleteMediatorAvatar(id) {
+ 263:     return adminRequest(() => apiClient.delete(
+ 264:       `/admin/mediators/${id}/avatar`, authOptions()
+ 265:     ))
+ 266:   },
+ 267: 
+ 268:   async addMediatorDeposit(
+ 269:     id,
+ 270:     data,
+ 271:   ) {
+ 272:     return adminRequest(
+ 273:       () =>
+ 274:         apiClient.post(
+ 275:           `/admin/mediators/${id}/deposits`,
+ 276:           data,
+ 277:           authOptions(),
+ 278:         ),
+ 279:     )
+ 280:   },
+ 281: 
+ 282:   async getSocialDashboard() {
+ 283:     return adminRequest(
+ 284:       () =>
+ 285:         apiClient.get(
+ 286:           '/admin/social/dashboard',
+ 287:           authOptions(),
+ 288:         ),
+ 289:     )
+ 290:   },
+ 291: 
+ 292:   async getSocialProviders() {
+ 293:     return adminRequest(
+ 294:       () =>
+ 295:         apiClient.get(
+ 296:           '/admin/social/providers',
+ 297:           authOptions(),
+ 298:         ),
+ 299:     )
+ 300:   },
+ 301: 
+ 302:   async updateSocialProvider(
+ 303:     id,
+ 304:     data,
+ 305:   ) {
+ 306:     return adminRequest(
+ 307:       () =>
+ 308:         apiClient.put(
+ 309:           `/admin/social/providers/${id}`,
+ 310:           data,
+ 311:           authOptions(),
+ 312:         ),
+ 313:     )
+ 314:   },
+ 315: 
+ 316:   async testSocialProvider(id) {
+ 317:     return adminRequest(
+ 318:       () =>
+ 319:         apiClient.post(
+ 320:           `/admin/social/providers/${id}/test`,
+ 321:           undefined,
+ 322:           authOptions(),
+ 323:         ),
+ 324:     )
+ 325:   },
+ 326: 
+ 327:   async syncSocialProvider(id) {
+ 328:     return adminRequest(
+ 329:       () =>
+ 330:         apiClient.post(
+ 331:           `/admin/social/providers/${id}/sync`,
+ 332:           undefined,
+ 333:           authOptions(),
+ 334:         ),
+ 335:     )
+ 336:   },
+ 337: 
+ 338:   async getSocialServices(
+ 339:     platform = '',
+ 340:     search = '',
+ 341:   ) {
+ 342:     const params =
+ 343:       new URLSearchParams()
+ 344: 
+ 345:     if (platform) {
+ 346:       params.set(
+ 347:         'platform',
+ 348:         platform,
+ 349:       )
+ 350:     }
+ 351: 
+ 352:     if (search.trim()) {
+ 353:       params.set(
+ 354:         'search',
+ 355:         search.trim(),
+ 356:       )
+ 357:     }
+ 358: 
+ 359:     const query =
+ 360:       params.toString()
+ 361: 
+ 362:     return adminRequest(
+ 363:       () =>
+ 364:         apiClient.get(
+ 365:           `/admin/social/services${query ? `?${query}` : ''}`,
+ 366:           authOptions(),
+ 367:         ),
+ 368:     )
+ 369:   },
+ 370: 
+ 371:   async getSocialProviderServices({
+ 372:     providerId = '',
+ 373:     mapped = '',
+ 374:     providerAvailability = '',
+ 375:     active = '',
+ 376:     search = '',
+ 377:     page = 1,
+ 378:     perPage = 50,
+ 379:   } = {}) {
+ 380:     const params =
+ 381:       new URLSearchParams()
+ 382: 
+ 383: 
+ 384:     if (providerAvailability) {
+ 385:       params.set(
+ 386:         'provider_availability',
+ 387:         providerAvailability,
+ 388:       )
+ 389:     }
+ 390: 
+ 391:     params.set(
+ 392:       'page',
+ 393:       String(page),
+ 394:     )
+ 395: 
+ 396:     params.set(
+ 397:       'per_page',
+ 398:       String(perPage),
+ 399:     )
+ 400: 
+ 401:     if (providerId) {
+ 402:       params.set(
+ 403:         'provider_id',
+ 404:         String(providerId),
+ 405:       )
+ 406:     }
+ 407: 
+ 408:     if (mapped !== '') {
+ 409:       params.set(
+ 410:         'mapped',
+ 411:         String(mapped),
+ 412:       )
+ 413:     }
+ 414: 
+ 415:     if (active !== '') {
+ 416:       params.set(
+ 417:         'active',
+ 418:         String(active),
+ 419:       )
+ 420:     }
+ 421: 
+ 422:     if (search.trim()) {
+ 423:       params.set(
+ 424:         'search',
+ 425:         search.trim(),
+ 426:       )
+ 427:     }
+ 428: 
+ 429:     return adminRequest(
+ 430:       () =>
+ 431:         apiClient.get(
+ 432:           `/admin/social/provider-services?${params.toString()}`,
+ 433:           authOptions(),
+ 434:         ),
+ 435:     )
+ 436:   },
+ 437: 
+ 438:   async updateSocialProviderService(
+ 439:     id,
+ 440:     data,
+ 441:   ) {
+ 442:     return adminRequest(
+ 443:       () =>
+ 444:         apiClient.patch(
+ 445:           `/admin/social/provider-services/${id}`,
+ 446:           data,
+ 447:           authOptions(),
+ 448:         ),
+ 449:     )
+ 450:   },
+ 451: 
+ 452:   async mapSocialProviderService(
+ 453:     id,
+ 454:     data,
+ 455:   ) {
+ 456:     return adminRequest(
+ 457:       () =>
+ 458:         apiClient.post(
+ 459:           `/admin/social/provider-services/${id}/map`,
+ 460:           data,
+ 461:           authOptions(),
+ 462:         ),
+ 463:     )
+ 464:   },
+ 465: 
+ 466:   async unmapSocialProviderService(
+ 467:     id,
+ 468:   ) {
+ 469:     return adminRequest(
+ 470:       () =>
+ 471:         apiClient.delete(
+ 472:           `/admin/social/provider-services/${id}/map`,
+ 473:           authOptions(),
+ 474:         ),
+ 475:     )
+ 476:   },
+ 477: 
+ 478:   async createSocialService(data) {
+ 479:     return adminRequest(
+ 480:       () =>
+ 481:         apiClient.post(
+ 482:           '/admin/social/services',
+ 483:           data,
+ 484:           authOptions(),
+ 485:         ),
+ 486:     )
+ 487:   },
+ 488: 
+ 489:   async updateSocialService(
+ 490:     id,
+ 491:     data,
+ 492:   ) {
+ 493:     return adminRequest(
+ 494:       () =>
+ 495:         apiClient.put(
+ 496:           `/admin/social/services/${id}`,
+ 497:           data,
+ 498:           authOptions(),
+ 499:         ),
+ 500:     )
+ 501:   },
+ 502: 
+ 503:   async getSocialAuditOrders({ page = 1 } = {}) {
+ 504:     return adminRequest(
+ 505:       () =>
+ 506:         apiClient.get(
+ 507:           `/admin/social/orders/audit?page=${encodeURIComponent(page)}`,
+ 508:           authOptions(),
+ 509:         ),
+ 510:     )
+ 511:   },
+ 512: 
+ 513:   async getSocialOrderReconciliationPreview(id) {
+ 514:     return adminRequest(
+ 515:       () => apiClient.get(
+ 516:         `/admin/social/orders/${id}/reconcile-preview`,
+ 517:         authOptions(),
+ 518:       ),
+ 519:     )
+ 520:   },
+ 521: 
+ 522:   async getSocialOrderResolutions(id, page = 1) {
+ 523:     return adminRequest(
+ 524:       () => apiClient.get(
+ 525:         `/admin/social/orders/${id}/resolutions?page=${page}`,
+ 526:         authOptions(),
+ 527:       ),
+ 528:     )
+ 529:   },
+ 530: 
+ 531:   async getSocialOrderAudits(id, page = 1) {
+ 532:     return adminRequest(
+ 533:       () => apiClient.get(
+ 534:         `/admin/social/orders/${id}/audits?page=${page}`,
+ 535:         authOptions(),
+ 536:       ),
+ 537:     )
+ 538:   },
+ 539: 
+ 540:   async createSocialOrderAudit(id, data) {
+ 541:     return adminRequest(
+ 542:       () => apiClient.post(
+ 543:         `/admin/social/orders/${id}/audits`,
+ 544:         data,
+ 545:         authOptions(),
+ 546:       ),
+ 547:     )
+ 548:   },
+ 549: 
+ 550:   async getSocialOrders({
+ 551:     status = '',
+ 552:     search = '',
+ 553:     page = 1,
+ 554:   } = {}) {
+ 555:     const params = new URLSearchParams()
+ 556: 
+ 557:     if (status) {
+ 558:       params.set('status', status)
+ 559:     }
+ 560: 
+ 561:     if (search.trim()) {
+ 562:       params.set('search', search.trim())
+ 563:     }
+ 564: 
+ 565:     params.set('page', String(page))
+ 566: 
+ 567:     return adminRequest(
+ 568:       () =>
+ 569:         apiClient.get(
+ 570:           `/admin/social/orders?${params.toString()}`,
+ 571:           authOptions(),
+ 572:         ),
+ 573:     )
+ 574:   },
+ 575: 
+ 576:   async cancelSocialOrder(id) {
+ 577:     return adminRequest(
+ 578:       () =>
+ 579:         apiClient.post(
+ 580:           `/admin/social/orders/${id}/cancel`,
+ 581:           {},
+ 582:           authOptions(),
+ 583:         ),
+ 584:     )
+ 585:   },
+ 586: 
+ 587:   async getEvidence(id) {
+ 588:     const token =
+ 589:       getAdminToken()
+ 590: 
+ 591:     if (!token) {
+ 592:       const error =
+ 593:         new Error(
+ 594:           'Phiên đăng nhập Admin không hợp lệ.',
+ 595:         )
+ 596: 
+ 597:       error.status = 401
+ 598: 
+ 599:       throw error
+ 600:     }
+ 601: 
+ 602:     let response
+ 603: 
+ 604:     try {
+ 605:       response =
+ 606:         await fetch(
+ 607:           `${API_BASE_URL}/admin/evidences/${id}`,
+ 608:           {
+ 609:             headers: {
+ 610:               Accept: '*/*',
+ 611: 
+ 612:               Authorization:
+ 613:                 `Bearer ${token}`,
+ 614:             },
+ 615:           },
+ 616:         )
+ 617:     } catch {
+ 618:       throw new Error(
+ 619:         'Không thể kết nối tới máy chủ để tải evidence.',
+ 620:       )
+ 621:     }
+ 622: 
+ 623:     if (!response.ok) {
+ 624:       if (
+ 625:         response.status === 401 ||
+ 626:         response.status === 403
+ 627:       ) {
+ 628:         removeAdminToken()
+ 629:       }
+ 630: 
+ 631:       const error =
+ 632:         new Error(
+ 633:           response.status === 401
+ 634:             ? 'Phiên đăng nhập đã hết hạn.'
+ 635:             : response.status === 403
+ 636:               ? 'Bạn không có quyền xem evidence.'
+ 637:               : response.status === 404
+ 638:                 ? 'Không tìm thấy evidence.'
+ 639:                 : 'Không thể tải evidence.',
+ 640:         )
+ 641: 
+ 642:       error.status =
+ 643:         response.status
+ 644: 
+ 645:       throw error
+ 646:     }
+ 647: 
+ 648:     return response.blob()
+ 649:   },
+ 650: 
+ 651:   async updateSocialOrderStatus(
+ 652:     id,
+ 653:     status,
+ 654:   ) {
+ 655:     return adminRequest(
+ 656:       () =>
+ 657:         apiClient.patch(
+ 658:           `/admin/social/orders/${id}/status`,
+ 659:           { status },
+ 660:           authOptions(),
+ 661:         ),
+ 662:     )
+ 663:   },
+ 664: 
+ 665:   async getSocialCustomers({
+ 666:     search = '',
+ 667:     page = 1,
+ 668:   } = {}) {
+ 669:     const params = new URLSearchParams()
+ 670: 
+ 671:     if (search.trim()) {
+ 672:       params.set('search', search.trim())
+ 673:     }
+ 674: 
+ 675:     params.set('page', String(page))
+ 676: 
+ 677:     return adminRequest(
+ 678:       () =>
+ 679:         apiClient.get(
+ 680:           `/admin/social/customers?${params.toString()}`,
+ 681:           authOptions(),
+ 682:         ),
+ 683:     )
+ 684:   },
+ 685: 
+ 686:   async getSocialCustomer(id) {
+ 687:     return adminRequest(
+ 688:       () =>
+ 689:         apiClient.get(
+ 690:           `/admin/social/customers/${id}`,
+ 691:           authOptions(),
+ 692:         ),
+ 693:     )
+ 694:   },
+ 695: 
+ 696:   async adjustSocialCustomerWallet(
+ 697:     id,
+ 698:     {
+ 699:       direction,
+ 700:       amount,
+ 701:       note = '',
+ 702:     },
+ 703:   ) {
+ 704:     return adminRequest(
+ 705:       () =>
+ 706:         apiClient.post(
+ 707:           `/admin/social/customers/${id}/wallet`,
+ 708:           {
+ 709:             direction,
+ 710:             amount,
+ 711:             note,
+ 712:           },
+ 713:           authOptions(),
+ 714:         ),
+ 715:     )
+ 716:   },
+ 717: 
+ 718:   async getSocialTopups({
+ 719:     status = '',
+ 720:     search = '',
+ 721:   } = {}) {
+ 722:     const params =
+ 723:       new URLSearchParams()
+ 724: 
+ 725:     if (status) {
+ 726:       params.set('status', status)
+ 727:     }
+ 728: 
+ 729:     if (search.trim()) {
+ 730:       params.set(
+ 731:         'search',
+ 732:         search.trim(),
+ 733:       )
+ 734:     }
+ 735: 
+ 736:     const query = params.toString()
+ 737: 
+ 738:     return adminRequest(
+ 739:       () =>
+ 740:         apiClient.get(
+ 741:           `/admin/social/topups${
+ 742:             query ? `?${query}` : ''
+ 743:           }`,
+ 744:           authOptions(),
+ 745:         ),
+ 746:     )
+ 747:   },
+ 748: 
+ 749:   async manualCreditSocialWallet({
+ 750:     username,
+ 751:     amount,
+ 752:     note = '',
+ 753:   }) {
+ 754:     return adminRequest(
+ 755:       () =>
+ 756:         apiClient.post(
+ 757:           '/admin/social/topups/manual-credit',
+ 758:           {
+ 759:             username,
+ 760:             amount,
+ 761:             note,
+ 762:           },
+ 763:           authOptions(),
+ 764:         ),
+ 765:     )
+ 766:   },
+ 767: 
+ 768:   async approveSocialTopup(id) {
+ 769:     return adminRequest(
+ 770:       () =>
+ 771:         apiClient.post(
+ 772:           `/admin/social/topups/${id}/approve`,
+ 773:           undefined,
+ 774:           authOptions(),
+ 775:         ),
+ 776:     )
+ 777:   },
+ 778: 
+ 779:   async rejectSocialTopup(
+ 780:     id,
+ 781:     note = '',
+ 782:   ) {
+ 783:     return adminRequest(
+ 784:       () =>
+ 785:         apiClient.post(
+ 786:           `/admin/social/topups/${id}/reject`,
+ 787:           { note },
+ 788:           authOptions(),
+ 789:         ),
+ 790:     )
+ 791:   },
+ 792: 
+ 793: }
+ 794: 
+ 795: export default adminService
+
+======================================================================
+FILE: noscam-backend/routes/api.php
+======================================================================
+   1: <?php
+   2: 
+   3: use App\Http\Controllers\Api\AdminAuthController;
+   4: use App\Http\Controllers\Api\AdminDashboardController;
+   5: use App\Http\Controllers\Api\AdminEvidenceController;
+   6: use App\Http\Controllers\Api\AdminMediatorController;
+   7: use App\Http\Controllers\Api\AdminReportController;
+   8: use App\Http\Controllers\Api\AlertController;
+   9: use App\Http\Controllers\Api\CommunityFeedbackController;
+  10: use App\Http\Controllers\Api\MediatorController;
+  11: use App\Http\Controllers\Api\MediatorBankController;
+  12: use App\Http\Controllers\Api\MediatorTagController;
+  13: use App\Http\Controllers\Api\PublicStatsController;
+  14: use App\Http\Controllers\Api\ReportController;
+  15: use App\Http\Controllers\Api\ReportModerationController;
+  16: use App\Http\Controllers\Api\SearchController;
+  17: use App\Http\Controllers\Api\AdminSocialCustomerController;
+  18: use App\Http\Controllers\Api\AdminSocialDashboardController;
+  19: use App\Http\Controllers\Api\AdminSocialOrderController;
+  20: use App\Http\Controllers\Api\AdminSocialOrderAuditController;
+  21: use App\Http\Controllers\Api\AdminSocialOrderReconciliationController;
+  22: use App\Http\Controllers\Api\AdminSocialOrderReconciliationPreviewController;
+  23: use App\Http\Controllers\Api\AdminSocialOrderResolutionController;
+  24: use App\Http\Controllers\Api\AdminSocialProviderController;
+  25: use App\Http\Controllers\Api\AdminSocialServiceController;
+  26: use App\Http\Controllers\Api\AdminWalletTopupController;
+  27: use App\Http\Controllers\Api\CustomerAuthController;
+  28: use App\Http\Controllers\Api\WalletController;
+  29: use App\Http\Controllers\Api\SocialServiceController;
+  30: use App\Http\Controllers\Api\SocialOrderController;
+  31: use App\Http\Controllers\Api\CustomerProfileController;
+  32: use Illuminate\Support\Facades\Route;
+  33: 
+  34: /*
+  35: |--------------------------------------------------------------------------
+  36: | Public Digital Services
+  37: |--------------------------------------------------------------------------
+  38: */
+  39: 
+  40: Route::get(
+  41:     '/digital/services',
+  42:     [\App\Http\Controllers\Api\PublicDigitalServiceController::class, 'index']
+  43: )->middleware('throttle:public-search');
+  44: 
+  45: Route::get(
+  46:     '/digital/services/{digitalService}',
+  47:     [\App\Http\Controllers\Api\PublicDigitalServiceController::class, 'show']
+  48: )->whereNumber('digitalService')
+  49:   ->middleware('throttle:public-search');
+  50: 
+  51: /*
+  52: |--------------------------------------------------------------------------
+  53: | Public API
+  54: |--------------------------------------------------------------------------
+  55: */
+  56: 
+  57: Route::get(
+  58:     '/stats',
+  59:     [PublicStatsController::class, 'index']
+  60: )->middleware(
+  61:     'throttle:public-search'
+  62: );
+  63: 
+  64: Route::get(
+  65:     '/search',
+  66:     [SearchController::class, 'index']
+  67: )->middleware(
+  68:     'throttle:public-search'
+  69: );
+  70: 
+  71: Route::get(
+  72:     '/alerts',
+  73:     [AlertController::class, 'index']
+  74: )->middleware(
+  75:     'throttle:public-search'
+  76: );
+  77: 
+  78: Route::get(
+  79:     '/community-feedback',
+  80:     [CommunityFeedbackController::class, 'index']
+  81: )->middleware(
+  82:     'throttle:public-search'
+  83: );
+  84: 
+  85: Route::post(
+  86:     '/community-feedback',
+  87:     [CommunityFeedbackController::class, 'store']
+  88: )->middleware(
+  89:     'throttle:public-report'
+  90: );
+  91: 
+  92: Route::post(
+  93:     '/reports',
+  94:     [ReportController::class, 'store']
+  95: )->middleware(
+  96:     'throttle:public-report'
+  97: );
+  98: 
+  99: /*
+ 100: |--------------------------------------------------------------------------
+ 101: | Community Comment Moderation
+ 102: |--------------------------------------------------------------------------
+ 103: */
+ 104: 
+ 105: Route::middleware([
+ 106:     'auth:sanctum',
+ 107:     'throttle:customer-api',
+ 108: ])->group(function () {
+ 109:     Route::get(
+ 110:         '/community/moderation/comments',
+ 111:         [\App\Http\Controllers\Api\CommunityCommentModerationController::class, 'index']
+ 112:     );
+ 113: 
+ 114:     Route::patch(
+ 115:         '/community/moderation/comments/{comment}',
+ 116:         [\App\Http\Controllers\Api\CommunityCommentModerationController::class, 'update']
+ 117:     )->whereNumber('comment');
+ 118: });
+ 119: 
+ 120: /*
+ 121: |--------------------------------------------------------------------------
+ 122: | Community Moderation
+ 123: |--------------------------------------------------------------------------
+ 124: */
+ 125: 
+ 126: Route::middleware([
+ 127:     'auth:sanctum',
+ 128:     'throttle:customer-api',
+ 129: ])->group(function () {
+ 130:     Route::get(
+ 131:         '/community/moderation/posts',
+ 132:         [\App\Http\Controllers\Api\CommunityModerationController::class, 'index']
+ 133:     );
+ 134: 
+ 135:     Route::patch(
+ 136:         '/community/moderation/posts/{post}',
+ 137:         [\App\Http\Controllers\Api\CommunityModerationController::class, 'update']
+ 138:     )->whereNumber('post');
+ 139: });
+ 140: 
+ 141: /*
+ 142: |--------------------------------------------------------------------------
+ 143: | Community Comments
+ 144: |--------------------------------------------------------------------------
+ 145: */
+ 146: 
+ 147: Route::get(
+ 148:     '/community/posts/{post}/comments',
+ 149:     [\App\Http\Controllers\Api\CommunityCommentController::class, 'index']
+ 150: )->whereNumber('post')
+ 151:   ->middleware('throttle:public-search');
+ 152: 
+ 153: Route::post(
+ 154:     '/community/posts/{post}/comments',
+ 155:     [\App\Http\Controllers\Api\CommunityCommentController::class, 'store']
+ 156: )->whereNumber('post')
+ 157:   ->middleware(['auth:sanctum', 'throttle:customer-api']);
+ 158: 
+ 159: /*
+ 160: |--------------------------------------------------------------------------
+ 161: | Community Reactions
+ 162: |--------------------------------------------------------------------------
+ 163: */
+ 164: 
+ 165: Route::middleware([
+ 166:     'auth:sanctum',
+ 167:     'throttle:customer-api',
+ 168: ])->group(function () {
+ 169:     Route::post(
+ 170:         '/community/posts/{post}/like',
+ 171:         [\App\Http\Controllers\Api\CommunityReactionController::class, 'store']
+ 172:     )->whereNumber('post');
+ 173: 
+ 174:     Route::delete(
+ 175:         '/community/posts/{post}/like',
+ 176:         [\App\Http\Controllers\Api\CommunityReactionController::class, 'destroy']
+ 177:     )->whereNumber('post');
+ 178: });
+ 179: 
+ 180: /*
+ 181: |--------------------------------------------------------------------------
+ 182: | Community Posts
+ 183: |--------------------------------------------------------------------------
+ 184: */
+ 185: 
+ 186: Route::get(
+ 187:     '/community/posts',
+ 188:     [\App\Http\Controllers\Api\CommunityPostController::class, 'index']
+ 189: )->middleware('throttle:public-search');
+ 190: 
+ 191: Route::post(
+ 192:     '/community/posts',
+ 193:     [\App\Http\Controllers\Api\CommunityPostController::class, 'store']
+ 194: )->middleware(['auth:sanctum', 'throttle:customer-api']);
+ 195: 
+ 196: /*
+ 197: |--------------------------------------------------------------------------
+ 198: | Mediator Public API
+ 199: |--------------------------------------------------------------------------
+ 200: */
+ 201: 
+ 202: Route::get(
+ 203:     '/mediator-tags',
+ 204:     [MediatorTagController::class, 'index']
+ 205: )->middleware(
+ 206:     'throttle:public-search'
+ 207: );
+ 208: 
+ 209: 
+ 210: Route::get(
+ 211:     '/mediator-banks',
+ 212:     [MediatorBankController::class, 'index']
+ 213: )->middleware(
+ 214:     'throttle:public-search'
+ 215: );
+ 216: 
+ 217: Route::get(
+ 218:     '/mediators',
+ 219:     [MediatorController::class, 'index']
+ 220: )->middleware(
+ 221:     'throttle:public-search'
+ 222: );
+ 223: 
+ 224: Route::get(
+ 225:     '/mediators/lookup',
+ 226:     [MediatorController::class, 'lookup']
+ 227: )->middleware(
+ 228:     'throttle:public-search'
+ 229: );
+ 230: 
+ 231: Route::get(
+ 232:     '/mediators/{code}',
+ 233:     [MediatorController::class, 'show']
+ 234: )->middleware(
+ 235:     'throttle:public-search'
+ 236: );
+ 237: 
+ 238: 
+ 239: /*
+ 240: |--------------------------------------------------------------------------
+ 241: | Social Services Public API
+ 242: |--------------------------------------------------------------------------
+ 243: */
+ 244: 
+ 245: Route::get(
+ 246:     '/social/services',
+ 247:     [SocialServiceController::class, 'index']
+ 248: )->middleware('throttle:public-search');
+ 249: 
+ 250: Route::get(
+ 251:     '/social/services/{service}',
+ 252:     [SocialServiceController::class, 'show']
+ 253: )->middleware('throttle:public-search');
+ 254: 
+ 255: /*
+ 256: |--------------------------------------------------------------------------
+ 257: | Customer Auth
+ 258: |--------------------------------------------------------------------------
+ 259: */
+ 260: 
+ 261: Route::post(
+ 262:     '/digital/guest/orders/{orderId}/lookup',
+ 263:     [\App\Http\Controllers\Api\GuestDigitalOrderController::class, 'show']
+ 264: )->whereNumber('orderId')->middleware('throttle:customer-auth');
+ 265: 
+ 266: Route::post(
+ 267:     '/digital/guest/orders',
+ 268:     [\App\Http\Controllers\Api\GuestDigitalOrderController::class, 'store']
+ 269: )->middleware('throttle:customer-auth');
+ 270: 
+ 271: Route::post(
+ 272:     '/digital/guest/orders/{orderId}/quotes/{quoteId}/respond',
+ 273:     [\App\Http\Controllers\Api\GuestDigitalOrderController::class, 'respondToQuote']
+ 274: )->whereNumber('orderId')
+ 275:   ->whereNumber('quoteId')
+ 276:   ->middleware('throttle:customer-auth');
+ 277: 
+ 278: 
+ 279: Route::post(
+ 280:     '/auth/register',
+ 281:     [CustomerAuthController::class, 'register']
+ 282: )->middleware('throttle:customer-auth');
+ 283: 
+ 284: Route::post(
+ 285:     '/auth/login',
+ 286:     [CustomerAuthController::class, 'login']
+ 287: )->middleware('throttle:customer-auth');
+ 288: 
+ 289: /*
+ 290: |--------------------------------------------------------------------------
+ 291: | Customer Protected API
+ 292: |--------------------------------------------------------------------------
+ 293: */
+ 294: 
+ 295: Route::middleware([
+ 296:     'auth:sanctum',
+ 297:     'throttle:customer-api',
+ 298: ])->group(function () {
+ 299:     Route::get(
+ 300:         '/auth/me',
+ 301:         [CustomerAuthController::class, 'me']
+ 302:     );
+ 303: 
+ 304:     Route::post(
+ 305:         '/auth/logout',
+ 306:         [CustomerAuthController::class, 'logout']
+ 307:     );
+ 308: 
+ 309:     Route::get(
+ 310:         '/profile',
+ 311:         [CustomerProfileController::class, 'show']
+ 312:     );
+ 313: 
+ 314:     Route::put(
+ 315:         '/profile',
+ 316:         [CustomerProfileController::class, 'update']
+ 317:     );
+ 318: 
+ 319:     Route::put(
+ 320:         '/profile/password',
+ 321:         [CustomerProfileController::class, 'changePassword']
+ 322:     );
+ 323: 
+ 324:     Route::get(
+ 325:         '/exchange/campaigns',
+ 326:         [\App\Http\Controllers\Api\ExchangeCampaignController::class, 'index']
+ 327:     );
+ 328: 
+ 329:     Route::get(
+ 330:         '/exchange/campaigns/by-request/{key}',
+ 331:         [\App\Http\Controllers\Api\ExchangeCampaignController::class, 'lookupByRequest']
+ 332:     )->where('key', '[A-Za-z0-9_-]{16,128}');
+ 333: 
+ 334:     Route::get(
+ 335:         '/exchange/campaigns/{id}',
+ 336:         [\App\Http\Controllers\Api\ExchangeCampaignController::class, 'show']
+ 337:     )->whereNumber('id');
+ 338: 
+ 339:     Route::get(
+ 340:         '/exchange/campaigns/{id}/claims',
+ 341:         [\App\Http\Controllers\Api\ExchangeCampaignController::class, 'claims']
+ 342:     )->whereNumber('id');
+ 343: 
+ 344:     Route::post(
+ 345:         '/exchange/campaigns',
+ 346:         [\App\Http\Controllers\Api\ExchangeCampaignController::class, 'store']
+ 347:     );
+ 348: 
+ 349:     Route::get(
+ 350:         '/exchange/tasks',
+ 351:         [\App\Http\Controllers\Api\ExchangeTaskController::class, 'index']
+ 352:     );
+ 353: 
+ 354:     Route::get(
+ 355:         '/exchange/claims/mine',
+ 356:         [\App\Http\Controllers\Api\ExchangeTaskController::class, 'mine']
+ 357:     );
+ 358: 
+ 359:     Route::post(
+ 360:         '/exchange/tasks/{campaignId}/claim',
+ 361:         [\App\Http\Controllers\Api\ExchangeTaskController::class, 'claim']
+ 362:     );
+ 363: 
+ 364:     Route::post(
+ 365:         '/exchange/claims/{claimId}/submit',
+ 366:         [\App\Http\Controllers\Api\ExchangeTaskController::class, 'submit']
+ 367:     );
+ 368: 
+ 369:     Route::post(
+ 370:         '/exchange/claims/{claimId}/approve',
+ 371:         [\App\Http\Controllers\Api\ExchangeTaskController::class, 'approve']
+ 372:     );
+ 373: 
+ 374:     Route::post(
+ 375:         '/exchange/claims/{claimId}/reject',
+ 376:         [\App\Http\Controllers\Api\ExchangeTaskController::class, 'reject']
+ 377:     );
+ 378: 
+ 379:     Route::post(
+ 380:         '/exchange/claims/{claimId}/appeal',
+ 381:         [\App\Http\Controllers\Api\ExchangeTaskController::class, 'appeal']
+ 382:     );
+ 383: 
+ 384:     Route::get(
+ 385:         '/exchange/prices',
+ 386:         [\App\Http\Controllers\Api\ExchangeTaskPriceController::class, 'index']
+ 387:     );
+ 388: 
+ 389:     Route::get(
+ 390:         '/exchange/accounts',
+ 391:         [\App\Http\Controllers\Api\ExchangeSocialAccountController::class, 'index']
+ 392:     );
+ 393: 
+ 394:     Route::post(
+ 395:         '/exchange/accounts',
+ 396:         [\App\Http\Controllers\Api\ExchangeSocialAccountController::class, 'store']
+ 397:     );
+ 398: 
+ 399:     Route::patch(
+ 400:         '/exchange/accounts/{id}/default',
+ 401:         [\App\Http\Controllers\Api\ExchangeSocialAccountController::class, 'setDefault']
+ 402:     )->whereNumber('id');
+ 403: 
+ 404:     Route::delete(
+ 405:         '/exchange/accounts/{id}',
+ 406:         [\App\Http\Controllers\Api\ExchangeSocialAccountController::class, 'destroy']
+ 407:     )->whereNumber('id');
+ 408: 
+ 409:     Route::get(
+ 410:         '/wallet',
+ 411:         [WalletController::class, 'show']
+ 412:     );
+ 413: 
+ 414:     Route::get(
+ 415:         '/wallet/transactions',
+ 416:         [WalletController::class, 'transactions']
+ 417:     );
+ 418: 
+ 419:     Route::get(
+ 420:         '/wallet/topups',
+ 421:         [WalletController::class, 'topups']
+ 422:     );
+ 423: 
+ 424:     Route::post(
+ 425:         '/wallet/topups',
+ 426:         [WalletController::class, 'createTopup']
+ 427:     );
+ 428: 
+ 429:     Route::get(
+ 430:         '/digital/orders',
+ 431:         [\App\Http\Controllers\Api\DigitalOrderController::class, 'index']
+ 432:     );
+ 433: 
+ 434:     Route::post(
+ 435:         '/digital/orders',
+ 436:         [\App\Http\Controllers\Api\DigitalOrderController::class, 'store']
+ 437:     );
+ 438: 
+ 439: 
+ 440:     Route::post(
+ 441:         '/digital/orders/{digitalOrder}/quotes/{quote}/respond',
+ 442:         [\App\Http\Controllers\Api\DigitalOrderController::class, 'respondToQuote']
+ 443:     )->whereNumber('digitalOrder')->whereNumber('quote');
+ 444: 
+ 445:     Route::post(
+ 446:         '/digital/orders/{digitalOrder}/pay-wallet',
+ 447:         [\App\Http\Controllers\Api\DigitalOrderPaymentController::class, 'payWithWallet']
+ 448:     )->whereNumber('digitalOrder');
+ 449: 
+ 450:     Route::get(
+ 451:         '/digital/orders/{digitalOrder}',
+ 452:         [\App\Http\Controllers\Api\DigitalOrderController::class, 'show']
+ 453:     )->whereNumber('digitalOrder');
+ 454: 
+ 455:     Route::get(
+ 456:         '/social/orders',
+ 457:         [SocialOrderController::class, 'index']
+ 458:     );
+ 459: 
+ 460:     Route::post(
+ 461:         '/social/orders',
+ 462:         [SocialOrderController::class, 'store']
+ 463:     );
+ 464: 
+ 465:     Route::get(
+ 466:         '/social/orders/{order}',
+ 467:         [SocialOrderController::class, 'show']
+ 468:     );
+ 469: });
+ 470: 
+ 471: /*
+ 472: |--------------------------------------------------------------------------
+ 473: | Admin Login
+ 474: |--------------------------------------------------------------------------
+ 475: */
+ 476: 
+ 477: Route::post(
+ 478:     '/admin/login',
+ 479:     [AdminAuthController::class, 'login']
+ 480: )->middleware(
+ 481:     'throttle:admin-login'
+ 482: );
+ 483: 
+ 484: /*
+ 485: |--------------------------------------------------------------------------
+ 486: | Protected Admin API
+ 487: |--------------------------------------------------------------------------
+ 488: */
+ 489: 
+ 490: Route::prefix('admin')
+ 491:     ->middleware([
+ 492:         'auth:sanctum',
+ 493:         'moderator',
+ 494:         'throttle:admin-api',
+ 495:     ])
+ 496:     ->group(function () {
+ 497: 
+ 498:         /*
+ 499:         |--------------------------------------------------------------------------
+ 500:         | Exchange Task Prices
+ 501:         |--------------------------------------------------------------------------
+ 502:         */
+ 503: 
+ 504:         Route::get(
+ 505:             '/exchange/campaigns',
+ 506:             [\App\Http\Controllers\Api\AdminExchangeCampaignController::class, 'index']
+ 507:         );
+ 508: 
+ 509:         Route::get(
+ 510:             '/exchange/campaigns/{campaignId}/claims',
+ 511:             [\App\Http\Controllers\Api\AdminExchangeCampaignController::class, 'campaignClaims']
+ 512:         );
+ 513: 
+ 514:         Route::patch(
+ 515:             '/exchange/campaigns/{campaignId}/status',
+ 516:             [\App\Http\Controllers\Api\AdminExchangeCampaignController::class, 'changeStatus']
+ 517:         );
+ 518: 
+ 519:         Route::post(
+ 520:             '/exchange/campaigns/{campaignId}/cancel-request',
+ 521:             [\App\Http\Controllers\Api\AdminExchangeCampaignController::class, 'requestCancellation']
+ 522:         );
+ 523: 
+ 524:         Route::post(
+ 525:             '/exchange/campaigns/{campaignId}/cancel-finalize',
+ 526:             [\App\Http\Controllers\Api\AdminExchangeCampaignController::class, 'finalizeCancellation']
+ 527:         );
+ 528: 
+ 529:         Route::get(
+ 530:             '/exchange/prices',
+ 531:             [\App\Http\Controllers\Api\AdminExchangeTaskPriceController::class, 'index']
+ 532:         );
+ 533: 
+ 534:         Route::put(
+ 535:             '/exchange/prices',
+ 536:             [\App\Http\Controllers\Api\AdminExchangeTaskPriceController::class, 'update']
+ 537:         );
+ 538: 
+ 539:         Route::get(
+ 540:             '/exchange/disputes',
+ 541:             [\App\Http\Controllers\Api\AdminExchangeDisputeListController::class, 'index']
+ 542:         );
+ 543: 
+ 544:         Route::post(
+ 545:             '/exchange/disputes/{disputeId}/resolve',
+ 546:             [\App\Http\Controllers\Api\AdminExchangeDisputeController::class, 'resolve']
+ 547:         );
+ 548: 
+ 549:         Route::post(
+ 550:             '/logout',
+ 551:             [
+ 552:                 AdminAuthController::class,
+ 553:                 'logout',
+ 554:             ]
+ 555:         );
+ 556: 
+ 557:         Route::get(
+ 558:             '/me',
+ 559:             [
+ 560:                 AdminAuthController::class,
+ 561:                 'me',
+ 562:             ]
+ 563:         );
+ 564: 
+ 565:         Route::get(
+ 566:             '/dashboard',
+ 567:             [
+ 568:                 AdminDashboardController::class,
+ 569:                 'index',
+ 570:             ]
+ 571:         );
+ 572: 
+ 573:         /*
+ 574:         |--------------------------------------------------------------------------
+ 575:         | Reports
+ 576:         |--------------------------------------------------------------------------
+ 577:         */
+ 578: 
+ 579:         Route::get(
+ 580:             '/reports',
+ 581:             [
+ 582:                 AdminReportController::class,
+ 583:                 'index',
+ 584:             ]
+ 585:         );
+ 586: 
+ 587:         Route::get(
+ 588:             '/reports/{report}',
+ 589:             [
+ 590:                 AdminReportController::class,
+ 591:                 'show',
+ 592:             ]
+ 593:         );
+ 594: 
+ 595:         Route::patch(
+ 596:             '/reports/{report}/status',
+ 597:             [
+ 598:                 ReportModerationController::class,
+ 599:                 'update',
+ 600:             ]
+ 601:         );
+ 602: 
+ 603:         /*
+ 604:         |--------------------------------------------------------------------------
+ 605:         | Mediator Tags
+ 606:         |--------------------------------------------------------------------------
+ 607:         */
+ 608: 
+ 609:         Route::post(
+ 610:             '/mediator-tags',
+ 611:             [
+ 612:                 MediatorTagController::class,
+ 613:                 'store',
+ 614:             ]
+ 615:         );
+ 616: 
+ 617:         Route::put(
+ 618:             '/mediator-tags/{mediatorTag}',
+ 619:             [
+ 620:                 MediatorTagController::class,
+ 621:                 'update',
+ 622:             ]
+ 623:         );
+ 624: 
+ 625:         /*
+ 626:         |--------------------------------------------------------------------------
+ 627:         | Mediators
+ 628:         |--------------------------------------------------------------------------
+ 629:         */
+ 630: 
+ 631: 
+ 632:         Route::post(
+ 633:             '/mediator-banks',
+ 634:             [
+ 635:                 MediatorBankController::class,
+ 636:                 'store',
+ 637:             ]
+ 638:         );
+ 639: 
+ 640:         Route::put(
+ 641:             '/mediator-banks/{mediatorBank}',
+ 642:             [
+ 643:                 MediatorBankController::class,
+ 644:                 'update',
+ 645:             ]
+ 646:         );
+ 647: 
+ 648:         Route::get(
+ 649:             '/mediators',
+ 650:             [
+ 651:                 AdminMediatorController::class,
+ 652:                 'index',
+ 653:             ]
+ 654:         );
+ 655: 
+ 656:         Route::post(
+ 657:             '/mediators',
+ 658:             [
+ 659:                 AdminMediatorController::class,
+ 660:                 'store',
+ 661:             ]
+ 662:         );
+ 663: 
+ 664:         Route::get(
+ 665:             '/mediators/{mediator}',
+ 666:             [
+ 667:                 AdminMediatorController::class,
+ 668:                 'show',
+ 669:             ]
+ 670:         );
+ 671: 
+ 672:         Route::put(
+ 673:             '/mediators/{mediator}',
+ 674:             [
+ 675:                 AdminMediatorController::class,
+ 676:                 'update',
+ 677:             ]
+ 678:         );
+ 679: 
+ 680:         Route::post(
+ 681:             '/mediators/{mediator}/avatar',
+ 682:             [AdminMediatorController::class, 'uploadAvatar']
+ 683:         );
+ 684: 
+ 685:         Route::delete(
+ 686:             '/mediators/{mediator}/avatar',
+ 687:             [AdminMediatorController::class, 'deleteAvatar']
+ 688:         );
+ 689: 
+ 690:         Route::post(
+ 691:             '/mediators/{mediator}/deposits',
+ 692:             [
+ 693:                 AdminMediatorController::class,
+ 694:                 'addDeposit',
+ 695:             ]
+ 696:         );
+ 697: 
+ 698:         /*
+ 699:         |--------------------------------------------------------------------------
+ 700:         | Social Services
+ 701:         |--------------------------------------------------------------------------
+ 702:         */
+ 703: 
+ 704:         Route::get(
+ 705:             '/social/dashboard',
+ 706:             [AdminSocialDashboardController::class, 'index']
+ 707:         );
+ 708: 
+ 709:         Route::get(
+ 710:             '/social/providers',
+ 711:             [AdminSocialProviderController::class, 'index']
+ 712:         );
+ 713: 
+ 714:         Route::get(
+ 715:             '/social/providers/{provider}',
+ 716:             [AdminSocialProviderController::class, 'show']
+ 717:         );
+ 718: 
+ 719:         Route::put(
+ 720:             '/social/providers/{provider}',
+ 721:             [AdminSocialProviderController::class, 'update']
+ 722:         );
+ 723: 
+ 724:         Route::post(
+ 725:             '/social/providers/{provider}/test',
+ 726:             [AdminSocialProviderController::class, 'test']
+ 727:         );
+ 728: 
+ 729:         Route::post(
+ 730:             '/social/providers/{provider}/sync',
+ 731:             [AdminSocialProviderController::class, 'sync']
+ 732:         );
+ 733: 
+ 734:         /*
+ 735:         |--------------------------------------------------------------------------
+ 736:         | Social Services
+ 737:         |--------------------------------------------------------------------------
+ 738:         */
+ 739: 
+ 740:         Route::get(
+ 741:             '/social/services',
+ 742:             [AdminSocialServiceController::class, 'index']
+ 743:         );
+ 744: 
+ 745:         Route::get(
+ 746:             '/social/provider-services',
+ 747:             [AdminSocialServiceController::class, 'providerServices']
+ 748:         );
+ 749: 
+ 750:         Route::patch(
+ 751:             '/social/provider-services/{providerService}',
+ 752:             [AdminSocialServiceController::class, 'updateProviderService']
+ 753:         );
+ 754: 
+ 755:         Route::post(
+ 756:             '/social/provider-services/{providerService}/map',
+ 757:             [AdminSocialServiceController::class, 'mapProviderService']
+ 758:         );
+ 759: 
+ 760:         Route::delete(
+ 761:             '/social/provider-services/{providerService}/map',
+ 762:             [AdminSocialServiceController::class, 'unmapProviderService']
+ 763:         );
+ 764: 
+ 765:         Route::post(
+ 766:             '/social/services',
+ 767:             [AdminSocialServiceController::class, 'store']
+ 768:         );
+ 769: 
+ 770:         Route::put(
+ 771:             '/social/services/{service}',
+ 772:             [AdminSocialServiceController::class, 'update']
+ 773:         );
+ 774: 
+ 775:         Route::get(
+ 776:             '/social/orders',
+ 777:             [AdminSocialOrderController::class, 'index']
+ 778:         );
+ 779: 
+ 780:         Route::get(
+ 781:             '/social/orders/audit',
+ 782:             [AdminSocialOrderController::class, 'audit']
+ 783:         );
+ 784: 
+ 785:         Route::get(
+ 786:             '/social/orders/{order}',
+ 787:             [AdminSocialOrderController::class, 'show']
+ 788:         );
+ 789: 
+ 790:         Route::get(
+ 791:             '/social/orders/{order}/audits',
+ 792:             [AdminSocialOrderAuditController::class, 'index']
+ 793:         );
+ 794: 
+ 795:         Route::post(
+ 796:             '/social/orders/{order}/audits',
+ 797:             [AdminSocialOrderAuditController::class, 'store']
+ 798:         );
+ 799: 
+ 800:         Route::get(
+ 801:             '/social/orders/{order}/resolutions',
+ 802:             [AdminSocialOrderResolutionController::class, 'index']
+ 803:         );
+ 804: 
+ 805:         Route::get(
+ 806:             '/social/orders/{order}/reconcile-preview',
+ 807:             [AdminSocialOrderReconciliationPreviewController::class, 'show']
+ 808:         );
+ 809: 
+ 810:         Route::post(
+ 811:             '/social/orders/{order}/reconcile',
+ 812:             [AdminSocialOrderReconciliationController::class, 'resolve']
+ 813:         );
+ 814: 
+ 815:         Route::post(
+ 816:             '/social/orders/{order}/cancel',
+ 817:             [AdminSocialOrderController::class, 'cancel']
+ 818:         );
+ 819: 
+ 820:         Route::patch(
+ 821:             '/social/orders/{order}/status',
+ 822:             [AdminSocialOrderController::class, 'updateStatus']
+ 823:         );
+ 824: 
+ 825:         Route::get(
+ 826:             '/social/customers',
+ 827:             [AdminSocialCustomerController::class, 'index']
+ 828:         );
+ 829: 
+ 830:         Route::get(
+ 831:             '/social/customers/{user}',
+ 832:             [AdminSocialCustomerController::class, 'show']
+ 833:         );
+ 834: 
+ 835:         Route::post(
+ 836:             '/social/customers/{user}/wallet',
+ 837:             [AdminSocialCustomerController::class, 'adjustWallet']
+ 838:         );
+ 839: 
+ 840:         Route::get(
+ 841:             '/social/topups',
+ 842:             [AdminWalletTopupController::class, 'index']
+ 843:         );
+ 844: 
+ 845:         Route::post(
+ 846:             '/social/topups',
+ 847:             [AdminWalletTopupController::class, 'store']
+ 848:         );
+ 849: 
+ 850:         Route::post(
+ 851:             '/social/topups/{topup}/approve',
+ 852:             [AdminWalletTopupController::class, 'approve']
+ 853:         );
+ 854: 
+ 855:         Route::post(
+ 856:             '/social/topups/{topup}/reject',
+ 857:             [AdminWalletTopupController::class, 'reject']
+ 858:         );
+ 859: 
+ 860:         /*
+ 861:         |--------------------------------------------------------------------------
+ 862:         | Digital Services
+ 863:         |--------------------------------------------------------------------------
+ 864:         */
+ 865: 
+ 866:         Route::get(
+ 867:             '/digital/services',
+ 868:             [\App\Http\Controllers\Api\AdminDigitalServiceController::class, 'index']
+ 869:         );
+ 870: 
+ 871:         Route::post(
+ 872:             '/digital/services',
+ 873:             [\App\Http\Controllers\Api\AdminDigitalServiceController::class, 'store']
+ 874:         );
+ 875: 
+ 876:         Route::put(
+ 877:             '/digital/services/{digitalService}',
+ 878:             [\App\Http\Controllers\Api\AdminDigitalServiceController::class, 'update']
+ 879:         );
+ 880: 
+ 881:         Route::patch(
+ 882:             '/digital/services/{digitalService}/status',
+ 883:             [\App\Http\Controllers\Api\AdminDigitalServiceController::class, 'status']
+ 884:         );
+ 885: 
+ 886:         /*
+ 887:         |--------------------------------------------------------------------------
+ 888:         | Digital Orders
+ 889:         |--------------------------------------------------------------------------
+ 890:         */
+ 891: 
+ 892:         Route::get(
+ 893:             '/digital/orders',
+ 894:             [\App\Http\Controllers\Api\AdminDigitalOrderController::class, 'index']
+ 895:         );
+ 896: 
+ 897:         Route::get(
+ 898:             '/digital/orders/{digitalOrder}',
+ 899:             [\App\Http\Controllers\Api\AdminDigitalOrderController::class, 'show']
+ 900:         )->whereNumber('digitalOrder');
+ 901: 
+ 902: 
+ 903:         Route::post(
+ 904:             '/digital/orders/{digitalOrder}/quotes',
+ 905:             [\App\Http\Controllers\Api\AdminDigitalOrderController::class, 'createQuote']
+ 906:         )->whereNumber('digitalOrder');
+ 907: 
+ 908:         Route::patch(
+ 909:             '/digital/orders/{digitalOrder}/status',
+ 910:             [\App\Http\Controllers\Api\AdminDigitalOrderController::class, 'updateStatus']
+ 911:         )->whereNumber('digitalOrder');
+ 912: 
+ 913:         Route::post(
+ 914:             '/digital/orders/{digitalOrder}/confirm-bank-payment',
+ 915:             [\App\Http\Controllers\Api\AdminDigitalBankPaymentController::class, 'confirm']
+ 916:         )->whereNumber('digitalOrder');
+ 917: 
+ 918: 
+ 919: 
+ 920:         /*
+ 921:         |--------------------------------------------------------------------------
+ 922:         | Evidence
+ 923:         |--------------------------------------------------------------------------
+ 924:         */
+ 925: 
+ 926:         Route::get(
+ 927:             '/evidences/{evidence}',
+ 928:             [
+ 929:                 AdminEvidenceController::class,
+ 930:                 'show',
+ 931:             ]
+ 932:         );
+ 933:     });
+ 934: 
+ 935: 
+ 936: /*
+ 937: |--------------------------------------------------------------------------
+ 938: | CHAT API ROUTES
+ 939: |--------------------------------------------------------------------------
+ 940: */
+ 941: 
+ 942: \Illuminate\Support\Facades\Route::middleware([
+ 943:     'auth:sanctum',
+ 944:     'throttle:customer-api',
+ 945: ])->group(function () {
+ 946:     \Illuminate\Support\Facades\Route::get(
+ 947:         '/chat/messages',
+ 948:         [\App\Http\Controllers\Api\ChatController::class, 'customerMessages']
+ 949:     );
+ 950: 
+ 951:     \Illuminate\Support\Facades\Route::post(
+ 952:         '/chat/messages',
+ 953:         [\App\Http\Controllers\Api\ChatController::class, 'customerSend']
+ 954:     );
+ 955: 
+ 956:     \Illuminate\Support\Facades\Route::post(
+ 957:         '/chat/read',
+ 958:         [\App\Http\Controllers\Api\ChatController::class, 'customerRead']
+ 959:     );
+ 960: });
+ 961: 
+ 962: \Illuminate\Support\Facades\Route::prefix('admin/chat')
+ 963:     ->middleware([
+ 964:         'auth:sanctum',
+ 965:         'moderator',
+ 966:         'throttle:admin-api',
+ 967:     ])
+ 968:     ->group(function () {
+ 969:         \Illuminate\Support\Facades\Route::get(
+ 970:             '/conversations',
+ 971:             [\App\Http\Controllers\Api\ChatController::class, 'adminConversations']
+ 972:         );
+ 973: 
+ 974:         \Illuminate\Support\Facades\Route::get(
+ 975:             '/conversations/{conversation}/messages',
+ 976:             [\App\Http\Controllers\Api\ChatController::class, 'adminMessages']
+ 977:         );
+ 978: 
+ 979:         \Illuminate\Support\Facades\Route::post(
+ 980:             '/conversations/{conversation}/messages',
+ 981:             [\App\Http\Controllers\Api\ChatController::class, 'adminSend']
+ 982:         );
+ 983: 
+ 984:         \Illuminate\Support\Facades\Route::post(
+ 985:             '/conversations/{conversation}/read',
+ 986:             [\App\Http\Controllers\Api\ChatController::class, 'adminRead']
+ 987:         );
+ 988:     });
+ 989: 
+ 990: 
+ 991: /*
+ 992: |--------------------------------------------------------------------------
+ 993: | NOScam private broadcasting authentication
+ 994: |--------------------------------------------------------------------------
+ 995: */
+ 996: \Illuminate\Support\Facades\Route::post(
+ 997:     '/broadcasting/auth',
+ 998:     [\Illuminate\Broadcasting\BroadcastController::class, 'authenticate']
+ 999: )->middleware([
+1000:     'auth:sanctum',
+
+======================================================================
+FILE: noscam-backend/app/Http/Controllers/Api/AdminAuthController.php
+======================================================================
+   1: <?php
+   2: 
+   3: namespace App\Http\Controllers\Api;
+   4: 
+   5: use App\Http\Controllers\Controller;
+   6: use App\Models\User;
+   7: use Illuminate\Http\JsonResponse;
+   8: use Illuminate\Http\Request;
+   9: use Illuminate\Support\Facades\Hash;
+  10: use Illuminate\Validation\ValidationException;
+  11: 
+  12: class AdminAuthController extends Controller
+  13: {
+  14:     public function login(
+  15:         Request $request
+  16:     ): JsonResponse {
+  17:         $credentials =
+  18:             $request->validate([
+  19:                 'email' => [
+  20:                     'required',
+  21:                     'email',
+  22:                 ],
+  23: 
+  24:                 'password' => [
+  25:                     'required',
+  26:                     'string',
+  27:                 ],
+  28:             ]);
+  29: 
+  30:         $email = strtolower(
+  31:             trim(
+  32:                 $credentials['email']
+  33:             )
+  34:         );
+  35: 
+  36:         $user = User::query()
+  37:             ->where(
+  38:                 'email',
+  39:                 $email
+  40:             )
+  41:             ->first();
+  42: 
+  43:         if (
+  44:             ! $user ||
+  45:             ! Hash::check(
+  46:                 $credentials['password'],
+  47:                 $user->password
+  48:             )
+  49:         ) {
+  50:             throw ValidationException::withMessages([
+  51:                 'email' => [
+  52:                     'Email hoặc mật khẩu không chính xác.',
+  53:                 ],
+  54:             ]);
+  55:         }
+  56: 
+  57:         if (! $user->canModerate()) {
+  58:             return response()->json([
+  59:                 'message' =>
+  60:                     'Tài khoản không có quyền truy cập khu vực quản trị.',
+  61:             ], 403);
+  62:         }
+  63: 
+  64:         $user
+  65:             ->tokens()
+  66:             ->delete();
+  67: 
+  68:         $token = $user
+  69:             ->createToken(
+  70:                 'admin-panel',
+  71:                 [
+  72:                     'moderate-reports',
+  73:                 ]
+  74:             )
+  75:             ->plainTextToken;
+  76: 
+  77:         return response()->json([
+  78:             'message' =>
+  79:                 'Đăng nhập thành công.',
+  80: 
+  81:             'data' => [
+  82:                 'token' =>
+  83:                     $token,
+  84: 
+  85:                 'user' =>
+  86:                     $this->userData(
+  87:                         $user
+  88:                     ),
+  89:             ],
+  90:         ]);
+  91:     }
+  92: 
+  93:     public function me(
+  94:         Request $request
+  95:     ): JsonResponse {
+  96:         $user =
+  97:             $request->user();
+  98: 
+  99:         if (
+ 100:             ! $user ||
+ 101:             ! $user->canModerate()
+ 102:         ) {
+ 103:             return response()->json([
+ 104:                 'message' =>
+ 105:                     'Phiên đăng nhập không hợp lệ.',
+ 106:             ], 403);
+ 107:         }
+ 108: 
+ 109:         return response()->json([
+ 110:             'data' => [
+ 111:                 'user' =>
+ 112:                     $this->userData(
+ 113:                         $user
+ 114:                     ),
+ 115:             ],
+ 116:         ]);
+ 117:     }
+ 118: 
+ 119:     public function logout(
+ 120:         Request $request
+ 121:     ): JsonResponse {
+ 122:         $request
+ 123:             ->user()
+ 124:             ?->currentAccessToken()
+ 125:             ?->delete();
+ 126: 
+ 127:         return response()->json([
+ 128:             'message' =>
+ 129:                 'Đăng xuất thành công.',
+ 130:         ]);
+ 131:     }
+ 132: 
+ 133:     private function userData(
+ 134:         User $user
+ 135:     ): array {
+ 136:         return [
+ 137:             'id' =>
+ 138:                 $user->id,
+ 139: 
+ 140:             'name' =>
+ 141:                 $user->name,
+ 142: 
+ 143:             'email' =>
+ 144:                 $user->email,
+ 145: 
+ 146:             'role' =>
+ 147:                 $user->role,
+ 148:         ];
+ 149:     }
+ 150: }
+
+DIRECTORY: noscam-frontend/src/routes
+AppRoutes.jsx
+AppRoutes.jsx.bak-20261009-144642
+AppRoutes.jsx.bak-20261009-150520
+AppRoutes.jsx.bak-20261010-004139
+AppRoutes.jsx.bak-20261010-010052
+AppRoutes.jsx.bak-20261010-023628
+AppRoutes.jsx.bak-20261011-013947
+AppRoutes.jsx.bak-20261011-144117
+AppRoutes.jsx.bak-20261011-144248
+AppRoutes.jsx.bak-20261011-144534
+AppRoutes.jsx.bak-20261011-144754
+AppRoutes.jsx.bak_20261016_101742
+AppRoutes.jsx.bak_20261016_102212
+AppRoutes.jsx.bak_20261016_102542
+
+DIRECTORY: noscam-frontend/src/layouts
+AppLayout.jsx
+AppLayout.jsx.bak-20261011-013815
+
+DIRECTORY: noscam-frontend/src/components/layout
+Container.jsx
+Footer.jsx
+Footer.jsx.bak-20261009-142246
+Header.jsx
+Header.jsx.bak-20261009-142246
+Header.jsx.bak-20261009-150520
+Header.jsx.bak-20261010-005112
+Header.jsx.bak-20261011-144354
+
+DIRECTORY: noscam-frontend/src/pages/Admin
+AdminChatPage.jsx
+AdminChatPage.jsx.bak-20261011-014246
+AdminChatPage.jsx.bak-20261011-015608
+AdminCommunityPage.jsx
+AdminDashboardPage.jsx
+AdminDigitalOrdersPage.jsx
+AdminDigitalOrdersPage.jsx.bak-20261010-010514
+AdminDigitalOrdersPage.jsx.bak-20261010-010752
+AdminDigitalOrdersPage.jsx.bak-20261010-011628
+AdminDigitalOrdersPage.jsx.bak-20261010-014819
+AdminDigitalOrdersPage.jsx.bak-20261010-015050
+AdminDigitalOrdersPage.jsx.bak-20261010-015341
+AdminDigitalOrdersPage.jsx.bak-20261011-002735
+AdminDigitalOrdersPage.jsx.bak-20261011-002811
+AdminDigitalOrdersPage.jsx.bak-20261011-002946
+AdminDigitalOrdersPage.jsx.bak-20261011-003127
+AdminDigitalOrdersPage.jsx.bak-20261011-003958
+AdminDigitalOrdersPage.jsx.bak-20261011-004140
+AdminDigitalServicesPage.jsx
+AdminDigitalServicesPage.jsx.bak-20261009-145032
+AdminDigitalServicesPage.jsx.bak-20261009-145236
+AdminDigitalServicesPage.jsx.bak-20261009-145447
+AdminDigitalServicesPage.jsx.bak-20261009-145607
+AdminDigitalServicesPage.jsx.bak-20261009-145902
+AdminExchangeCampaigns.jsx
+AdminExchangeDisputes.jsx
+AdminExchangeLists.jsx
+AdminExchangePage.jsx
+AdminLoginPage.jsx
+AdminMediatorsPage.backup-actions-20261018-100040.jsx
+AdminMediatorsPage.backup-tabs-20261018-095736.jsx
+AdminMediatorsPage.jsx
+AdminReportDetailPage.jsx
+AdminReportsPage.jsx
+AdminSocialCustomersPage.jsx
+AdminSocialOrdersPage.jsx
+AdminSocialPage.jsx
+AdminSocialProvidersPage.jsx
+AdminSocialServicesPage.jsx
+AdminSocialServicesPage.jsx.backup
+AdminSocialServicesPage.jsx.backup_limits_20261016_125852
+AdminSocialServicesPage.jsx.bak-20261009-140045
+AdminSocialServicesPage.jsx.bak-20261009-141456
+AdminSocialServicesPage.jsx.bak_20261016_095533
+AdminSocialServicesPage.jsx.bak_20261016_100729
+AdminSocialServicesPage.jsx.bak_20261016_100755
+AdminSocialServicesPage.jsx.bak_20261016_103305
+AdminSocialServicesPage.jsx.bak_20261016_103922
+AdminSocialServicesPage.jsx.bak_20261016_104820
+AdminSocialServicesPage.jsx.bak_20261016_105157
+AdminSocialServicesPage.jsx.bak_20261016_105423
+AdminSocialServicesPage.jsx.bak_20261016_110251
+AdminSocialServicesPage.jsx.bak_20261016_110408
+AdminSocialServicesPage.jsx.bak_20261016_111435
+AdminSocialServicesPage.jsx.bak_20261016_114345
+AdminSocialServicesPage.jsx.before_recovery_20261016_104226
+AdminSocialTopupsPage.jsx
+ExchangeCampaignList.jsx
+ExchangeDisputeList.jsx

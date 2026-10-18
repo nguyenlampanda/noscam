@@ -44,6 +44,10 @@ const menu = [
   {
     to: '/admin/exchange',
     label: 'Kiếm xu',
+  },
+  {
+    to: '/admin/popups',
+    label: 'Thông báo',
   }
 ]
 

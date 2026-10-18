@@ -1,3 +1,4 @@
+import AvatarLightbox from '../../components/AvatarLightbox'
 import {
   useEffect,
   useState,
@@ -270,6 +271,9 @@ function MediatorDetailPage() {
                     Hồ sơ trung gian được ghi nhận
                   </span>
 
+                  {data.avatar_url && (
+                    <AvatarLightbox src={data.avatar_url} alt="Ảnh đại diện trung gian" className="mt-5 h-24 w-24 rounded-full border-4 border-white object-cover shadow-md" />
+                  )}
                   <h1 className="mt-5 text-3xl font-black tracking-tight text-slate-950">
                     {data.name}
                   </h1>

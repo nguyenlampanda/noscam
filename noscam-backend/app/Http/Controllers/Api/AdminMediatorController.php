@@ -10,6 +10,7 @@ use App\Models\MediatorIdentifier;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 
 class AdminMediatorController extends Controller
@@ -228,6 +229,41 @@ class AdminMediatorController extends Controller
                 $this->loadMediator(
                     $mediator
                 ),
+        ]);
+    }
+
+    public function uploadAvatar(Request $request, Mediator $mediator): JsonResponse
+    {
+        $request->validate([
+            'avatar' => ['required', 'image', 'mimes:jpeg,png,webp', 'max:5120'],
+        ]);
+
+        $path = $request->file('avatar')->store('mediator-avatars', 'public');
+        $oldPath = $mediator->avatar_path;
+        try {
+            $mediator->avatar_path = $path;
+            $mediator->save();
+        } catch (\Throwable $error) {
+            Storage::disk('public')->delete($path);
+            throw $error;
+        }
+        if ($oldPath) Storage::disk('public')->delete($oldPath);
+
+        return response()->json([
+            'message' => 'Đã cập nhật ảnh đại diện.',
+            'data' => $this->loadMediator($mediator->fresh()),
+        ]);
+    }
+
+    public function deleteAvatar(Mediator $mediator): JsonResponse
+    {
+        $oldPath = $mediator->avatar_path;
+        $mediator->avatar_path = null;
+        $mediator->save();
+        if ($oldPath) Storage::disk('public')->delete($oldPath);
+        return response()->json([
+            'message' => 'Đã xóa ảnh đại diện.',
+            'data' => $this->loadMediator($mediator->fresh()),
         ]);
     }
 

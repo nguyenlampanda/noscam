@@ -1,0 +1,836 @@
+
+======================================================================
+FILE: noscam-frontend/src/pages/Admin/AdminDashboardPage.jsx
+======================================================================
+import {
+  useEffect,
+  useState,
+} from 'react'
+
+import {
+  Link,
+  useNavigate,
+} from 'react-router-dom'
+
+import { motion } from 'motion/react'
+
+import AdminNav from '../../components/admin/AdminNav'
+import adminService from '../../services/adminService'
+
+function StatCard({
+  label,
+  value,
+  to,
+  tone,
+}) {
+  const tones = {
+    slate:
+      'bg-slate-100 text-slate-700',
+    amber:
+      'bg-amber-50 text-amber-700',
+    green:
+      'bg-emerald-50 text-emerald-700',
+    red:
+      'bg-red-50 text-red-700',
+  }
+
+  return (
+    <Link to={to}>
+      <motion.div
+        whileHover={{
+          y: -4,
+        }}
+        className="h-full rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
+      >
+        <span
+          className={`rounded-full px-3 py-1.5 text-xs font-bold ${tones[tone]}`}
+        >
+          {label}
+        </span>
+
+        <div className="mt-5 text-4xl font-black text-slate-950">
+          {value}
+        </div>
+
+        <div className="mt-4 text-sm font-bold text-blue-600">
+          Xem chi tiết →
+        </div>
+      </motion.div>
+    </Link>
+  )
+}
+
+export default function AdminDashboardPage() {
+  const navigate = useNavigate()
+
+  const [data, setData] =
+    useState(null)
+
+  const [loading, setLoading] =
+    useState(true)
+
+  const [error, setError] =
+    useState('')
+
+  useEffect(() => {
+    let active = true
+
+    async function load() {
+      try {
+        const response =
+          await adminService.getDashboard()
+
+        if (active) {
+          setData(
+            response?.data ??
+              response ??
+              null,
+          )
+        }
+      } catch (err) {
+        if (
+          err?.status === 401 ||
+          err?.status === 403
+        ) {
+          await adminService.logout()
+
+          navigate(
+            '/admin/login',
+            {
+              replace: true,
+            },
+          )
+
+          return
+        }
+
+        if (active) {
+          setError(
+            err?.message ||
+              'Không tải được tổng quan.',
+          )
+        }
+      } finally {
+        if (active) {
+          setLoading(false)
+        }
+      }
+    }
+
+    load()
+
+    return () => {
+      active = false
+    }
+  }, [navigate])
+
+  const reports =
+    data?.reports ?? data ?? {}
+
+  const total =
+    reports.total ?? 0
+
+  const pending =
+    reports.pending ?? 0
+
+  const approved =
+    reports.approved ?? 0
+
+  const rejected =
+    reports.rejected ?? 0
+
+  return (
+    <div className="min-h-screen bg-slate-50">
+      <AdminNav />
+
+      <main className="mx-auto max-w-7xl px-5 py-10 lg:px-8">
+{/* NOSCAM_POPUP_ADMIN_LINK */}
+<div className="mb-5"><a href="/admin/popups" className="inline-flex items-center rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white">
+                  Quản lý Popup
+                </a></div>
+
+        <div>
+          <div className="text-xs font-black uppercase tracking-[0.2em] text-blue-600">
+            Hệ thống quản trị
+          </div>
+
+          <h1 className="mt-3 text-4xl font-black tracking-tight text-slate-950">
+            Tổng quan
+          </h1>
+
+          <p className="mt-2 text-slate-500">
+            Quản lý hoạt động của NoScam.vn.
+          </p>
+        </div>
+
+        {error && (
+          <div className="mt-6 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+            {error}
+          </div>
+        )}
+
+        <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <StatCard
+            label="Tổng báo cáo"
+            value={
+              loading ? '—' : total
+            }
+            to="/admin/reports?status=all"
+            tone="slate"
+          />
+
+          <StatCard
+            label="Chờ duyệt"
+            value={
+              loading
+                ? '—'
+                : pending
+            }
+            to="/admin/reports?status=pending"
+            tone="amber"
+          />
+
+          <StatCard
+            label="Đã duyệt"
+            value={
+              loading
+                ? '—'
+                : approved
+            }
+            to="/admin/reports?status=approved"
+            tone="green"
+          />
+
+          <StatCard
+            label="Đã từ chối"
+            value={
+              loading
+                ? '—'
+                : rejected
+            }
+            to="/admin/reports?status=rejected"
+            tone="red"
+          />
+        </div>
+
+        <div className="mt-8 grid gap-5 lg:grid-cols-2">
+          <Link
+            to="/admin/reports"
+            className="rounded-3xl border border-slate-200 bg-white p-7 shadow-sm transition hover:-translate-y-1 hover:shadow-xl"
+          >
+            <div className="text-xs font-black uppercase tracking-wider text-blue-600">
+              Kiểm duyệt
+            </div>
+
+            <h2 className="mt-3 text-2xl font-black text-slate-950">
+              Quản lý báo cáo
+            </h2>
+
+            <p className="mt-2 text-sm leading-6 text-slate-500">
+              Xem bằng chứng, duyệt hoặc từ chối báo cáo của người dùng.
+            </p>
+
+            <div className="mt-5 font-bold text-blue-600">
+              Vào quản lý báo cáo →
+            </div>
+          </Link>
+
+          <Link
+            to="/admin/mediators"
+            className="rounded-3xl border border-emerald-200 bg-white p-7 shadow-sm transition hover:-translate-y-1 hover:shadow-xl"
+          >
+            <div className="text-xs font-black uppercase tracking-wider text-emerald-600">
+              Hồ sơ & tiền cọc
+            </div>
+
+            <h2 className="mt-3 text-2xl font-black text-slate-950">
+              Quản lý trung gian
+            </h2>
+
+            <p className="mt-2 text-sm leading-6 text-slate-500">
+              Quản lý người trung gian, SĐT, tài khoản ngân hàng, mạng xã hội và lịch sử tiền cọc.
+            </p>
+
+            <div className="mt-5 font-bold text-emerald-600">
+              Vào quản lý trung gian →
+            </div>
+          </Link>
+        </div>
+      </main>
+    </div>
+  )
+}
+
+
+======================================================================
+FILE: noscam-frontend/src/pages/Admin/AdminPopupsPage.jsx
+======================================================================
+import { useCallback, useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { popupPages, sitePopupService } from '../../services/sitePopupService'
+
+const empty = {
+  title: '',
+  content: '',
+  pages: ['/'],
+  image_url: '',
+  button_text: '',
+  button_url: '',
+  is_active: false,
+  starts_at: '',
+  ends_at: '',
+}
+
+const toInputDate = value =>
+  value ? String(value).replace(' ', 'T').slice(0, 16) : ''
+
+function PopupPreview({ popup, onClose }) {
+  return (
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/70 p-4">
+      <div className="relative w-full max-w-lg overflow-hidden rounded-3xl bg-white shadow-2xl">
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute right-3 top-3 z-10 rounded-full bg-white px-3 py-1 text-2xl shadow"
+        >
+          ×
+        </button>
+        {popup.image_url && /^https?:\/\//i.test(popup.image_url) && (
+          <img src={popup.image_url} alt="" className="max-h-64 w-full object-cover" />
+        )}
+        <div className="p-7">
+          <p className="text-xs font-bold uppercase tracking-widest text-blue-600">
+            Thông báo từ NoScam.vn
+          </p>
+          <h2 className="mt-2 text-2xl font-bold text-slate-900">
+            {popup.title || 'Tiêu đề thông báo'}
+          </h2>
+          <p className="mt-4 whitespace-pre-wrap break-words leading-7 text-slate-700">
+            {popup.content || 'Nội dung thông báo'}
+          </p>
+          <div className="mt-6 flex justify-end gap-3">
+            <button onClick={onClose} className="rounded-xl border px-5 py-3">
+              Đã hiểu
+            </button>
+            {popup.button_text && (
+              <span className="rounded-xl bg-blue-600 px-5 py-3 text-white">
+                {popup.button_text}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default function AdminPopupsPage() {
+  const [items, setItems] = useState([])
+  const [form, setForm] = useState({ ...empty })
+  const [editing, setEditing] = useState(null)
+  const [preview, setPreview] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
+
+  const load = useCallback(async () => {
+    try {
+      const response = await sitePopupService.list()
+      setItems(response.data || [])
+    } catch (err) {
+      setError(err.message)
+    }
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  function reset() {
+    setEditing(null)
+    setForm({ ...empty, pages: ['/'] })
+  }
+
+  function edit(item) {
+    setEditing(item.id)
+    setForm({
+      title: item.title || '',
+      content: item.content || '',
+      pages: item.pages || [],
+      image_url: item.image_url || '',
+      button_text: item.button_text || '',
+      button_url: item.button_url || '',
+      is_active: Boolean(item.is_active),
+      starts_at: toInputDate(item.starts_at),
+      ends_at: toInputDate(item.ends_at),
+    })
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  function update(key, value) {
+    setForm(current => ({ ...current, [key]: value }))
+  }
+
+  function togglePage(path) {
+    setForm(current => ({
+      ...current,
+      pages: current.pages.includes(path)
+        ? current.pages.filter(item => item !== path)
+        : [...current.pages, path],
+    }))
+  }
+
+  async function save(event) {
+    event.preventDefault()
+    if (busy) return
+
+    setBusy(true)
+    setError('')
+    setNotice('')
+
+    try {
+      const payload = {
+        ...form,
+        image_url: form.image_url || null,
+        button_text: form.button_text || null,
+        button_url: form.button_url || null,
+        starts_at: form.starts_at || null,
+        ends_at: form.ends_at || null,
+      }
+
+      if (editing) {
+        await sitePopupService.update(editing, payload)
+      } else {
+        await sitePopupService.create(payload)
+      }
+
+      setNotice(editing ? 'Đã cập nhật popup. Người dùng sẽ thấy phiên bản mới.' : 'Đã tạo popup.')
+      reset()
+      await load()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function remove(item) {
+    if (!window.confirm(`Xóa thông báo "${item.title}"?`)) return
+    setError('')
+    try {
+      await sitePopupService.remove(item.id)
+      if (editing === item.id) reset()
+      await load()
+      setNotice('Đã xóa popup.')
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+
+  const inputClass = 'w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-blue-500'
+  const labelClass = 'mb-2 block text-sm font-semibold text-slate-700'
+
+  return (
+    <main className="min-h-screen bg-slate-50 px-4 py-8 text-slate-900 sm:px-6">
+      <div className="mx-auto max-w-6xl">
+        <div className="mb-7 flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <Link to="/admin" className="text-sm font-semibold text-blue-600">
+              ← Quay lại Admin
+            </Link>
+            <h1 className="mt-3 text-3xl font-bold">Quản lý Popup</h1>
+            <p className="mt-2 text-sm text-slate-600">
+              Tùy chỉnh thông báo theo từng mục trên NoScam.vn.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={reset}
+            className="rounded-xl bg-blue-600 px-5 py-3 font-semibold text-white"
+          >
+            + Tạo thông báo mới
+          </button>
+        </div>
+
+        {error && (
+          <div role="alert" className="mb-5 rounded-xl border border-red-200 bg-red-50 p-4 text-red-700">
+            {error}
+          </div>
+        )}
+        {notice && (
+          <div className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-700">
+            {notice}
+          </div>
+        )}
+
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+          <form onSubmit={save} className="space-y-5 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
+            <h2 className="text-xl font-bold">
+              {editing ? `Sửa thông báo #${editing}` : 'Tạo thông báo'}
+            </h2>
+
+            <div>
+              <label className={labelClass}>Tiêu đề *</label>
+              <input
+                required maxLength={180}
+                value={form.title}
+                onChange={e => update('title', e.target.value)}
+                className={inputClass}
+                placeholder="Ví dụ: Lưu ý khi sử dụng dịch vụ"
+              />
+            </div>
+
+            <div>
+              <label className={labelClass}>Nội dung *</label>
+              <textarea
+                required maxLength={10000} rows={7}
+                value={form.content}
+                onChange={e => update('content', e.target.value)}
+                className={inputClass}
+                placeholder="Nhập nội dung thông báo..."
+              />
+            </div>
+
+            <fieldset>
+              <legend className={labelClass}>Trang hiển thị *</legend>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {popupPages.map(([path, name]) => (
+                  <label key={path} className="flex cursor-pointer items-center gap-3 rounded-xl border border-slate-200 p-3 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={form.pages.includes(path)}
+                      onChange={() => togglePage(path)}
+                      className="h-4 w-4 accent-blue-600"
+                    />
+                    {name}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+
+            <div>
+              <label className={labelClass}>URL ảnh (không bắt buộc)</label>
+              <input
+                type="url"
+                value={form.image_url}
+                onChange={e => update('image_url', e.target.value)}
+                className={inputClass}
+                placeholder="https://..."
+              />
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label className={labelClass}>Chữ trên nút liên kết</label>
+                <input
+                  value={form.button_text}
+                  onChange={e => update('button_text', e.target.value)}
+                  className={inputClass}
+                  placeholder="Xem chi tiết"
+                />
+              </div>
+              <div>
+                <label className={labelClass}>URL nút liên kết</label>
+                <input
+                  type="url"
+                  value={form.button_url}
+                  onChange={e => update('button_url', e.target.value)}
+                  className={inputClass}
+                  placeholder="https://..."
+                />
+              </div>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label className={labelClass}>Bắt đầu (tùy chọn)</label>
+                <input
+                  type="datetime-local"
+                  value={form.starts_at}
+                  onChange={e => update('starts_at', e.target.value)}
+                  className={inputClass}
+                />
+              </div>
+              <div>
+                <label className={labelClass}>Kết thúc (tùy chọn)</label>
+                <input
+                  type="datetime-local"
+                  value={form.ends_at}
+                  onChange={e => update('ends_at', e.target.value)}
+                  className={inputClass}
+                />
+              </div>
+            </div>
+
+            <label className="flex items-center gap-3 rounded-xl bg-blue-50 p-4 text-sm font-semibold text-blue-900">
+              <input
+                type="checkbox"
+                checked={form.is_active}
+                onChange={e => update('is_active', e.target.checked)}
+                className="h-5 w-5 accent-blue-600"
+              />
+              Bật hiển thị popup
+            </label>
+
+            <div className="flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={() => setPreview(true)}
+                className="rounded-xl border border-slate-200 px-5 py-3 font-semibold"
+              >
+                Xem trước
+              </button>
+              <button
+                type="submit"
+                disabled={busy || form.pages.length === 0}
+                className="rounded-xl bg-blue-600 px-6 py-3 font-semibold text-white disabled:opacity-50"
+              >
+                {busy ? 'Đang lưu...' : editing ? 'Lưu cập nhật' : 'Đăng thông báo'}
+              </button>
+            </div>
+          </form>
+
+          <aside className="self-start rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+            <h2 className="mb-4 text-lg font-bold">Thông báo đã tạo ({items.length})</h2>
+
+            {items.length === 0 && (
+              <p className="text-sm text-slate-500">Chưa có thông báo nào.</p>
+            )}
+
+            <div className="space-y-3">
+              {items.map(item => (
+                <div key={item.id} className="rounded-2xl border border-slate-200 p-4">
+                  <div className="flex items-start justify-between gap-2">
+                    <h3 className="break-words font-bold">{item.title}</h3>
+                    <span className={`shrink-0 rounded-full px-2 py-1 text-xs font-semibold ${item.is_active ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}`}>
+                      {item.is_active ? 'Đang bật' : 'Đã tắt'}
+                    </span>
+                  </div>
+
+                  <p className="mt-2 text-xs text-slate-500">
+                    Phiên bản {item.version} · {item.pages.length} trang
+                  </p>
+
+                  <div className="mt-4 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => edit(item)}
+                      className="rounded-lg bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700"
+                    >
+                      Chỉnh sửa
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => remove(item)}
+                      className="rounded-lg bg-red-50 px-4 py-2 text-sm font-semibold text-red-700"
+                    >
+                      Xóa
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </aside>
+        </div>
+      </div>
+
+      {preview && (
+        <PopupPreview popup={form} onClose={() => setPreview(false)} />
+      )}
+    </main>
+  )
+}
+
+
+======================================================================
+FILE: noscam-frontend/src/components/admin/AdminNav.jsx
+======================================================================
+import {
+  NavLink,
+  useNavigate,
+} from 'react-router-dom'
+
+import adminService from '../../services/adminService'
+
+const menu = [
+  {
+    to: '/admin/chat',
+    label: 'Tin nhắn',
+  },
+
+  {
+    to: '/admin/digital/services',
+    label: 'Dịch vụ số',
+  },
+  {
+    to: '/admin/digital/orders',
+    label: 'Đơn dịch vụ số',
+  },
+
+  {
+    to: '/admin',
+    label: 'Tổng quan',
+    end: true,
+  },
+  {
+    to: '/admin/reports',
+    label: 'Báo cáo',
+  },
+  {
+    to: '/admin/community',
+    label: 'Cộng đồng',
+  },
+  {
+    to: '/admin/mediators',
+    label: 'Trung gian',
+  },
+  {
+    to: '/admin/social',
+    label: 'Tăng tương tác',
+  },
+  {
+    to: '/admin/exchange',
+    label: 'Kiếm xu',
+  }
+]
+
+export default function AdminNav() {
+  const navigate = useNavigate()
+
+  async function handleLogout() {
+    try {
+      await adminService.logout()
+    } finally {
+      navigate('/admin/login', {
+        replace: true,
+      })
+    }
+  }
+
+  return (
+    <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur-xl">
+      <div className="mx-auto max-w-7xl px-5 lg:px-8">
+        <div className="flex h-20 items-center justify-between gap-5">
+          <NavLink
+            to="/admin"
+            className="flex items-center gap-3"
+          >
+            <div className="grid h-11 w-11 place-items-center rounded-2xl bg-blue-600 font-black text-white">
+              N
+            </div>
+
+            <div>
+              <div className="font-black text-slate-950">
+                NoScam.vn
+              </div>
+
+              <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">
+                Moderation Panel
+              </div>
+            </div>
+          </NavLink>
+
+          <div className="flex items-center gap-2">
+            <a
+              href="/"
+              className="hidden rounded-xl px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 sm:block"
+            >
+              Xem website
+            </a>
+
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:border-red-200 hover:bg-red-50 hover:text-red-600"
+            >
+              Đăng xuất
+            </button>
+          </div>
+        </div>
+
+        <nav className="flex gap-1 overflow-x-auto">
+          {menu.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              end={item.end}
+              className={({ isActive }) =>
+                `relative shrink-0 px-4 py-3 text-sm font-bold ${
+                  isActive
+                    ? 'text-blue-600'
+                    : 'text-slate-500 hover:text-slate-950'
+                }`
+              }
+            >
+              {({ isActive }) => (
+                <>
+                  {item.label}
+
+                  {isActive && (
+                    <span className="absolute inset-x-3 bottom-0 h-0.5 rounded-full bg-blue-600" />
+                  )}
+                </>
+              )}
+            </NavLink>
+          ))}
+        </nav>
+      </div>
+    </header>
+  )
+}
+
+
+======================================================================
+FILE: noscam-frontend/src/components/admin/social/SocialAdminNav.jsx
+======================================================================
+import {
+  NavLink,
+} from 'react-router-dom'
+
+const items = [
+  {
+    to: '/admin/social',
+    label: 'Tổng quan',
+    end: true,
+  },
+  {
+    to: '/admin/social/services',
+    label: 'Dịch vụ',
+  },
+  {
+    to: '/admin/social/orders',
+    label: 'Đơn hàng',
+  },
+  {
+    to: '/admin/social/providers',
+    label: 'Nhà cung cấp',
+  },
+  {
+    to: '/admin/social/customers',
+    label: 'Khách hàng',
+  },
+]
+
+export default function SocialAdminNav() {
+  return (
+    <div className="mt-6 overflow-x-auto">
+      <div className="flex min-w-max gap-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
+        {items.map((item) => (
+          <NavLink
+            key={item.to}
+            to={item.to}
+            end={item.end}
+            className={({ isActive }) =>
+              `rounded-xl px-4 py-2.5 text-sm font-bold transition ${
+                isActive
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'text-slate-500 hover:bg-slate-50 hover:text-slate-950'
+              }`
+            }
+          >
+            {item.label}
+          </NavLink>
+        ))}
+      </div>
+    </div>
+  )
+}
+

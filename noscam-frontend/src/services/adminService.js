@@ -251,6 +251,20 @@ export const adminService = {
     )
   },
 
+  async uploadMediatorAvatar(id, file) {
+    const body = new FormData()
+    body.append('avatar', file)
+    return adminRequest(() => apiClient.post(
+      `/admin/mediators/${id}/avatar`, body, authOptions()
+    ))
+  },
+
+  async deleteMediatorAvatar(id) {
+    return adminRequest(() => apiClient.delete(
+      `/admin/mediators/${id}/avatar`, authOptions()
+    ))
+  },
+
   async addMediatorDeposit(
     id,
     data,

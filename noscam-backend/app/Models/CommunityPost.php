@@ -17,6 +17,14 @@ class CommunityPost extends Model
         'status',
         'published_at',
         'images',
+        'work_mode',
+        'city',
+        'address',
+        'salary',
+        'salary_unit',
+        'deadline',
+        'contact',
+
     ];
 
     protected $hidden = [
@@ -29,6 +37,7 @@ class CommunityPost extends Model
             'is_anonymous' => 'boolean',
             'published_at' => 'datetime',
             'images' => 'array',
+            'deadline' => 'date:Y-m-d',
         ];
     }
 

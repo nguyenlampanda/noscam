@@ -140,6 +140,8 @@ export default function AdminDashboardPage() {
       <AdminNav />
 
       <main className="mx-auto max-w-7xl px-5 py-10 lg:px-8">
+
+
         <div>
           <div className="text-xs font-black uppercase tracking-[0.2em] text-blue-600">
             Hệ thống quản trị

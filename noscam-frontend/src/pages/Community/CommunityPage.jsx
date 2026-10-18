@@ -1,7 +1,7 @@
 import { NoScamBrand } from '../../components/ui/NoScamUI'
 import NoScamSelect from '../../components/ui/NoScamSelect'
 import './community-motion.css'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import communityService from '../../services/communityService'
 import { getCustomerToken } from '../../services/customerService'
@@ -11,6 +11,10 @@ const categories = [
   { value: 'question', label: 'Hỏi đáp' },
   { value: 'experience', label: 'Chia sẻ kinh nghiệm' },
   { value: 'warning', label: 'Cảnh báo cộng đồng' },
+  { value: 'job_offer', label: 'Tuyển dụng / Đăng job' },
+  { value: 'job_seeking', label: 'Tìm việc MMO' },
+  { value: 'service_offer', label: 'Cung cấp dịch vụ' },
+  { value: 'partnership', label: 'Tìm đối tác' },
 ]
 
 const emptyForm = {
@@ -22,11 +26,38 @@ const emptyForm = {
 
 function CommunityPage() {
   const [posts, setPosts] = useState([])
+  const [mmoSearch, setMmoSearch] = useState('')
+  const [mmoFilter, setMmoFilter] = useState('all')
+  // NOSCAM_MMO_API_V2
+  const [mmoWorkMode, setMmoWorkMode] = useState('all')
+  const [mmoCity, setMmoCity] = useState('')
+  const [mmoPage, setMmoPage] = useState(1)
+  const [mmoMeta, setMmoMeta] = useState({
+    current_page: 1, last_page: 1, total: 0,
+  })
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  // NOSCAM_MMO_PERFORMANCE_V1
+  const [debouncedCity, setDebouncedCity] = useState('')
+  const requestIdRef = useRef(0)
   const [likedPosts, setLikedPosts] = useState({})
   const [busyLikes, setBusyLikes] = useState({})
   const [commentSuccessOpen, setCommentSuccessOpen] = useState(false)
 
   const [form, setForm] = useState(emptyForm)
+  // NOSCAM_MMO_JOB_FORM_V1
+  const initialJob = {
+    work_mode: 'remote',
+    city: '',
+    address: '',
+    salary: '',
+    salary_unit: 'month',
+    deadline: '',
+    contact: '',
+  }
+  const [job, setJob] = useState(initialJob)
+  const mmoTypes = ['job_offer', 'job_seeking', 'service_offer', 'partnership']
+  const isMmo = mmoTypes.includes(form.category)
+
   const [composerOpen, setComposerOpen] = useState(false)
   const [postSuccessOpen, setPostSuccessOpen] = useState(false)
   const [selectedImages, setSelectedImages] = useState([])
@@ -47,25 +78,63 @@ function CommunityPage() {
 
   const loggedIn = Boolean(getCustomerToken())
 
+  const filteredPosts = posts
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(mmoSearch.trim())
+    }, 450)
+    return () => clearTimeout(timer)
+  }, [mmoSearch])
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedCity(mmoCity.trim())
+    }, 450)
+    return () => clearTimeout(timer)
+  }, [mmoCity])
+
+  useEffect(() => {
+    setMmoPage(1)
+  }, [debouncedSearch, mmoFilter, mmoWorkMode, debouncedCity])
+
   const loadPosts = useCallback(async () => {
+    const requestId = ++requestIdRef.current
     setLoading(true)
     setError('')
 
     try {
-      const response = await communityService.posts()
+      const response = await communityService.posts(mmoPage, {
+        q: debouncedSearch,
+        category: mmoFilter,
+        work_mode: mmoWorkMode,
+        city: debouncedCity,
+      })
+      if (requestId !== requestIdRef.current) return
       setPosts(response.data || [])
+      setMmoMeta(response.meta || {
+        current_page: mmoPage, last_page: 1,
+        total: (response.data || []).length,
+      })
       setLikedPosts(Object.fromEntries(
         (response.data || []).map(post => [post.id, Boolean(post.liked_by_me)])
       ))
     } catch (err) {
-      setError(err.message)
+      if (requestId === requestIdRef.current) {
+        setError(err.message)
+      }
     } finally {
-      setLoading(false)
+      if (requestId === requestIdRef.current) {
+        setLoading(false)
+      }
     }
-  }, [])
+  }, [mmoPage, debouncedSearch, mmoFilter, mmoWorkMode, debouncedCity])
 
   useEffect(() => {
     loadPosts()
+    return () => {
+      requestIdRef.current += 1
+    }
   }, [loadPosts])
 
   const previews = useMemo(() => selectedImages.map(file => ({
@@ -76,6 +145,7 @@ function CommunityPage() {
 
   function resetComposer() {
     setForm(emptyForm)
+    setJob(initialJob)
     setSelectedImages([])
     setImageError('')
     setConfirmPost(false)
@@ -85,7 +155,11 @@ function CommunityPage() {
 
   function requestClose() {
     if (submitting) return
-    if (form.title.trim() || form.content.trim() || selectedImages.length) {
+    if (form.title.trim() || form.content.trim() ||
+        selectedImages.length ||
+        Object.entries(job).some(([key, value]) =>
+          key !== 'work_mode' && key !== 'salary_unit' && Boolean(value)
+        )) {
       setConfirmDiscard(true)
     } else {
       resetComposer()
@@ -116,7 +190,45 @@ function CommunityPage() {
     setSubmitting(true)
     setNotice('')
     try {
-      const response = await communityService.createPost({ ...form, images: selectedImages })
+      const workLabels = {
+        remote: 'Online / Remote',
+        onsite: 'Trực tiếp',
+        hybrid: 'Hybrid',
+      }
+      const salaryLabels = {
+        hour: 'giờ',
+        day: 'ngày',
+        month: 'tháng',
+        project: 'dự án / sản phẩm',
+        negotiable: 'thỏa thuận',
+      }
+      const details = isMmo ? [
+        'THÔNG TIN MMO',
+        'Hình thức: ' + workLabels[job.work_mode],
+        job.city.trim() ? 'Tỉnh/thành phố: ' + job.city.trim() : '',
+        job.address.trim() ? 'Địa điểm: ' + job.address.trim() : '',
+        job.salary.trim() ? 'Thu nhập / Giá: ' + job.salary.trim() +
+          ' / ' + salaryLabels[job.salary_unit] : '',
+        job.deadline ? 'Hạn nhận hồ sơ: ' + job.deadline : '',
+        job.contact.trim() ? 'Liên hệ / Ứng tuyển: ' + job.contact.trim() : '',
+      ].filter(Boolean).join('\\n') : ''
+      const finalContent = details
+        ? details + '\\n\\nMÔ TẢ CHI TIẾT\\n' + form.content.trim()
+        : form.content
+      const response = await communityService.createPost({
+        ...form,
+        content: isMmo ? form.content.trim() : finalContent,
+        ...(isMmo ? {
+          work_mode: job.work_mode,
+          city: job.city,
+          address: job.address,
+          salary: job.salary,
+          salary_unit: job.salary_unit,
+          deadline: job.deadline,
+          contact: job.contact,
+        } : {}),
+        images: selectedImages,
+      })
       resetComposer()
       setNotice(response.message || 'Bài viết đã được gửi kiểm duyệt.')
     
@@ -133,6 +245,35 @@ function CommunityPage() {
     if (!form.title.trim() && !form.content.trim() && !selectedImages.length) {
       setImageError('Hãy viết nội dung hoặc chọn ít nhất một ảnh.')
       return
+    }
+    if (isMmo) {
+      if (!form.title.trim()) {
+        setImageError('Bài MMO cần có tiêu đề.')
+        return
+      }
+      if (!form.content.trim()) {
+        setImageError('Vui lòng nhập mô tả chi tiết.')
+        return
+      }
+      if (job.work_mode !== 'remote' && !job.city.trim()) {
+        setImageError('Vui lòng nhập tỉnh/thành phố làm việc.')
+        return
+      }
+      if (job.work_mode !== 'remote' && !job.address.trim()) {
+        setImageError('Vui lòng nhập địa chỉ hoặc khu vực làm việc.')
+        return
+      }
+      if (!job.contact.trim()) {
+        setImageError('Vui lòng nhập cách liên hệ hoặc ứng tuyển.')
+        return
+      }
+      const combinedLength = form.content.length +
+        job.city.length + job.address.length +
+        job.salary.length + job.contact.length + 300
+      if (combinedLength > 10000) {
+        setImageError('Nội dung quá dài, vui lòng rút gọn.')
+        return
+      }
     }
     setImageError('')
     setConfirmPost(true)
@@ -391,11 +532,11 @@ function CommunityPage() {
         </p>
 
         <h1 className="mt-2 text-3xl font-bold text-slate-950">
-          Cộng đồng NoScam
+          Cộng đồng MMO NoScam
         </h1>
 
         <p className="mt-3 text-slate-600">
-          Chia sẻ kinh nghiệm, đặt câu hỏi và cùng nhau phòng tránh lừa đảo.
+          Tìm việc, tuyển cộng tác viên, cung cấp dịch vụ và kết nối đối tác an toàn.
         </p>
 
         {notice && (
@@ -435,7 +576,7 @@ function CommunityPage() {
             </section>
 
             <section className="noscam-community-feed space-y-4">
-              <h2 className="text-xl font-bold">Bảng tin cộng đồng</h2>
+              <h2 className="text-xl font-bold">Bảng tin việc làm & cộng đồng MMO</h2>
 
               {loading && <p>Đang tải bài viết...</p>}
               {error && <p role="alert" className="text-red-600">{error}</p>}
@@ -446,7 +587,103 @@ function CommunityPage() {
                 </div>
               )}
 
-              {posts.map(post => (
+              <section className="mb-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                <h2 className="mb-3 text-lg font-bold text-slate-900">
+                  Khám phá việc làm và dịch vụ MMO
+                </h2>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <input
+                    type="search"
+                    value={mmoSearch}
+                    onChange={event => setMmoSearch(event.target.value)}
+                    placeholder="Tìm job, kỹ năng, dịch vụ..."
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 transition-colors focus:border-blue-600"
+                  style={{
+                      outline: 'none',
+                      boxShadow: 'none',
+                      WebkitAppearance: 'none',
+                    }}
+                  />
+                  <select
+                    value={mmoFilter}
+                    onChange={event => setMmoFilter(event.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-blue-500"
+                  >
+                    <option value="all">Tất cả bài viết</option>
+                    {categories.map(category => (
+                      <option key={category.value} value={category.value}>
+                        {category.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <p className="mt-3 text-xs text-slate-500">
+                  Hiển thị {filteredPosts.length} / {posts.length} bài đã tải
+                </p>
+              </section>
+
+
+              <div className="mb-5 flex flex-wrap gap-2">
+                {[
+                  { value: 'all', label: 'Tất cả' },
+                  { value: 'job_offer', label: 'Tuyển dụng' },
+                  { value: 'job_seeking', label: 'Tìm việc' },
+                  { value: 'service_offer', label: 'Dịch vụ MMO' },
+                  { value: 'partnership', label: 'Hợp tác' },
+                ].map(option => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => setMmoFilter(option.value)}
+                    aria-pressed={mmoFilter === option.value}
+                    className={`rounded-full border px-4 py-2 text-sm font-semibold transition ${
+                      mmoFilter === option.value
+                        ? 'border-blue-600 bg-blue-600 text-white'
+                        : 'border-slate-200 bg-white text-slate-600 hover:border-blue-300 hover:text-blue-600'
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+
+
+              <div className="mb-5 grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:grid-cols-2">
+                <div>
+                  <label className="mb-2 block text-sm font-semibold text-slate-700">
+                    Hình thức làm việc
+                  </label>
+                  <select
+                    value={mmoWorkMode}
+                    onChange={e => setMmoWorkMode(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-blue-600 focus:ring-0"
+                  >
+                    <option value="all">Tất cả hình thức</option>
+                    <option value="remote">Online / Remote</option>
+                    <option value="onsite">Trực tiếp</option>
+                    <option value="hybrid">Hybrid</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-2 block text-sm font-semibold text-slate-700">
+                    Tỉnh / thành phố
+                  </label>
+                  <input
+                    value={mmoCity}
+                    onChange={e => setMmoCity(e.target.value)}
+                    placeholder="Ví dụ: Hồ Chí Minh"
+                    maxLength={100}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-blue-600 focus:ring-0"
+                    style={{ outline: 'none', boxShadow: 'none' }}
+                  />
+                </div>
+                <p className="text-xs text-slate-500 sm:col-span-2">
+                  Tìm kiếm toàn bộ bài đã được duyệt. Các bài cũ chưa có thông tin
+                  địa điểm riêng có thể không xuất hiện khi lọc theo địa điểm.
+                </p>
+              </div>
+
+              {filteredPosts.map(post => (
                 <article key={post.id} className="noscam-community-post rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
                   <div className="text-sm text-slate-500">
                     <span className="font-semibold text-blue-600">{post.author}</span>
@@ -455,7 +692,36 @@ function CommunityPage() {
                   </div>
 
                   {post.title && <h3 className="mt-3 text-xl font-bold">{post.title}</h3>}
-                  {post.content && (
+                  {['job_offer', 'job_seeking', 'service_offer', 'partnership'].includes(post.category) &&
+                  (post.work_mode || post.city || post.salary || post.deadline) && (
+                    <div className="my-3 flex flex-wrap gap-2">
+                      {post.work_mode && (
+                        <span className="rounded-lg bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700">
+                          {({ remote: 'Online / Remote', onsite: 'Trực tiếp', hybrid: 'Hybrid' })[post.work_mode] || post.work_mode}
+                        </span>
+                      )}
+                      {post.city && (
+                        <span className="rounded-lg bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700">
+                          Địa điểm: {post.city}
+                        </span>
+                      )}
+                      {post.salary && (
+                        <span className="rounded-lg bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700">
+                          {post.salary}
+                          {post.salary_unit ? ' / ' + ({
+                            hour: 'giờ', day: 'ngày', month: 'tháng',
+                            project: 'dự án', negotiable: 'thỏa thuận',
+                          }[post.salary_unit] || post.salary_unit) : ''}
+                        </span>
+                      )}
+                      {post.deadline && (
+                        <span className="rounded-lg bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">
+                          Hạn tuyển: {post.deadline}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                {post.content && (
                     <p className="mt-3 whitespace-pre-wrap break-words text-slate-700">{post.content}</p>
                   )}
                   <PhotoGrid images={post.images} />
@@ -599,6 +865,140 @@ function CommunityPage() {
                     </option>
                   ))}
                 </NoScamSelect>
+
+                {isMmo && (
+                  <div className="space-y-4 rounded-2xl border border-blue-100 bg-blue-50/30 p-4">
+                    <h3 className="font-bold text-slate-900">
+                      Thông tin công việc / dịch vụ
+                    </h3>
+                    <p className="text-xs text-slate-500">
+                      Không đăng OTP, mật khẩu hoặc thông tin riêng tư.
+                    </p>
+
+                    <div>
+                      <label className="mb-2 block text-sm font-semibold">
+                        Hình thức làm việc
+                      </label>
+                      <select
+                        value={job.work_mode}
+                        onChange={e => setJob(prev => ({
+                          ...prev, work_mode: e.target.value,
+                        }))}
+                        className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-blue-500"
+                      >
+                        <option value="remote">Online / Remote</option>
+                        <option value="onsite">Trực tiếp</option>
+                        <option value="hybrid">Hybrid</option>
+                      </select>
+                    </div>
+
+                    {job.work_mode !== 'remote' && (
+                      <>
+                        <div>
+                          <label className="mb-2 block text-sm font-semibold">
+                            Tỉnh / thành phố *
+                          </label>
+                          <input
+                            maxLength={100}
+                            value={job.city}
+                            onChange={e => setJob(prev => ({
+                              ...prev, city: e.target.value,
+                            }))}
+                            placeholder="Ví dụ: TP. Hồ Chí Minh"
+                            className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-2 block text-sm font-semibold">
+                            Địa chỉ / khu vực làm việc *
+                          </label>
+                          <input
+                            maxLength={250}
+                            value={job.address}
+                            onChange={e => setJob(prev => ({
+                              ...prev, address: e.target.value,
+                            }))}
+                            placeholder="Ví dụ: Phường Tân Sơn Nhất, TP.HCM"
+                            className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-blue-500"
+                          />
+                          <p className="mt-1 text-xs text-slate-500">
+                            Không cần công khai số nhà riêng.
+                          </p>
+                        </div>
+                      </>
+                    )}
+
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div>
+                        <label className="mb-2 block text-sm font-semibold">
+                          Thu nhập / Giá dịch vụ
+                        </label>
+                        <input
+                          maxLength={100}
+                          value={job.salary}
+                          onChange={e => setJob(prev => ({
+                            ...prev, salary: e.target.value,
+                          }))}
+                          placeholder="Ví dụ: 8.000.000đ"
+                          className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-blue-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-2 block text-sm font-semibold">
+                          Đơn vị tính
+                        </label>
+                        <select
+                          value={job.salary_unit}
+                          onChange={e => setJob(prev => ({
+                            ...prev, salary_unit: e.target.value,
+                          }))}
+                          className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-blue-500"
+                        >
+                          <option value="hour">Theo giờ</option>
+                          <option value="day">Theo ngày</option>
+                          <option value="month">Theo tháng</option>
+                          <option value="project">Theo dự án / sản phẩm</option>
+                          <option value="negotiable">Thỏa thuận</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {form.category === 'job_offer' && (
+                      <div>
+                        <label className="mb-2 block text-sm font-semibold">
+                          Hạn nhận hồ sơ
+                        </label>
+                        <input
+                          type="date"
+                          value={job.deadline}
+                          min={new Date().toISOString().slice(0, 10)}
+                          onChange={e => setJob(prev => ({
+                            ...prev, deadline: e.target.value,
+                          }))}
+                          className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-blue-500"
+                        />
+                      </div>
+                    )}
+
+                    <div>
+                      <label className="mb-2 block text-sm font-semibold">
+                        Cách liên hệ / ứng tuyển *
+                      </label>
+                      <input
+                        maxLength={250}
+                        value={job.contact}
+                        onChange={e => setJob(prev => ({
+                          ...prev, contact: e.target.value,
+                        }))}
+                        placeholder="Email công việc hoặc đường dẫn ứng tuyển"
+                        className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-blue-500"
+                      />
+                      <p className="mt-1 text-xs text-slate-500">
+                        Thông tin này sẽ hiển thị công khai sau khi duyệt.
+                      </p>
+                    </div>
+                  </div>
+                )}
 
                 <textarea
                   maxLength={10000}
@@ -808,6 +1208,35 @@ function CommunityPage() {
           </section>
         </div>
       )}
+
+              <div className="mx-auto mt-6 flex w-full max-w-[890px] flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:px-5 lg:mr-auto lg:ml-[max(0px,calc((100vw-1194px)/2))]">
+                <span className="text-sm text-slate-600">
+                  {loading ? 'Đang tải bài viết...' : (
+                    <>
+                      Trang {mmoMeta.current_page} / {mmoMeta.last_page}
+                      {' '}· Tổng {mmoMeta.total} bài
+                    </>
+                  )}
+                </span>
+                <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    disabled={loading || mmoPage <= 1}
+                    onClick={() => setMmoPage(page => Math.max(1, page - 1))}
+                    className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold disabled:opacity-40"
+                  >
+                    Trang trước
+                  </button>
+                  <button
+                    type="button"
+                    disabled={loading || mmoPage >= mmoMeta.last_page}
+                    onClick={() => setMmoPage(page => page + 1)}
+                    className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
+                  >
+                    Trang sau
+                  </button>
+                </div>
+              </div>
 
     </main>
   )

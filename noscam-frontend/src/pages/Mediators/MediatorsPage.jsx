@@ -1,3 +1,4 @@
+import AvatarLightbox from '../../components/AvatarLightbox'
 import {
   useEffect,
   useState,
@@ -127,6 +128,7 @@ function MediatorsPage() {
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div>
+                        {item.avatar_url && <AvatarLightbox src={item.avatar_url} alt="" className="mb-3 h-16 w-16 rounded-full border border-slate-100 object-cover" />}
                         <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-700">
                           {item.status ===
                           'active'

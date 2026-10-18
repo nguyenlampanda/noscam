@@ -18,6 +18,15 @@ class Mediator extends Model
         'verified_at',
     ];
 
+    protected $appends = ['avatar_url'];
+
+    public function getAvatarUrlAttribute(): ?string
+    {
+        return $this->avatar_path
+            ? url('/storage/'.$this->avatar_path)
+            : null;
+    }
+
     protected function casts(): array
     {
         return [
