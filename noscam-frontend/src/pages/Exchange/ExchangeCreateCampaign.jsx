@@ -1,10 +1,5 @@
-import NoScamSelect from '../../components/ui/NoScamSelect'
-import { useNoScamUI } from '../../components/ui/NoScamUI'
 import { useRef, useState } from 'react'
 import exchangeService from '../../services/exchangeService'
-import customerService, {
-  getCustomerToken,
-} from '../../services/customerService'
 
 const platforms = {
   instagram: 'Instagram',
@@ -17,9 +12,6 @@ const tasks = {
   like: 'Thích',
   comment: 'Bình luận',
 }
-
-const coins = (value) =>
-  `${Math.round(Number(value || 0)).toLocaleString('vi-VN')} xu`
 
 function validLink(value, platform) {
   try {
@@ -88,138 +80,104 @@ function normalizeTarget(value, platform, taskType) {
   return ''
 }
 
-const STORAGE_KEY = 'noscam_exchange_pending_campaign'
 
-function sessionIdentity() {
-  const token = getCustomerToken()
-  if (!token) return null
 
-  // Không lưu token; chỉ dùng dấu nhận diện để đối chiếu phiên.
-  let hash = 2166136261
+function StyledExchangeSelect({ value, onChange, disabled, options }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
 
-  for (let i = 0; i < token.length; i += 1) {
-    hash ^= token.charCodeAt(i)
-    hash = Math.imul(hash, 16777619)
-  }
+  return (
+    <div ref={ref} className="relative min-w-0">
+      <button
+        type="button"
+        disabled={disabled}
+        aria-expanded={open}
+        aria-haspopup="listbox"
+        onClick={() => setOpen((v) => !v)}
+        onBlur={(event) => {
+          if (!ref.current?.contains(event.relatedTarget)) {
+            setOpen(false)
+          }
+        }}
+        className="flex w-full items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-left text-sm font-semibold text-slate-800 shadow-sm transition hover:border-blue-400 focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-100 disabled:opacity-50"
+      >
+        <span className="truncate">
+          {options.find((item) => item.value === value)?.label || value}
+        </span>
+        <svg
+          className={`h-4 w-4 shrink-0 text-blue-600 transition-transform ${open ? 'rotate-180' : ''}`}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          aria-hidden="true"
+        >
+          <path d="m6 9 6 6 6-6" />
+        </svg>
+      </button>
 
-  return (hash >>> 0).toString(16)
+      {open && !disabled && (
+        <div
+          role="listbox"
+          className="absolute left-0 right-0 top-full z-40 mt-2 overflow-hidden rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl"
+        >
+          {options.map((item) => (
+            <button
+              key={item.value}
+              type="button"
+              role="option"
+              aria-selected={value === item.value}
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => {
+                onChange(item.value)
+                setOpen(false)
+              }}
+              className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm transition ${
+                value === item.value
+                  ? 'bg-blue-50 font-bold text-blue-700'
+                  : 'text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              <span>{item.label}</span>
+              {value === item.value && <span aria-hidden="true">✓</span>}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
 }
 
-function savePending(attempt) {
-  try {
-    const identity = sessionIdentity()
-    if (!identity) return false
-
-    sessionStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({
-        ...attempt,
-        sessionIdentity: identity,
-      }),
-    )
-    return true
-  } catch {
-    return false
-  }
-}
-
-function readPending() {
-  try {
-    const raw = sessionStorage.getItem(STORAGE_KEY)
-    if (!raw) return null
-
-    const value = JSON.parse(raw)
-
-    if (
-      !value ||
-      !sessionIdentity() ||
-      value.sessionIdentity !== sessionIdentity() ||
-      typeof value.key !== 'string' ||
-      !/^[A-Za-z0-9_-]{16,128}$/.test(value.key) ||
-      !value.payload ||
-      typeof value.payload !== 'object'
-    ) {
-      return null
-    }
-
-    return value
-  } catch {
-    return null
-  }
-}
-
-function removePending() {
-  try {
-    sessionStorage.removeItem(STORAGE_KEY)
-  } catch {
-    // Storage unavailable.
-  }
-}
-
-function makeKey() {
-  if (!globalThis.crypto?.randomUUID) {
-    throw new Error('Trình duyệt không hỗ trợ tạo mã giao dịch an toàn.')
-  }
-  return `exchange_${globalThis.crypto.randomUUID()}`
-}
-
-export default function ExchangeCreateCampaign({
-  prices,
-  balance,
-  onRefresh,
-}) {
-  const { confirm } = useNoScamUI()
+export default function ExchangeCreateCampaign({ onRefresh, onViewCampaigns }) {
   const [platform, setPlatform] = useState('instagram')
   const [taskType, setTaskType] = useState('follow')
   const [targetUrl, setTargetUrl] = useState('')
-  const [showConfirm, setShowConfirm] = useState(false)
-  const [showForm, setShowForm] = useState(true)
   const [quantity, setQuantity] = useState('10')
   const [accepted, setAccepted] = useState(false)
+  const showForm = true
+  const [showConfirm, setShowConfirm] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
-  const [pending, setPending] = useState(readPending)
   const lock = useRef(false)
 
-  const price = prices.find(
-    (item) =>
-      item.platform === platform &&
-      item.task_type === taskType,
-  )
-
   const normalizedUrl = normalizeTarget(targetUrl, platform, taskType)
-  const minimum = Number(price?.min_quantity ?? 10)
   const count = Number(quantity)
+
   const validCount =
     quantity.trim() !== '' &&
     Number.isSafeInteger(count) &&
-    Number.isSafeInteger(minimum) &&
-    minimum >= 1 &&
-    minimum <= 100000 &&
-    count >= minimum &&
+    count >= 1 &&
     count <= 100000
 
-  const cost = Number(price?.cost_per_task || 0)
-  const total = validCount ? cost * count : 0
-
-  const validTotal =
-    Number.isSafeInteger(total) &&
-    total > 0 &&
-    total <= 99999999999999
-
   const valid =
-    Boolean(price) &&
     validCount &&
-    validTotal &&
     Boolean(normalizedUrl) &&
     validLink(normalizedUrl, platform) &&
-    accepted &&
-    balance != null &&
-    Number(balance) >= total
+    accepted
 
   function changeField(setter, value) {
-    if (pending) return
+    if (busy) return
     setter(value)
     setError('')
     setSuccess('')
@@ -228,183 +186,56 @@ export default function ExchangeCreateCampaign({
   async function submit() {
     if (lock.current || busy) return
 
-    if (!pending && !valid) {
-      setError('Vui lòng kiểm tra liên kết, số lượng, số dư và điều khoản.')
+    if (!valid) {
+      setError('Vui lòng kiểm tra liên kết, số lượt và quy định.')
       return
+    }
+
+    if (!globalThis.crypto?.randomUUID) {
+      setError('Trình duyệt không hỗ trợ tạo mã yêu cầu an toàn.')
+      return
+    }
+
+    const key = `exchange_free_${globalThis.crypto.randomUUID()}`
+
+    const payload = {
+      platform,
+      task_type: taskType,
+      target_url: normalizedUrl,
+      quantity: count,
+      rules_accepted: true,
     }
 
     lock.current = true
     setBusy(true)
     setError('')
-    setSuccess('')
-
-    let attempt = pending
 
     try {
-      if (!attempt) {
-        const [latestPrices, walletResponse] = await Promise.all([
-          exchangeService.prices(),
-          customerService.wallet(),
-        ])
-
-        const latest = (latestPrices?.data || []).find(
-          (item) =>
-            item.platform === platform &&
-            item.task_type === taskType,
-        )
-
-        if (!latest) {
-          throw new Error('Loại nhiệm vụ hiện đã ngừng hoạt động.')
-        }
-
-        const latestMinimum = Number(latest.min_quantity ?? 10)
-
-        if (
-          !Number.isSafeInteger(latestMinimum) ||
-          latestMinimum < 1 ||
-          latestMinimum > 100000 ||
-          count < latestMinimum
-        ) {
-          throw new Error(
-            `Số lượng tối thiểu hiện tại là ${latestMinimum} lượt.`
-          )
-        }
-
-        const latestCost = Number(latest.cost_per_task)
-        const latestTotal = latestCost * count
-        const latestBalance = Number(walletResponse?.data?.balance)
-
-        if (
-          !Number.isSafeInteger(latestTotal) ||
-          latestTotal <= 0 ||
-          latestTotal > 99999999999999
-        ) {
-          throw new Error('Ngân sách không hợp lệ.')
-        }
-
-        if (
-          !Number.isFinite(latestBalance) ||
-          latestBalance < latestTotal
-        ) {
-          throw new Error('Số dư ví không đủ để tạo chiến dịch.')
-        }
-
-        if (latestTotal !== total) {
-          throw new Error(
-            'Giá nhiệm vụ đã thay đổi. Vui lòng kiểm tra ngân sách và xác nhận lại.',
-          )
-        }
-
-        attempt = {
-          key: makeKey(),
-          payload: {
-            platform,
-            task_type: taskType,
-            target_url: normalizedUrl,
-            quantity: count,
-            rules_accepted: true,
-            max_budget: latestTotal,
-          },
-        }
-
-        attempt = {
-          ...attempt,
-          sessionIdentity: sessionIdentity(),
-        }
-
-        if (!attempt.sessionIdentity || !savePending(attempt)) {
-          throw new Error(
-            'Không thể lưu mã giao dịch an toàn. ' +
-            'Vui lòng kiểm tra phiên đăng nhập và sessionStorage.',
-          )
-        }
-
-        setPending(attempt)
-      } else {
-        if (attempt.sessionIdentity !== sessionIdentity()) {
-          throw new Error(
-            'Phiên đăng nhập đã thay đổi. ' +
-            'Không thể gửi lại giao dịch của phiên khác.',
-          )
-        }
-
-        let found = null
-
-        try {
-          found = await exchangeService.lookupCampaign(attempt.key)
-        } catch (lookupError) {
-          if (lookupError?.status !== 404) {
-            throw new Error(
-              'Chưa thể xác minh giao dịch trước đó. ' +
-              'Vui lòng kiểm tra kết nối và thử lại.',
-            )
-          }
-        }
-
-        if (found?.status === 'created' && found?.data?.id) {
-          setSuccess(
-            `Chiến dịch #${found.data.id} đã được tạo. ` +
-            'Không thực hiện thêm giao dịch.',
-          )
-
-          removePending()
-          setPending(null)
-
-          if (onRefresh) {
-            try {
-              await onRefresh()
-            } catch {
-              // Không ảnh hưởng kết quả tra cứu.
-            }
-          }
-
-          return
-        }
-
-        if (found && found.status !== 'created') {
-          throw new Error(
-            'Phản hồi tra cứu chưa xác định. Không gửi lại.',
-          )
-        }
-
-        const confirmed = await confirm(
-          'Chưa tìm thấy chiến dịch theo mã yêu cầu. ' +
-          'Bạn có muốn gửi lại ĐÚNG yêu cầu cũ với cùng mã giao dịch? ' +
-          'Backend sẽ kiểm tra và chống tạo trùng.',
-        )
-
-        if (!confirmed) return
-      }
-
-      const result = await exchangeService.createCampaign(
-        attempt.payload,
-        attempt.key,
-      )
+      // Endpoint /exchange/campaigns được cấu hình cho bài miễn phí.
+      // Không gọi API ví, giá hoặc thanh toán.
+      const result = await exchangeService.createCampaign(payload, key)
 
       setSuccess(
-        `Đã tạo chiến dịch #${result?.data?.id}. ` +
-        'Ngân sách đã được giữ trong ví.',
+        `Bài tương tác miễn phí #${result?.data?.id || result?.id || ''} đã được tạo.`
       )
-      removePending()
-      setPending(null)
-      setAccepted(false)
       setTargetUrl('')
       setQuantity('10')
+      setAccepted(false)
+      setShowConfirm(false)
 
       if (onRefresh) {
         try {
           await onRefresh()
         } catch {
-          // Chiến dịch đã được tạo; lỗi tải lại không phải lỗi thanh toán.
+          // Đăng thành công, chỉ lỗi làm mới danh sách.
         }
       }
     } catch (err) {
       setError(
-        (err?.message || 'Không thể tạo chiến dịch.') +
-        (attempt
-          ? ' Nếu chưa chắc kết quả, hãy dùng nút gửi lại yêu cầu cũ; không tạo yêu cầu mới.'
-          : ''),
+        (err?.message || 'Chưa thể xác nhận kết quả đăng bài.') +
+        ' Nếu kết nối bị gián đoạn, hãy kiểm tra danh sách bài của tôi trước khi đăng lại để tránh trùng.'
       )
+      setShowConfirm(false)
     } finally {
       lock.current = false
       setBusy(false)
@@ -412,161 +243,188 @@ export default function ExchangeCreateCampaign({
   }
 
   return (
-    <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-6">
+    <section className="mt-6 min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-xl font-black">Chiến dịch tương tác</h2>
-        <button
-          type="button"
-          disabled={busy || Boolean(pending)}
-          onClick={() => {
-            setShowForm((current) => !current)
-            setShowConfirm(false)
-          }}
-          className="rounded-xl bg-blue-600 px-5 py-3 font-bold text-white disabled:bg-slate-300"
-        >
-          {showForm ? 'Đóng biểu mẫu' : '+ Tạo chiến dịch mới'}
-        </button>
-      </div>
-
-      {(showForm || pending) && (
-        <>
-      <p className="mt-2 text-sm text-slate-500">
-        1 xu = 1 VNĐ. Ngân sách được giữ trước khi nhiệm vụ bắt đầu.
-      </p>
-
-      <div className="mt-6 grid gap-4 md:grid-cols-2">
-        <label className="flex flex-col gap-2 text-sm font-semibold">
-          Nền tảng
-          <NoScamSelect
-            disabled={busy || Boolean(pending)}
-            value={platform}
-            onChange={(event) => changeField(setPlatform, event.target.value)}
-            className="rounded-xl border border-slate-200 p-3"
-          >
-            {Object.entries(platforms).map(([value, label]) => (
-              <option key={value} value={value}>{label}</option>
-            ))}
-          </NoScamSelect>
-        </label>
-
-        <label className="flex flex-col gap-2 text-sm font-semibold">
-          Loại nhiệm vụ
-          <NoScamSelect
-            disabled={busy || Boolean(pending)}
-            value={taskType}
-            onChange={(event) => changeField(setTaskType, event.target.value)}
-            className="rounded-xl border border-slate-200 p-3"
-          >
-            {Object.entries(tasks).map(([value, label]) => (
-              <option
-                key={value}
-                value={value}
-                disabled={!prices.some(
-                  (item) =>
-                    item.platform === platform &&
-                    item.task_type === value,
-                )}
-              >
-                {label}
-              </option>
-            ))}
-          </NoScamSelect>
-        </label>
-
-        <label className="flex flex-col gap-2 text-sm font-semibold md:col-span-2">
-          ID, tên tài khoản hoặc liên kết mục tiêu
-          <input
-            disabled={busy || Boolean(pending)}
-            type="text"
-            maxLength={2048}
-            value={targetUrl}
-            onChange={(event) => changeField(setTargetUrl, event.target.value)}
-            placeholder={
-              taskType === 'follow'
-                ? '@username hoặc https://...'
-                : 'Dán liên kết bài viết hoặc video'
-            }
-            className="rounded-xl border border-slate-200 p-3"
-          />
-          {targetUrl.trim() && normalizedUrl && (
-            <span className="break-all text-xs font-normal text-green-700">
-              Liên kết sẽ sử dụng: {normalizedUrl}
-            </span>
-          )}
-          {targetUrl.trim() && !normalizedUrl && (
-            <span className="text-xs font-normal text-red-600">
-              ID hoặc liên kết không hợp lệ. Like/Bình luận cần URL bài viết.
-            </span>
-          )}
-        </label>
-
-        <label className="flex flex-col gap-2 text-sm font-semibold">
-          Số lượng
-          <input
-            disabled={busy || Boolean(pending)}
-            type="number"
-            min={minimum}
-            max="100000"
-            step="1"
-            value={quantity}
-            onChange={(event) => changeField(setQuantity, event.target.value)}
-            className="rounded-xl border border-slate-200 p-3"
-          />
-          <span className="text-xs font-normal text-slate-500">
-            Tối thiểu {Number.isSafeInteger(minimum) ? minimum : 10} lượt.
-            Tối đa 100.000 lượt.
-          </span>
-        </label>
-
-        <div className="rounded-xl bg-slate-50 p-4">
-          <p className="text-sm text-slate-500">Giá mỗi nhiệm vụ</p>
-          <p className="mt-1 text-xl font-black">
-            {price ? coins(cost) : 'Chưa mở'}
+        <div>
+          <h2 className="text-xl font-black text-slate-950">
+            Tạo bài tương tác chéo
+          </h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Đăng bài để cộng đồng tương tác qua lại hoàn toàn miễn phí.
           </p>
         </div>
+
+
       </div>
 
-      <div className="mt-6 rounded-xl bg-slate-50 p-5">
-        <p className="text-sm">
-          Số dư ví: <strong>{coins(balance)}</strong>
-        </p>
-        <p className="mt-2 text-sm">
-          Thưởng người thực hiện:{' '}
-          <strong>{coins(price?.reward_per_task)}</strong>
-        </p>
-        <p className="mt-4 border-t border-slate-200 pt-4 text-lg font-black">
-          Tổng ngân sách: {validTotal ? coins(total) : 'Không hợp lệ'}
-        </p>
-      </div>
+      {success && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 shadow-sm"
+        >
+          <div className="flex items-start gap-3">
+            <span
+              aria-hidden="true"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-xl font-bold text-white"
+            >
+              ✓
+            </span>
 
-      <label className="mt-5 flex items-start gap-3 text-sm text-slate-600">
-        <input
-          type="checkbox"
-          checked={accepted}
-          disabled={busy || Boolean(pending)}
-          onChange={(event) => changeField(setAccepted, event.target.checked)}
-          className="mt-1"
-        />
-        Tôi đồng ý với quy định nhiệm vụ, duyệt kết quả
-        và hoàn ngân sách của NoScam.
-      </label>
+            <div className="min-w-0 flex-1">
+              <h3 className="text-base font-black text-emerald-900">
+                Đăng bài thành công!
+              </h3>
+
+              <p className="mt-1 text-sm leading-6 text-emerald-800">
+                {success}
+              </p>
+
+              <p className="mt-1 text-xs text-emerald-700">
+                Bài tương tác chéo đã được hệ thống tiếp nhận.
+              </p>
+
+              <button
+                type="button"
+                onClick={() => onViewCampaigns?.()}
+                className="mt-3 rounded-xl bg-emerald-700 px-4 py-2 text-xs font-bold text-white transition hover:bg-emerald-800"
+              >
+                Xem bài của tôi
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {error && (
-        <p role="alert" className="mt-4 text-sm text-red-600">
+        <p role="alert" className="mt-4 rounded-xl bg-red-50 p-3 text-sm text-red-700">
           {error}
         </p>
       )}
 
-      {success && (
-        <p role="status" className="mt-4 text-sm text-green-700">
-          {success}
-        </p>
+      {showForm && (
+        <form
+          onSubmit={(event) => {
+            event.preventDefault()
+            if (!busy) {
+              if (!valid) {
+                setError('Vui lòng kiểm tra đầy đủ thông tin.')
+                return
+              }
+              setShowConfirm(true)
+            }
+          }}
+          className="mt-5 space-y-4"
+        >
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="flex min-w-0 flex-col gap-2 text-sm font-semibold text-slate-700">
+              Nền tảng
+              <StyledExchangeSelect
+                value={platform}
+                disabled={busy}
+                onChange={(value) => changeField(setPlatform, value)}
+                options={Object.entries(platforms).map(([value, label]) => ({
+                  value,
+                  label,
+                }))}
+              />
+            </label>
+
+            <label className="flex min-w-0 flex-col gap-2 text-sm font-semibold text-slate-700">
+              Loại tương tác
+              <StyledExchangeSelect
+                value={taskType}
+                disabled={busy}
+                onChange={(value) => changeField(setTaskType, value)}
+                options={Object.entries(tasks).map(([value, label]) => ({
+                  value,
+                  label,
+                }))}
+              />
+            </label>
+          </div>
+
+          <label className="flex min-w-0 flex-col gap-2 text-sm font-semibold text-slate-700">
+            Tài khoản hoặc liên kết cần tương tác
+            <input
+              type="text"
+              value={targetUrl}
+              disabled={busy}
+              maxLength={2048}
+              onChange={(event) => changeField(setTargetUrl, event.target.value)}
+              placeholder={
+                taskType === 'follow'
+                  ? '@username hoặc https://...'
+                  : 'Dán liên kết bài viết hoặc video'
+              }
+              className="w-full min-w-0 rounded-xl border border-slate-200 p-3 outline-none focus:border-blue-500"
+            />
+
+            {targetUrl.trim() && (
+              <span className={`break-all text-xs font-normal ${
+                normalizedUrl ? 'text-green-700' : 'text-red-600'
+              }`}>
+                {normalizedUrl
+                  ? `Liên kết: ${normalizedUrl}`
+                  : 'Liên kết không hợp lệ. Thích/Bình luận cần liên kết bài viết.'}
+              </span>
+            )}
+          </label>
+
+          <label className="flex flex-col gap-2 text-sm font-semibold text-slate-700">
+            Số lượt tương tác mong muốn
+            <input
+              type="number"
+              min="1"
+              max="100000"
+              step="1"
+              value={quantity}
+              disabled={busy}
+              onChange={(event) => changeField(setQuantity, event.target.value)}
+              className="w-full rounded-xl border border-slate-200 p-3 outline-none focus:border-blue-500"
+            />
+            <span className="text-xs font-normal text-slate-500">
+              Từ 1 đến 100.000 lượt. Số lượt thực tế phụ thuộc vào người tham gia.
+            </span>
+          </label>
+
+          <div className="rounded-xl border border-blue-100 bg-blue-50 p-4">
+            <p className="text-sm font-bold text-blue-900">
+              Tương tác chéo miễn phí
+            </p>
+            <p className="mt-1 text-xs leading-5 text-blue-800">
+              Bài đăng sẽ được hiển thị để các thành viên có thể thực hiện
+              tương tác. Không sử dụng ví hay thanh toán.
+            </p>
+          </div>
+
+          <label className="flex items-start gap-3 text-sm text-slate-600">
+            <input
+              type="checkbox"
+              checked={accepted}
+              disabled={busy}
+              onChange={(event) => changeField(setAccepted, event.target.checked)}
+              className="mt-1"
+            />
+            <span>
+              Tôi đồng ý với quy định tương tác chéo của NoScam.vn và
+              chỉ đăng liên kết thuộc quyền quản lý hoặc được phép sử dụng.
+            </span>
+          </label>
+
+          <button
+            type="submit"
+            disabled={busy || !valid}
+            className="w-full rounded-xl bg-blue-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+          >
+            {busy ? 'Đang xử lý...' : 'Đăng bài miễn phí'}
+          </button>
+        </form>
       )}
 
-      {showConfirm && !pending && (
+      {showConfirm && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4"
-          role="presentation"
           onMouseDown={(event) => {
             if (event.target === event.currentTarget && !busy) {
               setShowConfirm(false)
@@ -576,94 +434,56 @@ export default function ExchangeCreateCampaign({
           <div
             role="dialog"
             aria-modal="true"
-            aria-labelledby="exchange-confirm-title"
-            className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl"
+            aria-labelledby="free-exchange-confirm-title"
+            className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-2xl sm:p-6"
           >
             <h3
-              id="exchange-confirm-title"
-              className="text-xl font-black text-slate-900"
+              id="free-exchange-confirm-title"
+              className="text-lg font-black text-slate-950"
             >
-              Xác nhận tạo chiến dịch
+              Xác nhận đăng bài miễn phí
             </h3>
-            <p className="mt-2 text-sm text-slate-500">
-              Kiểm tra thông tin trước khi giữ ngân sách.
-            </p>
 
-            <div className="mt-5 space-y-3 text-sm">
+            <div className="mt-4 space-y-2 text-sm text-slate-700">
               <p>Nền tảng: <strong>{platforms[platform]}</strong></p>
-              <p>Nhiệm vụ: <strong>{tasks[taskType]}</strong></p>
-              <p>Số lượng: <strong>{count} lượt</strong></p>
-              <p className="break-all">
-                Liên kết: <strong><a href={normalizedUrl} target="_blank" rel="noopener noreferrer" className="font-semibold text-blue-600 underline break-all hover:text-blue-800">{normalizedUrl}</a></strong>
-              </p>
-              <p>Giá mỗi lượt: <strong>{coins(cost)}</strong></p>
-              <p>Thưởng mỗi lượt: <strong>{coins(price?.reward_per_task)}</strong></p>
-              <div className="border-t border-slate-200 pt-4">
-                <p className="text-lg font-black">
-                  Tổng ngân sách: {coins(total)}
-                </p>
-                <p className="mt-2 text-slate-600">
-                  Số dư còn lại dự kiến: {coins(Number(balance) - total)}
-                </p>
+              <p>Loại tương tác: <strong>{tasks[taskType]}</strong></p>
+              <p>Số lượt mong muốn: <strong>{count}</strong></p>
+              <div className="min-w-0">
+                <span>Liên kết: </span>
+                <a
+                  href={normalizedUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title={normalizedUrl}
+                  className="break-all font-semibold text-blue-600 underline underline-offset-2 hover:text-blue-800"
+                >
+                  {normalizedUrl}
+                  <span aria-hidden="true"> ↗</span>
+                </a>
               </div>
+
             </div>
 
-            <p className="mt-4 text-xs text-amber-700">
-              Ngân sách sẽ được giữ khi xác nhận thành công.
-              Giá và số dư được kiểm tra lại trước khi gửi.
-            </p>
-
-            <div className="mt-6 flex gap-3">
+            <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row">
               <button
                 type="button"
                 disabled={busy}
                 onClick={() => setShowConfirm(false)}
-                className="flex-1 rounded-xl border border-slate-300 px-4 py-3 font-bold"
+                className="flex-1 rounded-xl border border-slate-200 px-4 py-3 text-sm font-bold text-slate-700"
               >
-                Hủy
+                Quay lại
               </button>
               <button
                 type="button"
                 disabled={busy || !valid}
-                onClick={() => {
-                  setShowConfirm(false)
-                  submit()
-                }}
-                className="flex-1 rounded-xl bg-blue-600 px-4 py-3 font-bold text-white disabled:bg-slate-300"
+                onClick={submit}
+                className="flex-1 rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold text-white disabled:opacity-50"
               >
-                Xác nhận
+                {busy ? 'Đang đăng...' : 'Xác nhận đăng bài'}
               </button>
             </div>
           </div>
         </div>
-      )}
-
-      <button
-        type="button"
-        onClick={() => {
-          if (pending) {
-            submit()
-          } else if (valid) {
-            setShowConfirm(true)
-          }
-        }}
-        disabled={busy || (!pending && !valid)}
-        className="mt-5 w-full rounded-xl bg-blue-600 px-5 py-3 font-bold text-white disabled:cursor-not-allowed disabled:bg-slate-300"
-      >
-        {busy
-          ? 'Đang xử lý...'
-          : pending
-            ? 'Gửi lại yêu cầu cũ'
-            : 'Tạo chiến dịch'}
-      </button>
-
-      {pending && (
-        <p className="mt-3 text-xs text-amber-700">
-          Có yêu cầu chưa xác định kết quả. Không thay đổi nội dung
-          hoặc tạo yêu cầu mới trước khi xác minh.
-        </p>
-      )}
-        </>
       )}
     </section>
   )

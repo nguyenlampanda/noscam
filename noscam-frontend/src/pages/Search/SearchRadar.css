@@ -1,0 +1,257 @@
+/* NOSCAM SEARCH RADAR V1 */
+.noscam-radar {
+  --radar: #2563eb;
+  --radar-rgb: 37, 99, 235;
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  min-height: 192px;
+  padding: 26px 30px;
+  margin-bottom: 24px;
+  overflow: hidden;
+  border: 1px solid #bfdbfe;
+  border-radius: 24px;
+  background: linear-gradient(115deg, #eff6ff, #ffffff 60%, #f0f9ff);
+  box-shadow: 0 14px 35px rgba(15, 23, 42, .05);
+}
+
+.noscam-radar--alert {
+  --radar: #dc2626;
+  --radar-rgb: 220, 38, 38;
+  border-color: #fecaca;
+  background: linear-gradient(115deg, #fff1f2, #ffffff 60%, #fff7ed);
+}
+
+.noscam-radar__visual {
+  position: relative;
+  z-index: 1;
+  flex: 0 0 138px;
+  width: 138px;
+  height: 138px;
+}
+
+.noscam-radar__screen {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border: 1px solid rgba(var(--radar-rgb), .35);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(var(--radar-rgb), .13), rgba(var(--radar-rgb), .025) 65%);
+  box-shadow: 0 0 0 7px rgba(var(--radar-rgb), .055);
+}
+
+.noscam-radar__ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  border: 1px dashed rgba(var(--radar-rgb), .35);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.noscam-radar__ring--one { width: 34%; height: 34%; }
+.noscam-radar__ring--two { width: 62%; height: 62%; }
+.noscam-radar__ring--three { width: 88%; height: 88%; }
+
+.noscam-radar__crosshair {
+  position: absolute;
+  background: rgba(var(--radar-rgb), .16);
+}
+
+.noscam-radar__crosshair--horizontal {
+  top: 50%;
+  left: 0;
+  width: 100%;
+  height: 1px;
+}
+
+.noscam-radar__crosshair--vertical {
+  top: 0;
+  left: 50%;
+  width: 1px;
+  height: 100%;
+}
+
+.noscam-radar__sweep {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg,
+    transparent 245deg,
+    rgba(var(--radar-rgb), .025) 265deg,
+    rgba(var(--radar-rgb), .27) 358deg,
+    transparent 360deg
+  );
+  animation: noscamRadarSweep 4.5s linear infinite;
+}
+
+.noscam-radar--alert .noscam-radar__sweep {
+  animation-duration: 2.4s;
+}
+
+.noscam-radar__target {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 13px;
+  height: 13px;
+  border: 3px solid white;
+  border-radius: 50%;
+  background: var(--radar);
+  box-shadow: 0 0 0 4px rgba(var(--radar-rgb), .16);
+  transform: translate(-50%, -50%);
+}
+
+.noscam-radar__pulse {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 28px;
+  height: 28px;
+  border: 2px solid var(--radar);
+  border-radius: 50%;
+  animation: noscamRadarPulse 2.4s ease-out infinite;
+}
+
+.noscam-radar__content {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  min-width: 0;
+}
+
+.noscam-radar__eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--radar);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .12em;
+}
+
+.noscam-radar__indicator,
+.noscam-radar__status-dot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 8px;
+  border-radius: 50%;
+  background: var(--radar);
+}
+
+.noscam-radar--alert .noscam-radar__indicator {
+  animation: noscamRadarBlink 1.2s ease-in-out infinite;
+}
+
+.noscam-radar__title {
+  margin-top: 10px;
+  color: #0f172a;
+  font-size: clamp(21px, 2.5vw, 29px);
+  font-weight: 850;
+  line-height: 1.2;
+}
+
+.noscam-radar--alert .noscam-radar__title {
+  color: #b91c1c;
+}
+
+.noscam-radar__description {
+  max-width: 540px;
+  margin-top: 9px;
+  color: #475569;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.noscam-radar__query {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 9px;
+  margin-top: 14px;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.noscam-radar__query strong {
+  max-width: 100%;
+  padding: 5px 11px;
+  overflow-wrap: anywhere;
+  border: 1px solid rgba(var(--radar-rgb), .15);
+  border-radius: 8px;
+  background: rgba(var(--radar-rgb), .07);
+  color: #0f172a;
+  font-weight: 750;
+}
+
+.noscam-radar__status {
+  position: absolute;
+  top: 18px;
+  right: 20px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--radar);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .06em;
+}
+
+@keyframes noscamRadarSweep {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes noscamRadarPulse {
+  0% { transform: translate(-50%, -50%) scale(.4); opacity: .8; }
+  100% { transform: translate(-50%, -50%) scale(4.4); opacity: 0; }
+}
+
+@keyframes noscamRadarBlink {
+  50% { opacity: .2; }
+}
+
+@media (max-width: 640px) {
+  .noscam-radar {
+    align-items: flex-start;
+    gap: 17px;
+    padding: 52px 17px 20px;
+    border-radius: 20px;
+  }
+
+  .noscam-radar__visual {
+    flex-basis: 78px;
+    width: 78px;
+    height: 78px;
+  }
+
+  .noscam-radar__eyebrow {
+    font-size: 9px;
+    letter-spacing: .06em;
+  }
+
+  .noscam-radar__title {
+    font-size: 19px;
+  }
+
+  .noscam-radar__description {
+    font-size: 12px;
+  }
+
+  .noscam-radar__status {
+    top: 17px;
+    right: 17px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .noscam-radar *,
+  .noscam-radar *::before,
+  .noscam-radar *::after {
+    animation: none !important;
+  }
+}

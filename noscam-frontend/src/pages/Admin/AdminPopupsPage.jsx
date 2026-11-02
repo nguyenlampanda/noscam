@@ -44,13 +44,8 @@ function PopupPreview({ popup, onClose }) {
           </p>
           <div className="mt-6 flex justify-end gap-3">
             <button onClick={onClose} className="rounded-xl border px-5 py-3">
-              Đã hiểu
+              Đóng
             </button>
-            {popup.button_text && (
-              <span className="rounded-xl bg-blue-600 px-5 py-3 text-white">
-                {popup.button_text}
-              </span>
-            )}
           </div>
         </div>
       </div>
@@ -62,10 +57,17 @@ export default function AdminPopupsPage() {
   const [items, setItems] = useState([])
   const [form, setForm] = useState({ ...empty })
   const [editing, setEditing] = useState(null)
+  // NOSCAM_POPUP_SCHEDULE_V2
+  const [scheduleMode, setScheduleMode] = useState('now')
   const [preview, setPreview] = useState(false)
   const [busy, setBusy] = useState(false)
+  // NOSCAM_POPUP_IMAGE_UPLOAD_V1
+  const [uploadingImage, setUploadingImage] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  // NOSCAM_POPUP_CONFIRM_SUCCESS_V2
+  const [confirmAction, setConfirmAction] = useState(null)
+  const [successMessage, setSuccessMessage] = useState('')
 
   const load = useCallback(async () => {
     try {
@@ -80,11 +82,13 @@ export default function AdminPopupsPage() {
 
   function reset() {
     setEditing(null)
+    setScheduleMode('now')
     setForm({ ...empty, pages: ['/'] })
   }
 
   function edit(item) {
     setEditing(item.id)
+    setScheduleMode(item.starts_at ? 'custom' : 'now')
     setForm({
       title: item.title || '',
       content: item.content || '',
@@ -103,6 +107,40 @@ export default function AdminPopupsPage() {
     setForm(current => ({ ...current, [key]: value }))
   }
 
+  async function uploadPopupImage(event) {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    event.target.value = ''
+
+    const allowed = ['image/jpeg', 'image/png', 'image/webp']
+
+    if (!allowed.includes(file.type)) {
+      setError('Chỉ hỗ trợ ảnh JPG, PNG hoặc WebP.')
+      return
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Ảnh không được vượt quá 5 MB.')
+      return
+    }
+
+    setUploadingImage(true)
+    setError('')
+
+    try {
+      const result = await sitePopupService.uploadImage(file)
+      if (!result?.url) {
+        throw new Error('Máy chủ chưa trả về đường dẫn ảnh.')
+      }
+      update('image_url', result.url)
+    } catch (err) {
+      setError(err.message || 'Tải ảnh thất bại.')
+    } finally {
+      setUploadingImage(false)
+    }
+  }
+
   function togglePage(path) {
     setForm(current => ({
       ...current,
@@ -112,9 +150,15 @@ export default function AdminPopupsPage() {
     }))
   }
 
-  async function save(event) {
+  async function save(event, draft = false, confirmed = false) {
     event.preventDefault()
-    if (busy) return
+
+    if (!confirmed) {
+      if (busy) return
+      setConfirmAction({ draft, editing: Boolean(editing) })
+      return
+    }
+    if (busy || uploadingImage) return
 
     setBusy(true)
     setError('')
@@ -123,10 +167,16 @@ export default function AdminPopupsPage() {
     try {
       const payload = {
         ...form,
+        is_active: draft ? false : form.is_active,
         image_url: form.image_url || null,
         button_text: form.button_text || null,
         button_url: form.button_url || null,
-        starts_at: form.starts_at || null,
+        starts_at:
+          scheduleMode === 'custom'
+            ? form.starts_at || null
+            : editing
+              ? form.starts_at || null
+              : null,
         ends_at: form.ends_at || null,
       }
 
@@ -136,7 +186,15 @@ export default function AdminPopupsPage() {
         await sitePopupService.create(payload)
       }
 
-      setNotice(editing ? 'Đã cập nhật popup. Người dùng sẽ thấy phiên bản mới.' : 'Đã tạo popup.')
+      setSuccessMessage(
+        draft
+          ? 'Đã lưu bản nháp thành công!'
+          : editing
+            ? 'Cập nhật thông báo thành công!'
+            : 'Đăng thông báo thành công!'
+      )
+      setConfirmAction(null)
+      setNotice('')
       reset()
       await load()
     } catch (err) {
@@ -153,7 +211,7 @@ export default function AdminPopupsPage() {
       await sitePopupService.remove(item.id)
       if (editing === item.id) reset()
       await load()
-      setNotice('Đã xóa popup.')
+      setNotice('')
     } catch (err) {
       setError(err.message)
     }
@@ -192,11 +250,7 @@ export default function AdminPopupsPage() {
             {error}
           </div>
         )}
-        {notice && (
-          <div className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-700">
-            {notice}
-          </div>
-        )}
+
 
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
           <form onSubmit={save} className="space-y-5 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
@@ -243,51 +297,98 @@ export default function AdminPopupsPage() {
               </div>
             </fieldset>
 
-            <div>
-              <label className={labelClass}>URL ảnh (không bắt buộc)</label>
-              <input
-                type="url"
-                value={form.image_url}
-                onChange={e => update('image_url', e.target.value)}
-                className={inputClass}
-                placeholder="https://..."
-              />
+            <div className="space-y-3">
+              <label className={labelClass}>
+                Hình ảnh thông báo (không bắt buộc)
+              </label>
+
+              <label className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-blue-200 bg-blue-50/60 px-5 py-7 text-center transition hover:bg-blue-50 ${uploadingImage ? 'pointer-events-none opacity-60' : ''}`}>
+                <span className="text-3xl" aria-hidden="true">📷</span>
+                <span className="text-sm font-bold text-blue-700">
+                  {uploadingImage ? 'Đang tải ảnh...' : 'Chọn ảnh từ điện thoại hoặc máy tính'}
+                </span>
+                <span className="text-xs text-slate-500">
+                  JPG, PNG, WebP · Tối đa 5 MB
+                </span>
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  disabled={uploadingImage || busy}
+                  onChange={uploadPopupImage}
+                  className="sr-only"
+                />
+              </label>
+
+              {form.image_url && (
+                <div className="overflow-hidden rounded-2xl border border-slate-200 p-3">
+                  <img
+                    src={form.image_url}
+                    alt="Ảnh xem trước của thông báo"
+                    className="max-h-64 w-full rounded-xl object-contain"
+                  />
+                  <div className="mt-3 flex justify-end">
+                    <button
+                      type="button"
+                      disabled={uploadingImage || busy}
+                      onClick={() => update('image_url', '')}
+                      className="rounded-lg bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 disabled:opacity-50"
+                    >
+                      Bỏ ảnh
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <label className={labelClass}>Chữ trên nút liên kết</label>
-                <input
-                  value={form.button_text}
-                  onChange={e => update('button_text', e.target.value)}
-                  className={inputClass}
-                  placeholder="Xem chi tiết"
-                />
-              </div>
-              <div>
-                <label className={labelClass}>URL nút liên kết</label>
-                <input
-                  type="url"
-                  value={form.button_url}
-                  onChange={e => update('button_url', e.target.value)}
-                  className={inputClass}
-                  placeholder="https://..."
-                />
-              </div>
-            </div>
+            {/* NOSCAM_POPUP_MULTILINK_V1:
+                Liên kết được nhập trực tiếp trong nội dung. */}
+            <p className="rounded-xl bg-blue-50 p-3 text-xs leading-6 text-blue-700">
+              Bạn có thể nhập nhiều URL trực tiếp trong nội dung thông báo.
+              Các đường dẫn sẽ tự động bấm được khi hiển thị.
+            </p>
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <label className={labelClass}>Bắt đầu (tùy chọn)</label>
-                <input
-                  type="datetime-local"
-                  value={form.starts_at}
-                  onChange={e => update('starts_at', e.target.value)}
-                  className={inputClass}
-                />
+            <div className="space-y-4 rounded-2xl border border-slate-200 p-4">
+              <div className="text-sm font-bold text-slate-900">
+                Thời gian hiển thị
               </div>
+
+              <label className="flex items-center gap-3 text-sm">
+                <input
+                  type="radio"
+                  name="popup-schedule"
+                  checked={scheduleMode === 'now'}
+                  onChange={() => setScheduleMode('now')}
+                />
+                {editing ? 'Giữ thời gian bắt đầu hiện tại' : 'Đăng ngay khi bật popup'}
+              </label>
+
+              <label className="flex items-center gap-3 text-sm">
+                <input
+                  type="radio"
+                  name="popup-schedule"
+                  checked={scheduleMode === 'custom'}
+                  onChange={() => setScheduleMode('custom')}
+                />
+                Tùy chỉnh ngày và giờ bắt đầu
+              </label>
+
+              {scheduleMode === 'custom' && (
+                <div>
+                  <label className={labelClass}>Ngày giờ bắt đầu *</label>
+                  <input
+                    type="datetime-local"
+                    required
+                    value={form.starts_at}
+                    onChange={e => update('starts_at', e.target.value)}
+                    className={inputClass}
+                  />
+                </div>
+              )}
+
               <div>
-                <label className={labelClass}>Kết thúc (tùy chọn)</label>
+                <label className={labelClass}>
+                  Kết thúc (để trống nếu không giới hạn)
+                </label>
                 <input
                   type="datetime-local"
                   value={form.ends_at}
@@ -316,8 +417,21 @@ export default function AdminPopupsPage() {
                 Xem trước
               </button>
               <button
+                type="button"
+                disabled={busy || uploadingImage || form.pages.length === 0}
+                onClick={() => {
+                  const formElement = document.querySelector('form')
+                  if (formElement?.reportValidity()) {
+                    save({ preventDefault() {} }, true)
+                  }
+                }}
+                className="rounded-xl border border-slate-200 px-5 py-3 font-semibold disabled:opacity-50"
+              >
+                Lưu nháp
+              </button>
+              <button
                 type="submit"
-                disabled={busy || form.pages.length === 0}
+                disabled={busy || uploadingImage || form.pages.length === 0}
                 className="rounded-xl bg-blue-600 px-6 py-3 font-semibold text-white disabled:opacity-50"
               >
                 {busy ? 'Đang lưu...' : editing ? 'Lưu cập nhật' : 'Đăng thông báo'}
@@ -368,6 +482,57 @@ export default function AdminPopupsPage() {
           </aside>
         </div>
       </div>
+
+      {confirmAction && (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-slate-950/60 p-4">
+          <div role="dialog" aria-modal="true" aria-labelledby="popup-confirm-title"
+            className="w-full max-w-md rounded-3xl bg-white p-7 shadow-2xl">
+            <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-blue-50 text-3xl text-blue-600">?</div>
+            <h2 id="popup-confirm-title" className="text-xl font-black text-slate-900">
+              Xác nhận {confirmAction.draft ? 'lưu nháp' : confirmAction.editing ? 'cập nhật' : 'đăng thông báo'}
+            </h2>
+            <p className="mt-3 text-sm leading-6 text-slate-600">
+              {confirmAction.draft
+                ? 'Thông báo sẽ được lưu lại nhưng chưa hiển thị trên website.'
+                : confirmAction.editing
+                  ? 'Bạn có chắc chắn muốn cập nhật thông báo này?'
+                  : 'Bạn có chắc chắn muốn đăng thông báo này lên NoScam.vn?'}
+            </p>
+            <div className="mt-6 flex justify-end gap-3">
+              <button type="button" disabled={busy}
+                onClick={() => setConfirmAction(null)}
+                className="rounded-xl border border-slate-200 px-5 py-3 font-bold">
+                Hủy
+              </button>
+              <button type="button" disabled={busy}
+                onClick={() => save({ preventDefault() {} }, confirmAction.draft, true)}
+                className="rounded-xl bg-blue-600 px-5 py-3 font-bold text-white disabled:opacity-50">
+                {busy ? 'Đang xử lý...' : 'Xác nhận'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {successMessage && (
+        <div className="fixed inset-0 z-[10001] flex items-center justify-center bg-slate-950/60 p-4">
+          <div role="alertdialog" aria-modal="true" aria-labelledby="popup-success-title"
+            className="w-full max-w-md rounded-3xl bg-white p-8 text-center shadow-2xl">
+            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-emerald-100 text-4xl font-black text-emerald-600">✓</div>
+            <h2 id="popup-success-title" className="mt-5 text-xl font-black text-slate-900">
+              {successMessage}
+            </h2>
+            <p className="mt-3 text-sm text-slate-500">
+              Thông báo đã được lưu vào hệ thống NoScam.vn.
+            </p>
+            <button type="button" onClick={() => setSuccessMessage('')}
+              className="mt-7 w-full rounded-xl bg-blue-600 px-5 py-3 font-bold text-white">
+              Đóng
+            </button>
+          </div>
+        </div>
+      )}
+
 
       </main>
 

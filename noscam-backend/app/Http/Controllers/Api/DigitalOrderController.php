@@ -226,7 +226,12 @@ class DigitalOrderController extends Controller
         $submitted = $data['request_data'];
 
         $rules = [];
-        $allowedKeys = [];
+        $allowedKeys = ['zalo_phone'];
+        $rules['request_data.zalo_phone'] = [
+            'required',
+            'string',
+            'regex:/^0[0-9]{9}$/',
+        ];
 
         foreach ($requirements as $field) {
             if (

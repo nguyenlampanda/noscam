@@ -1,27 +1,39 @@
+import AlertEvidenceGallery from './AlertEvidenceGallery'
 import { motion } from 'motion/react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 
-import RiskBadge from './RiskBadge'
-
-const scoreStyles = {
-  high:
-    'border-red-200 bg-red-50 text-red-700',
-
-  medium:
-    'border-amber-200 bg-amber-50 text-amber-700',
-
-  low:
-    'border-blue-200 bg-blue-50 text-blue-700',
-}
 
 function AlertCard({ alert }) {
-  const scoreStyle =
-    scoreStyles[
-      alert.riskLevel
-    ] || scoreStyles.low
+  // NOSCAM_CLICKABLE_ALERT_CARD_V1
+  const navigate = useNavigate()
 
-  return (
+  const searchUrl = `/search?q=${encodeURIComponent(alert.value)}`
+
+  const handleCardClick = (event) => {
+    // Không chuyển trang khi bấm ảnh, nút hoặc liên kết.
+    if (event.target.closest('button, a, [role="dialog"]')) {
+      return
+    }
+
+    navigate(searchUrl)
+  }
+
+  const handleCardKeyDown = (event) => {
+    if (event.target !== event.currentTarget) return
+
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      navigate(searchUrl)
+    }
+  }
+
+return (
     <motion.article
+      role="link"
+      tabIndex={0}
+      aria-label={`Tra cứu ${alert.value}`}
+      onClick={handleCardClick}
+      onKeyDown={handleCardKeyDown}
       whileHover={{
         y: -5,
         scale: 1.005,
@@ -29,7 +41,7 @@ function AlertCard({ alert }) {
       transition={{
         duration: 0.25,
       }}
-      className="group relative overflow-hidden rounded-3xl border border-slate-200 bg-white p-5 shadow-sm transition-shadow hover:shadow-xl hover:shadow-slate-200/60 sm:p-6"
+      className="group relative cursor-pointer overflow-hidden rounded-3xl border border-slate-200 bg-white p-5 shadow-sm transition-shadow hover:shadow-xl hover:shadow-slate-200/60 sm:p-6"
     >
       <motion.div
         aria-hidden="true"
@@ -52,15 +64,9 @@ function AlertCard({ alert }) {
               {alert.type}
             </span>
 
-            <RiskBadge
-              level={
-                alert.riskLevel
-              }
-            >
-              {
-                alert.riskLabel
-              }
-            </RiskBadge>
+            <span className="rounded-full border border-red-200 bg-red-50 px-3 py-1 text-xs font-bold text-red-700">
+              SCAM · Có báo cáo đã duyệt
+            </span>
           </div>
 
           <p className="mt-3 break-all text-base font-bold text-slate-950 transition-colors group-hover:text-blue-700 sm:text-lg">
@@ -90,27 +96,9 @@ function AlertCard({ alert }) {
           </div>
         </div>
 
+        {/* NOSCAM_PUBLIC_ALERT_IMAGES_V1 */}
+        <AlertEvidenceGallery images={alert.publicImages || []} />
         <div className="flex shrink-0 items-center justify-between gap-4 border-t border-slate-100 pt-4 lg:min-w-[210px] lg:border-0 lg:pt-0">
-          <motion.div
-            whileHover={{
-              scale: 1.04,
-            }}
-            className={`min-w-[92px] rounded-2xl border px-4 py-3 text-center ${scoreStyle}`}
-          >
-            <p className="text-[10px] font-bold uppercase tracking-[0.12em] opacity-70">
-              Risk Score
-            </p>
-
-            <p className="mt-1 text-2xl font-black tracking-[-0.04em]">
-              {
-                alert.riskScore
-              }
-            </p>
-
-            <p className="text-[10px] font-semibold opacity-70">
-              / 100
-            </p>
-          </motion.div>
 
           <motion.div
             whileHover={{

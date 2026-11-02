@@ -272,7 +272,7 @@ export default function ExchangeCampaignClaims({
   }
 
   return (
-    <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-4 sm:p-6">
+    <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-blue-200 hover:shadow-md sm:p-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-xl font-black text-slate-950">
@@ -493,7 +493,7 @@ export default function ExchangeCampaignClaims({
                             href={profile}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="mt-1 inline-block text-xs font-bold text-blue-600 underline"
+                            className="mt-1 inline-block text-xs font-bold break-all font-semibold text-blue-600 underline underline-offset-2 hover:text-blue-800"
                           >
                             Xem tài khoản
                           </a>

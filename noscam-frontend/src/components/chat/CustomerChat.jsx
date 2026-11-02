@@ -1,3 +1,4 @@
+import './CustomerChat.css'
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import chatService from '../../services/chatService'
@@ -143,10 +144,10 @@ export default function CustomerChat() {
   }
 
   return (
-    <div className="fixed bottom-5 right-5 z-[90]">
+    <div className="fixed bottom-3 right-3 z-[90] sm:bottom-5 sm:right-5">
       {open && (
-        <section className="mb-3 flex h-[min(540px,75vh)] w-[min(370px,calc(100vw-40px))] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
-          <header className="flex items-center justify-between bg-blue-600 px-4 py-4 text-white">
+        <section className="noscam-chat-panel mb-3 flex h-[min(540px,75dvh)] w-[min(370px,calc(100vw-24px))] flex-col overflow-hidden">
+          <header className="noscam-chat-header flex items-center justify-between text-white">
             <div>
               <h2 className="font-bold">Hỗ trợ NoScam.vn</h2>
               <p className="text-xs text-blue-100">Nhắn tin trực tiếp với Admin</p>
@@ -176,7 +177,7 @@ export default function CustomerChat() {
             </div>
           ) : (
             <>
-              <div className="flex-1 space-y-3 overflow-y-auto bg-slate-50 p-4">
+              <div className="noscam-chat-messages flex-1 space-y-3 overflow-y-auto bg-slate-50 p-4">
                 {loading && (
                   <p className="text-center text-sm text-slate-500">
                     Đang tải tin nhắn...
@@ -215,7 +216,7 @@ export default function CustomerChat() {
                 </p>
               )}
 
-              <form onSubmit={sendMessage} className="flex gap-2 border-t border-slate-200 p-3">
+              <form onSubmit={sendMessage} className="noscam-chat-form flex gap-2">
                 <input
                   value={body}
                   onChange={(event) => setBody(event.target.value)}
@@ -241,10 +242,10 @@ export default function CustomerChat() {
         type="button"
         onClick={() => setOpen((value) => !value)}
         aria-label={open ? 'Đóng hỗ trợ trực tuyến' : 'Mở hỗ trợ trực tuyến'}
-        className="ml-auto flex items-center gap-2 rounded-full bg-blue-600 px-5 py-4 font-bold text-white shadow-xl transition hover:bg-blue-700"
+        className="ml-auto flex min-h-11 items-center gap-2 rounded-full bg-blue-600 px-3 py-2.5 text-xs font-bold text-white shadow-xl ring-2 ring-white transition hover:bg-blue-700 sm:px-5 sm:py-4 sm:text-sm"
       >
         <span aria-hidden="true">✉</span>
-        {open ? 'Đóng' : 'Chat hỗ trợ'}
+        {open ? 'Đóng' : 'Chat'}<span className="hidden sm:inline">{open ? '' : ' hỗ trợ'}</span>
       </button>
     </div>
   )

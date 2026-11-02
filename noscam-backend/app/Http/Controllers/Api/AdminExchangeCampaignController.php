@@ -15,7 +15,14 @@ class AdminExchangeCampaignController extends Controller
 
         $validated = $request->validate([
             'status' => ['sometimes', 'string', 'in:draft,active,paused,cancelling,completed,cancelled'],
-            'platform' => ['sometimes', 'string', 'in:instagram,tiktok,facebook'],
+            'platform' => [
+                'sometimes', 'string',
+                'in:instagram,tiktok,facebook,youtube,threads,twitter,telegram,zalo,pinterest,linkedin,reddit'
+            ],
+            'task_type' => [
+                'sometimes', 'string',
+                'in:follow,like,comment,view,share,subscribe,repost,join,reaction,save,upvote'
+            ],
             'per_page' => ['sometimes', 'integer', 'min:1', 'max:50'],
         ]);
 
@@ -44,6 +51,10 @@ class AdminExchangeCampaignController extends Controller
 
         if (isset($validated['platform'])) {
             $query->where('platform', $validated['platform']);
+        }
+
+        if (isset($validated['task_type'])) {
+            $query->where('task_type', $validated['task_type']);
         }
 
         $campaigns = $query
@@ -134,6 +145,8 @@ class AdminExchangeCampaignController extends Controller
     }
 
 
+
+    // NOSCAM_ADMIN_INTERACTION_AUDIT_V1
     public function campaignClaims(
         \Illuminate\Http\Request $request,
         int $campaignId
@@ -141,40 +154,94 @@ class AdminExchangeCampaignController extends Controller
         abort_unless($request->user()?->isAdmin(), 403);
 
         $campaign = \App\Models\ExchangeCampaign::query()
+            ->with(['user:id,name,username', 'socialAccount:id,username,profile_url'])
             ->findOrFail($campaignId);
+
+        $serialize = function ($claim) {
+            $target = $claim->campaign;
+            $worker = $claim->worker;
+
+            return [
+                'id' => $claim->id,
+                'campaign_id' => $claim->campaign_id,
+                'platform' => $target?->platform,
+                'task_type' => $target?->task_type,
+                'target_url' => $target?->target_url,
+                'target_username' => $target?->socialAccount?->username,
+                'target_profile_url' => $target?->socialAccount?->profile_url,
+                'status' => $claim->status,
+                'reciprocal_status' => $claim->reciprocal_status,
+                'worker' => $worker ? [
+                    'id' => $worker->id,
+                    'name' => $worker->name,
+                    'username' => $worker->username,
+                ] : null,
+                'account_username' => $claim->submitted_username
+                    ?: $claim->socialAccount?->username,
+                'profile_url' => $claim->submitted_profile_url
+                    ?: $claim->socialAccount?->profile_url,
+                'return_campaign_id' => $claim->return_campaign_id,
+                'return_username' => $claim->return_username,
+                'return_profile_url' => $claim->return_profile_url,
+                'claimed_at' => $claim->claimed_at,
+                'submitted_at' => $claim->submitted_at,
+                'reciprocal_submitted_at' => $claim->reciprocal_submitted_at,
+                'reciprocal_confirmed_at' => $claim->reciprocal_confirmed_at,
+                'rejected_at' => $claim->rejected_at,
+                'finalized_at' => $claim->finalized_at,
+                'created_at' => $claim->created_at,
+            ];
+        };
+
+        $relations = [
+            'worker:id,name,username',
+            'socialAccount:id,username,profile_url',
+            'campaign.socialAccount:id,username,profile_url',
+        ];
 
         $claims = \App\Models\ExchangeTaskClaim::query()
             ->where('campaign_id', $campaign->id)
-            ->with([
-                'worker:id,name,username',
-                'socialAccount:id,username,profile_url',
-            ])
+            ->with($relations)
             ->orderBy('id')
             ->get();
+
+        // Lịch sử chủ chiến dịch thực hiện cho người khác.
+        // Chỉ lấy nhiệm vụ thuộc chiến dịch miễn phí.
+        $performed = [];
+
+        if ($campaign->is_free_reciprocal) {
+            $performed = \App\Models\ExchangeTaskClaim::query()
+                ->where('worker_user_id', $campaign->user_id)
+                ->whereHas('campaign', function ($query) {
+                    $query->where('is_free_reciprocal', true);
+                })
+                ->with($relations)
+                ->orderByDesc('id')
+                ->limit(100)
+                ->get()
+                ->map($serialize)
+                ->values()
+                ->all();
+        }
 
         return response()->json([
             'data' => [
                 'campaign_id' => $campaign->id,
                 'quantity' => (int) $campaign->quantity,
-                'claims' => $claims->map(function ($claim) {
-                    return [
-                        'id' => $claim->id,
-                        'status' => $claim->status,
-                        'worker' => $claim->worker ? [
-                            'id' => $claim->worker->id,
-                            'name' => $claim->worker->name,
-                            'username' => $claim->worker->username,
-                        ] : null,
-                        'account_username' =>
-                            $claim->submitted_username
-                            ?: $claim->socialAccount?->username,
-                        'profile_url' =>
-                            $claim->submitted_profile_url
-                            ?: $claim->socialAccount?->profile_url,
-                        'claimed_at' => $claim->claimed_at,
-                        'submitted_at' => $claim->submitted_at,
-                    ];
-                })->values(),
+                'is_free_reciprocal' => (bool) $campaign->is_free_reciprocal,
+                'creator' => $campaign->user ? [
+                    'id' => $campaign->user->id,
+                    'name' => $campaign->user->name,
+                    'username' => $campaign->user->username,
+                ] : null,
+                'receiver' => [
+                    'username' => $campaign->socialAccount?->username,
+                    'profile_url' => $campaign->socialAccount?->profile_url,
+                    'target_url' => $campaign->target_url,
+                ],
+                'claims' => $claims->map($serialize)->values(),
+                'performed_history' => $performed,
+                'performed_history_limit' => 100,
             ],
         ]);
     }

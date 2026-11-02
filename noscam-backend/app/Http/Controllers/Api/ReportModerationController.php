@@ -85,6 +85,62 @@ class ReportModerationController extends Controller
         /** @var Report $updatedReport */
         $updatedReport = $result['report'];
 
+        // NOSCAM_AUTO_PUBLISH_ON_APPROVAL_V1
+        // Tự tạo bản sao có watermark khi báo cáo vừa được duyệt.
+        if ($newStatus === 'approved' && ! $result['unchanged']) {
+            $failedImages = [];
+
+            $evidences = \App\Models\Evidence::query()
+                ->where('report_id', $updatedReport->id)
+                ->whereIn('mime_type', [
+                    'image/jpeg',
+                    'image/png',
+                    'image/webp',
+                ])
+                ->orderBy('id')
+                ->limit(3)
+                ->get();
+
+            foreach ($evidences as $evidence) {
+                try {
+                    $confirmationRequest = \Illuminate\Http\Request::create(
+                        '/',
+                        'POST',
+                        ['confirm_redacted' => true]
+                    );
+
+                    app(PublicEvidenceController::class)->publish(
+                        $confirmationRequest,
+                        $evidence
+                    );
+                } catch (\Throwable $exception) {
+                    $failedImages[] = $evidence->id;
+
+                    \Illuminate\Support\Facades\Log::error(
+                        'Không thể công khai ảnh bằng chứng',
+                        [
+                            'report_id' => $updatedReport->id,
+                            'evidence_id' => $evidence->id,
+                            'error' => $exception->getMessage(),
+                        ]
+                    );
+                }
+            }
+
+            if ($failedImages) {
+                return response()->json([
+                    'message' => 'Báo cáo đã duyệt, nhưng một số ảnh chưa được công khai.',
+                    'data' => [
+                        'id' => $updatedReport->id,
+                        'status' => $updatedReport->status,
+                        'failed_evidence_ids' => $failedImages,
+                    ],
+                ], 207);
+            }
+        }
+
+
+
         if ($result['unchanged']) {
             return response()->json([
                 'message' =>

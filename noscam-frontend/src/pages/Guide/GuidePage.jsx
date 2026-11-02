@@ -84,7 +84,7 @@ const safetySteps = [
 function GuidePage() {
   return (
     <>
-      <section className="relative overflow-hidden border-b border-slate-200 bg-slate-50/70 py-12 sm:py-20">
+      <section className="noscam-page-hero relative overflow-hidden border-b border-blue-100 bg-gradient-to-br from-blue-50 via-white to-cyan-50 py-12 sm:py-20">
         <div
           aria-hidden="true"
           className="noscam-grid absolute inset-0 opacity-40"
@@ -495,7 +495,7 @@ function GuidePage() {
               Dữ liệu có thể chưa đầy
               đủ hoặc chưa được hệ thống
               ghi nhận. Kết quả tra cứu
-              và Risk Score chỉ hỗ trợ
+              và Điểm rủi ro chỉ hỗ trợ
               đánh giá rủi ro, không
               phải kết luận một cá nhân
               hoặc tổ chức là lừa đảo.

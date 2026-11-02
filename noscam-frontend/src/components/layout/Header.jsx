@@ -1,3 +1,4 @@
+import { showAuthSuccess } from './AuthSuccessPopup'
 import {
   useCallback,
   useEffect,
@@ -19,43 +20,39 @@ import customerService, {
 } from '../../services/customerService'
 import Container from './Container'
 
-const navigation = [
-  {
-    name: 'Trang chủ',
+const defaultNavigation = [
+{
+    name: 'Tăng tương tác',
     path: '/',
   },
-  {
-    name: 'Kiểm tra lừa đảo',
-    path: '/search',
-  },
-  {
-    name: 'Cảnh báo',
-    path: '/alerts',
-  },
-  {
-    name: 'Cộng đồng',
-    path: '/community',
-  },
-  {
-    name: 'Trung gian',
-    path: '/mediators',
-  },
-  {
-    name: 'Tăng tương tác',
-    path: '/social-services',
-  },
-  {
+{
     name: 'Dịch vụ số',
     path: '/digital-services',
   },
-  {
-    name: 'Kiếm xu',
+{
+    name: 'Tương tác chéo',
     path: '/exchange',
   },
-  {
+{
+    name: 'Kiểm tra lừa đảo',
+    path: '/search',
+  },
+{
+    name: 'Cảnh báo',
+    path: '/alerts',
+  },
+{
+    name: 'Cộng đồng',
+    path: '/community',
+  },
+{
+    name: 'Trung gian',
+    path: '/mediators',
+  },
+{
     name: 'Hướng dẫn',
     path: '/guide',
-  },
+  }
 ]
 
 function money(value) {
@@ -65,6 +62,38 @@ function money(value) {
 }
 
 function Header() {
+  // NOSCAM_HEADER_MANAGER_V1
+  const [navigation, setNavigation] = useState(defaultNavigation)
+
+  useEffect(() => {
+    const controller = new AbortController()
+
+    fetch(
+      `${import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api'}/header-settings`,
+      { signal: controller.signal, headers: { Accept: 'application/json' } }
+    )
+      .then(response => {
+        if (!response.ok) throw new Error('Header settings unavailable')
+        return response.json()
+      })
+      .then(response => {
+        if (!Array.isArray(response?.data)) return
+        const allowed = new Map(defaultNavigation.map(item => [item.path, item]))
+        const visiblePaths = new Set(
+          response.data
+            .filter(item => item.visible !== false && allowed.has(item.path))
+            .map(item => item.path)
+        )
+        const next = defaultNavigation.filter(item =>
+          visiblePaths.has(item.path)
+        )
+        setNavigation(next)
+      })
+      .catch(() => {})
+
+    return () => controller.abort()
+  }, [])
+
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -179,6 +208,7 @@ function Header() {
     setAccountOpen(false)
     setIsMenuOpen(false)
 
+    showAuthSuccess('logout')
     navigate('/')
   }
 
@@ -227,7 +257,7 @@ function Header() {
                   className={({
                     isActive,
                   }) =>
-                    `relative whitespace-nowrap py-5 text-sm font-semibold transition ${
+                    `noscam-nav-link relative whitespace-nowrap py-5 text-sm font-semibold transition-all duration-200 ${
                       isActive
                         ? 'text-blue-600'
                         : 'text-slate-600 hover:text-slate-950'

@@ -1119,7 +1119,7 @@ function ModerationDialog({
 
   return (
     <motion.div
-      className="fixed inset-0 z-[100] grid place-items-center bg-slate-950/70 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-[100] grid place-items-center bg-slate-950/65 p-4 backdrop-blur-[5px]"
       initial={{
         opacity: 0,
       }}
@@ -1154,7 +1154,7 @@ function ModerationDialog({
           opacity: 0,
           scale: 0.96,
         }}
-        className="w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-2xl"
+        className="w-full max-w-[480px] max-h-[90vh] overflow-y-auto rounded-[26px] border border-slate-200 bg-white shadow-[0_28px_90px_rgba(15,23,42,0.25)]"
       >
         <div
           className={`h-1.5 ${
@@ -1181,24 +1181,24 @@ function ModerationDialog({
             {approving
               ? report.status ===
                 'rejected'
-                ? 'Duyệt lại báo cáo?'
-                : 'Duyệt báo cáo?'
-              : 'Từ chối báo cáo?'}
+                ? 'Xác nhận duyệt lại báo cáo'
+                : 'Xác nhận duyệt báo cáo'
+              : 'Xác nhận từ chối báo cáo'}
           </h2>
 
           <p className="mt-2 text-sm leading-6 text-slate-500">
             Report #{report.id}
             {approving
-              ? ' sẽ được đưa vào dữ liệu cảnh báo và Risk Score có thể được tính lại.'
+              ? ' sẽ được đưa vào dữ liệu cảnh báo và Điểm rủi ro có thể được tính lại.'
               : ' sẽ không đóng góp vào dữ liệu cảnh báo công khai.'}
           </p>
 
-          <div className="mt-5 rounded-2xl bg-slate-50 p-4">
+          <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
             <div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">
               Nội dung
             </div>
 
-            <p className="mt-2 line-clamp-4 text-sm leading-6 text-slate-700">
+            <p className="mt-2 max-h-36 overflow-y-auto whitespace-pre-wrap break-words text-sm leading-6 text-slate-700">
               {report.description ||
                 'Không có mô tả.'}
             </p>
@@ -1209,7 +1209,7 @@ function ModerationDialog({
               type="button"
               disabled={processing}
               onClick={onCancel}
-              className="flex-1 rounded-xl border border-slate-200 px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+              className="flex-1 min-h-12 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
             >
               Hủy
             </button>
@@ -1218,7 +1218,7 @@ function ModerationDialog({
               type="button"
               disabled={processing}
               onClick={onConfirm}
-              className={`flex-1 rounded-xl px-4 py-3 text-sm font-bold text-slate-950 transition disabled:cursor-not-allowed disabled:opacity-60 ${
+              className={`flex-1 min-h-12 rounded-xl px-4 py-3 text-sm font-bold text-white shadow-sm transition disabled:cursor-not-allowed disabled:opacity-60 ${
                 approving
                   ? 'bg-blue-600 hover:bg-blue-700'
                   : 'bg-red-600 hover:bg-red-700'

@@ -1,3 +1,4 @@
+// NOSCAM_OVERVIEW_SAFE_V2
 import {
   NavLink,
   useNavigate,
@@ -7,23 +8,18 @@ import adminService from '../../services/adminService'
 
 const menu = [
   {
-    to: '/admin/chat',
-    label: 'Tin nhắn',
-  },
-
-  {
-    to: '/admin/digital/services',
-    label: 'Dịch vụ số',
-  },
-  {
-    to: '/admin/digital/orders',
-    label: 'Đơn dịch vụ số',
-  },
-
-  {
     to: '/admin',
     label: 'Tổng quan',
     end: true,
+  },
+  
+  {
+    to: '/admin/social',
+    label: 'Tăng tương tác',
+  },
+  {
+    to: '/admin/exchange',
+    label: 'Tương tác chéo',
   },
   {
     to: '/admin/reports',
@@ -34,21 +30,30 @@ const menu = [
     label: 'Cộng đồng',
   },
   {
+    to: '/admin/digital/services',
+    label: 'Dịch vụ số',
+  },
+  
+  {
+    to: '/admin/users',
+    label: 'Người dùng',
+  },
+  {
+    to: '/admin/chat',
+    label: 'Tin nhắn',
+  },
+  {
     to: '/admin/mediators',
     label: 'Trung gian',
   },
   {
-    to: '/admin/social',
-    label: 'Tăng tương tác',
-  },
-  {
-    to: '/admin/exchange',
-    label: 'Kiếm xu',
-  },
-  {
     to: '/admin/popups',
     label: 'Thông báo',
-  }
+  },
+  {
+    to: '/admin/header',
+    label: 'Quản lý Header',
+  },
 ]
 
 export default function AdminNav() {

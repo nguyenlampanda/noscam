@@ -94,6 +94,55 @@ class SitePopupController extends Controller
         ];
     }
 
+
+    // NOSCAM_POPUP_IMAGE_UPLOAD_V1
+    public function uploadImage(Request $request): JsonResponse
+    {
+        $this->admin($request);
+
+        $validated = $request->validate([
+            'image' => [
+                'required',
+                'image',
+                'mimes:jpg,jpeg,png,webp',
+                'max:5120',
+            ],
+        ]);
+
+        $file = $validated['image'];
+        $path = $file->store('site-popups', 'public');
+
+        if (!$path) {
+            abort(500, 'Không thể lưu ảnh.');
+        }
+
+        $filename = basename($path);
+
+        return response()->json([
+            'url' => $request->getSchemeAndHttpHost()
+                . '/api/site-popups/images/'
+                . rawurlencode($filename),
+        ], 201);
+    }
+
+    public function publicImage(string $filename)
+    {
+        abort_unless(
+            preg_match('/^[A-Za-z0-9_-]+\.(jpg|jpeg|png|webp)$/i', $filename),
+            404
+        );
+
+        $path = 'site-popups/' . $filename;
+        $disk = \Illuminate\Support\Facades\Storage::disk('public');
+
+        abort_unless($disk->exists($path), 404);
+
+        return response()->file($disk->path($path), [
+            'X-Content-Type-Options' => 'nosniff',
+            'Cache-Control' => 'public, max-age=86400',
+        ]);
+    }
+
     public function publicIndex(Request $request): JsonResponse
     {
         $data = $request->validate([
@@ -145,6 +194,11 @@ class SitePopupController extends Controller
         $data = $this->normalize(
             $request->validate($this->rules())
         );
+
+        // NOSCAM_POPUP_SCHEDULE_V2
+        if (!empty($data['is_active']) && empty($data['starts_at'])) {
+            $data['starts_at'] = now();
+        }
 
         $id = DB::table('site_popups')->insertGetId([
             ...$data,

@@ -16,7 +16,7 @@ const principles = [
     title:
       'Không kết luận thay người dùng',
     description:
-      'Risk Score và dữ liệu cảnh báo chỉ hỗ trợ đánh giá rủi ro, không tự động kết luận một cá nhân hoặc tổ chức là lừa đảo.',
+      'Điểm rủi ro và dữ liệu cảnh báo chỉ hỗ trợ đánh giá rủi ro, không tự động kết luận một cá nhân hoặc tổ chức là lừa đảo.',
   },
   {
     number: '03',
@@ -587,7 +587,7 @@ function AboutPage() {
 
             <div className="relative mt-8 border-t border-slate-800 pt-5 sm:mt-10 sm:pt-6">
               <p className="max-w-3xl text-xs leading-5 text-slate-400">
-                Risk Score chỉ mang tính
+                Điểm rủi ro chỉ mang tính
                 cảnh báo dựa trên dữ liệu
                 hệ thống, không phải kết
                 luận một cá nhân hoặc tổ

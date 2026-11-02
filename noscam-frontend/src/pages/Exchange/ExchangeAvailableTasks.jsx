@@ -49,7 +49,9 @@ function safeTargetUrl(value, platform) {
 export default function ExchangeAvailableTasks({
   tasks,
   accounts,
+  onOpenAccounts,
   myTasks = [],
+  completedAccounts = {},
   claimsReady = false,
   loading,
   onRefresh,
@@ -58,6 +60,12 @@ export default function ExchangeAvailableTasks({
   const [selectedAccounts, setSelectedAccounts] = useState({})
   const [activeTaskId, setActiveTaskId] = useState(null)
   const [platformFilter, setPlatformFilter] = useState('all')
+  const [typeFilter, setTypeFilter] = useState('all')
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [sortOrder, setSortOrder] = useState('newest')
+  const [pageSize, setPageSize] = useState(5)
+  const [currentPage, setCurrentPage] = useState(1)
+
   const [busyId, setBusyId] = useState(null)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
@@ -65,9 +73,7 @@ export default function ExchangeAvailableTasks({
   const locked = useRef(false)
 
   const claimedIds = (campaignId) => new Set(
-    myTasks
-      .filter((claim) => Number(claim.campaign_id) === Number(campaignId))
-      .map((claim) => Number(claim.social_account_id)),
+    (completedAccounts[String(campaignId)] || []).map(Number)
   )
 
   const matchingAccounts = (task) => accounts.filter(
@@ -106,12 +112,53 @@ export default function ExchangeAvailableTasks({
   const activeTask = tasks.find(
     (task) => Number(task.id) === Number(activeTaskId),
   )
-  const visibleTasks = tasks.filter(
-    (task) => platformFilter === 'all' || task.platform === platformFilter,
+  const allTasks = Array.isArray(tasks) ? tasks : []
+
+  const statistics = {
+    total: allTasks.length,
+    tiktok: allTasks.filter(t => t.platform === 'tiktok').length,
+    instagram: allTasks.filter(t => t.platform === 'instagram').length,
+    facebook: allTasks.filter(t => t.platform === 'facebook').length,
+    available: allTasks.filter(t => availableAccounts(t).length > 0).length,
+  }
+
+  const visibleTasks = allTasks.filter((task) => {
+    const matchingForTask = matchingAccounts(task)
+    if (matchingForTask.length > 0 && availableAccounts(task).length === 0) {
+      return false
+    }
+    if (platformFilter !== 'all' && task.platform !== platformFilter) return false
+    if (typeFilter !== 'all' && task.task_type !== typeFilter) return false
+
+    const matching = matchingAccounts(task)
+    const available = availableAccounts(task)
+
+    if (statusFilter === 'available' && available.length === 0) return false
+    if (statusFilter === 'completed' &&
+        (matching.length === 0 || available.length !== 0)) return false
+    if (statusFilter === 'unlinked' && matching.length !== 0) return false
+
+    return true
+  }).sort((a, b) =>
+    sortOrder === 'newest'
+      ? Number(b.id) - Number(a.id)
+      : Number(a.id) - Number(b.id)
   )
 
+  const totalPages = Math.max(1, Math.ceil(visibleTasks.length / pageSize))
+  const safePage = Math.min(currentPage, totalPages)
+  const pagedTasks = visibleTasks.slice(
+    (safePage - 1) * pageSize,
+    safePage * pageSize
+  )
+
+  const changeFilter = (setter, value) => {
+    setter(value)
+    setCurrentPage(1)
+  }
+
   async function receive(task) {
-    if (locked.current || loading || !claimsReady) return
+    if (locked.current || loading) return
 
     const selectedIds = new Set(getSelected(task))
     const chosen = availableAccounts(task)
@@ -119,16 +166,9 @@ export default function ExchangeAvailableTasks({
       .slice(0, 10)
 
     if (!chosen.length) {
-      setError('Vui lòng chọn ít nhất một tài khoản.')
+      setError('Vui lòng chọn tài khoản chưa tương tác.')
       return
     }
-
-    const reward = Number(task.reward_per_task || 0) * chosen.length
-    if (!await confirm(
-      `Xác nhận nhận ${chosen.length} nhiệm vụ?\n` +
-      `Tổng thưởng dự kiến: ${formatCoins(reward)}.\n` +
-      'Xu chỉ được cộng sau khi chủ chiến dịch duyệt.',
-    )) return
 
     locked.current = true
     setBusyId(task.id)
@@ -140,40 +180,42 @@ export default function ExchangeAvailableTasks({
     let failure = ''
 
     try {
-      for (let i = 0; i < chosen.length; i += 1) {
-        const account = chosen[i]
-        setProgress(`Đang xử lý ${i + 1}/${chosen.length}: ${account.username}`)
+      for (const account of chosen) {
+        setProgress(
+          `Đang xác nhận ${completed + 1}/${chosen.length}: ${account.username}`
+        )
 
         try {
-          await exchangeService.claimTask(task.id, account.id)
+          await exchangeService.tickReciprocal(task.id, account.id)
           completed += 1
           setSelectedAccounts((current) => ({
             ...current,
             [task.id]: (current[task.id] || []).filter(
-              (id) => Number(id) !== Number(account.id),
+              (id) => Number(id) !== Number(account.id)
             ),
           }))
         } catch (err) {
-          failure = `${account.username}: ${err?.message || 'Chưa xác định được kết quả'}`
+          failure = `${account.username}: ${
+            err?.response?.data?.message || err?.message ||
+            'Không thể xác nhận.'
+          }`
           break
         }
       }
 
-      setSuccess(`Đã nhận thành công ${completed}/${chosen.length} tài khoản.`)
-
-      if (failure) {
-        setError(
-          `${failure}. Hãy kiểm tra mục Nhiệm vụ của tôi trước khi thử lại.`,
+      if (completed) {
+        setSuccess(
+          `Đã xác nhận ${completed}/${chosen.length} tài khoản.`
         )
-      } else {
-        setActiveTaskId(null)
       }
 
-      try {
-        await onRefresh()
-      } catch {
-        setError('Không cập nhật được dữ liệu. Vui lòng tải lại trang.')
-      }
+      if (failure) setError(failure)
+
+      await onRefresh()
+
+      if (!failure) setActiveTaskId(null)
+    } catch (err) {
+      setError(err?.message || 'Không tải lại được danh sách.')
     } finally {
       locked.current = false
       setBusyId(null)
@@ -200,14 +242,14 @@ export default function ExchangeAvailableTasks({
   }
 
   return (
-    <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+    <section className="min-w-0 rounded-3xl border border-slate-200 bg-white p-3 shadow-sm sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-black tracking-tight text-slate-950">
-            Nhiệm vụ có sẵn
+            Khám phá tương tác chéo
           </h2>
           <p className="mt-1 text-sm text-slate-500">
-            Chọn chiến dịch và tài khoản để nhận nhiệm vụ.
+            Kết nối và tương tác qua lại trên các nền tảng mạng xã hội.
           </p>
         </div>
 
@@ -240,94 +282,191 @@ export default function ExchangeAvailableTasks({
         </p>
       )}
 
+
+      <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 lg:grid-cols-5">
+        {[
+          ['Tổng bài tương tác', statistics.total],
+          ['TikTok', statistics.tiktok],
+          ['Instagram', statistics.instagram],
+          ['Facebook', statistics.facebook],
+          ['Có thể thực hiện', statistics.available],
+        ].map(([label, count]) => (
+          <div key={label} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <p className="text-xs font-semibold text-slate-500">{label}</p>
+            <p className="mt-2 text-2xl font-black text-slate-900">{count}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-5 grid grid-cols-2 gap-3 lg:flex lg:flex-wrap lg:items-end">
+        <label className="flex min-w-0 flex-col gap-1 text-xs font-semibold text-slate-600 lg:min-w-36">
+          Loại tương tác
+          <select value={typeFilter}
+            onChange={e => changeFilter(setTypeFilter, e.target.value)}
+            className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800">
+            <option value="all">Tất cả</option>
+            <option value="follow">Theo dõi</option>
+            <option value="like">Thích</option>
+            <option value="comment">Bình luận</option>
+          </select>
+        </label>
+
+        <label className="flex min-w-0 flex-col gap-1 text-xs font-semibold text-slate-600 lg:min-w-44">
+          Trạng thái
+          <select value={statusFilter}
+            onChange={e => changeFilter(setStatusFilter, e.target.value)}
+            className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800">
+            <option value="all">Tất cả</option>
+            <option value="available">Có thể thực hiện</option>
+            <option value="completed">Đã tương tác</option>
+            <option value="unlinked">Chưa liên kết tài khoản</option>
+          </select>
+        </label>
+
+        <label className="flex min-w-0 flex-col gap-1 text-xs font-semibold text-slate-600 lg:min-w-32">
+          Sắp xếp
+          <select value={sortOrder}
+            onChange={e => changeFilter(setSortOrder, e.target.value)}
+            className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800">
+            <option value="newest">Mới nhất</option>
+            <option value="oldest">Cũ nhất</option>
+          </select>
+        </label>
+
+        <label className="flex min-w-0 flex-col gap-1 text-xs font-semibold text-slate-600 lg:min-w-28">
+          Hiển thị
+          <select value={pageSize}
+            onChange={e => {
+              setPageSize(Number(e.target.value))
+              setCurrentPage(1)
+            }}
+            className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800">
+            <option value={5}>5 bài</option>
+            <option value={10}>10 bài</option>
+            <option value={20}>20 bài</option>
+          </select>
+        </label>
+      </div>
+
+      <p className="mt-4 text-sm font-medium text-slate-500">
+        Hiển thị {visibleTasks.length === 0 ? 0 : (safePage - 1) * pageSize + 1}
+        –{Math.min(safePage * pageSize, visibleTasks.length)}
+        / {visibleTasks.length} bài tương tác
+      </p>
+
       {!loading && visibleTasks.length === 0 && (
         <p className="mt-6 rounded-xl bg-slate-50 p-6 text-sm text-slate-500">
-          Hiện chưa có nhiệm vụ phù hợp.
+          Hiện chưa có lượt tương tác phù hợp.
         </p>
       )}
 
-      <div className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {visibleTasks.map((task) => {
+      <div className="mt-5 flex min-w-0 flex-col gap-3">
+        {pagedTasks.map((task) => {
           const style = platformStyles[task.platform] || platformStyles.facebook
           const available = availableAccounts(task)
+          const matching = matchingAccounts(task)
           const url = safeTargetUrl(task.target_url, task.platform)
-          const count = Number(task.quantity || 0)
-          const claimed = Number(task.claimed_count || 0)
-          const hasCount = Number.isFinite(count) && count > 0
-          const remaining = hasCount ? Math.max(0, count - claimed) : null
+
+          const actionLabel =
+            matching.length === 0
+              ? 'Chưa liên kết tài khoản'
+              : available.length === 0
+                ? 'Đã tương tác'
+                : 'Thực hiện tương tác'
 
           return (
             <article
               key={task.id}
-              className="group flex min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition duration-200 hover:-translate-y-1 hover:border-blue-200 hover:shadow-xl"
+              className="min-w-0 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm transition hover:border-blue-200 hover:shadow-md sm:p-4"
             >
-              <div className={`relative flex h-36 items-center justify-center overflow-hidden bg-gradient-to-br ${style.background}`}>
-                <div className="absolute -right-8 -top-12 h-44 w-44 rounded-full border-[25px] border-white/10" />
-                <div className="absolute -bottom-16 -left-10 h-44 w-44 rounded-full bg-white/10 blur-xl" />
-                <div className="relative flex items-center gap-3 text-white">
-                  <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-white/30 bg-white/20 text-5xl font-black shadow-lg backdrop-blur-sm">
-                    {style.icon}
-                  </div>
-                  <div>
-                    <p className="text-xl font-black">{style.name}</p>
-                    <p className="text-sm font-semibold text-white/90">
-                      {taskNames[task.task_type] || task.task_type}
-                    </p>
-                  </div>
+              <div className="flex min-w-0 items-center gap-3">
+                <div
+                  className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-2xl font-black text-white ${style.background}`}
+                >
+                  {style.icon}
                 </div>
-                <span className="absolute left-3 top-3 rounded-lg bg-white/90 px-2.5 py-1 text-[11px] font-black text-slate-800">
-                  NHIỆM VỤ
-                </span>
-              </div>
 
-              <div className="flex flex-1 flex-col p-4">
-                <h3 className="text-base font-black text-slate-950">
-                  {style.name} · {taskNames[task.task_type] || task.task_type}
-                </h3>
-                <p className="mt-1 text-xs text-slate-500">
-                  Chiến dịch #{task.id}
-                </p>
-
-                <div className="mt-4 rounded-xl bg-blue-50 px-3 py-3">
-                  <p className="text-xs font-medium text-slate-500">Thưởng mỗi tài khoản</p>
-                  <p className="mt-1 text-xl font-black text-blue-700">
-                    {formatCoins(task.reward_per_task)}
+                <div className="min-w-0 flex-1">
+                  <h3 className="truncate text-sm font-black text-slate-950 sm:text-base">
+                    {style.name} · {taskNames[task.task_type] || task.task_type}
+                  </h3>
+                  <p className="mt-0.5 truncate text-xs text-slate-500">
+                    Bài #{task.id} · {available.length} tài khoản có thể tương tác
                   </p>
                 </div>
 
-                <p className="mt-3 text-xs font-medium text-slate-500">
-                  {available.length} tài khoản của bạn có thể nhận
-                </p>
-
-                {url && (
-                  <a
-                    href={url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-3 break-words text-sm font-semibold text-blue-600 underline underline-offset-2 hover:text-blue-800"
-                  >
-                    Xem liên kết nhiệm vụ ↗
-                  </a>
-                )}
-
-                <div className="mt-auto pt-5">
+                <div className="flex shrink-0 flex-col items-end gap-2">
+                  <span className="rounded-full bg-blue-50 px-2 py-1 text-[10px] font-bold text-blue-700">
+                    Miễn phí
+                  </span>
                   <button
                     type="button"
                     onClick={() => {
                       setError('')
                       setActiveTaskId(task.id)
                     }}
-                    disabled={loading || !claimsReady || busyId !== null || !url || available.length === 0}
-                    className="w-full rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                    disabled={loading || !claimsReady || busyId !== null || !url}
+                    className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-bold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
                   >
-                    {available.length === 0 ? 'Không còn tài khoản' : 'Nhận nhiệm vụ'}
+                    {matching.length === 0 ? 'Liên kết →' : 'Tương tác →'}
                   </button>
                 </div>
               </div>
+
+              <div className="mt-2 flex min-w-0 items-center gap-2">
+                {url ? (
+                  <a
+                    href={url}
+                    title={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="min-w-0 flex-1 truncate text-xs font-medium text-blue-600 underline underline-offset-2 hover:text-blue-800"
+                  >
+                    {url}
+                  </a>
+                ) : (
+                  <span className="min-w-0 flex-1 text-xs text-slate-400">
+                    Liên kết không hợp lệ
+                  </span>
+                )}
+              </div>
+
+
             </article>
           )
         })}
       </div>
+
+
+      {!loading && (
+        <nav
+          aria-label="Phân trang tương tác"
+          className="mt-5 flex flex-wrap items-center justify-center gap-2"
+        >
+          {safePage > 1 && (
+            <button
+              type="button"
+              onClick={() => setCurrentPage(safePage - 1)}
+              className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              ← Lùi
+            </button>
+          )}
+
+          <span className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white">
+            Trang {safePage} / {totalPages}
+          </span>
+
+          <button
+            type="button"
+            disabled={safePage >= totalPages}
+            onClick={() => setCurrentPage(safePage + 1)}
+            className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Tiếp →
+          </button>
+        </nav>
+      )}
 
       {activeTask && (() => {
         const task = activeTask
@@ -353,7 +492,7 @@ export default function ExchangeAvailableTasks({
             <div
               role="dialog"
               aria-modal="true"
-              aria-label="Nhận nhiệm vụ"
+              aria-label="Thực hiện tương tác"
               className="flex max-h-[92vh] w-full max-w-xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl"
             >
               <div className="flex items-center justify-between gap-3 border-b border-slate-100 p-5">
@@ -362,7 +501,7 @@ export default function ExchangeAvailableTasks({
                     {style.icon}
                   </div>
                   <div className="min-w-0">
-                    <h3 className="text-lg font-black text-slate-950">Nhận nhiệm vụ</h3>
+                    <h3 className="text-lg font-black text-slate-950">Thực hiện tương tác</h3>
                     <p className="text-xs text-slate-500">
                       {style.name} · {taskNames[task.task_type] || task.task_type} · #{task.id}
                     </p>
@@ -380,17 +519,56 @@ export default function ExchangeAvailableTasks({
               </div>
 
               <div className="overflow-y-auto p-5">
-                <div className="rounded-2xl bg-blue-50 p-4">
-                  <p className="text-xs font-semibold text-slate-500">
-                    Thưởng mỗi tài khoản
-                  </p>
-                  <p className="mt-1 text-2xl font-black text-blue-700">
-                    {formatCoins(task.reward_per_task)}
-                  </p>
-                  <p className="mt-1 text-xs text-slate-500">
-                    Chỉ cộng xu sau khi nhiệm vụ được duyệt.
-                  </p>
-                </div>
+
+                {/* Liên kết tương tác trong popup */}
+                {safeTargetUrl(task.target_url, task.platform) && (
+                  <div className="rounded-2xl border border-blue-100 bg-blue-50/60 p-4">
+                    <h4 className="text-sm font-black text-slate-900">
+                      Liên kết tương tác
+                    </h4>
+
+                    <a
+                      href={safeTargetUrl(task.target_url, task.platform)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-2 block break-all text-sm font-semibold leading-6 text-blue-700 underline underline-offset-2 hover:text-blue-900"
+                    >
+                      {safeTargetUrl(task.target_url, task.platform)}
+                    </a>
+
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <a
+                        href={safeTargetUrl(task.target_url, task.platform)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-700"
+                      >
+                        Mở liên kết ↗
+                      </a>
+
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            await navigator.clipboard.writeText(
+                              safeTargetUrl(task.target_url, task.platform)
+                            )
+                            setSuccess('Đã sao chép liên kết tương tác.')
+                            setError('')
+                          } catch {
+                            setError('Không sao chép được liên kết.')
+                          }
+                        }}
+                        className="rounded-xl border border-blue-200 bg-white px-4 py-2.5 text-sm font-bold text-blue-700 hover:bg-blue-50"
+                      >
+                        Sao chép liên kết
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+
+                
 
                 <div className="mt-5 flex items-center justify-between gap-3">
                   <div>
@@ -419,7 +597,24 @@ export default function ExchangeAvailableTasks({
                 <div className="mt-3 max-h-72 space-y-2 overflow-y-auto pr-1">
                   {matching.length === 0 && (
                     <p className="rounded-xl bg-slate-50 p-4 text-sm text-slate-500">
-                      Chưa có tài khoản phù hợp.
+                      Bạn chưa liên kết tài khoản {style.name}.
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveTaskId(null)
+                          onOpenAccounts?.()
+                        }}
+                        className="mt-3 block rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-700"
+                      >
+                        Liên kết tài khoản {style.name}
+                      </button>
+                    </p>
+                  )}
+
+                  {matching.length > 0 && available.length === 0 && (
+                    <p className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm font-semibold text-slate-600">
+                      Tất cả tài khoản {style.name} của bạn đã thực hiện nhiệm vụ này.
+                      Bạn không thể xác nhận lại bằng tài khoản đã sử dụng.
                     </p>
                   )}
 
@@ -455,7 +650,7 @@ export default function ExchangeAvailableTasks({
                             {account.username}
                           </p>
                           <p className={`text-xs font-semibold ${already ? 'text-slate-500' : 'text-emerald-600'}`}>
-                            {already ? 'Đã nhận' : 'Chưa nhận'}
+                            {already ? 'Đã tham gia' : 'Có thể tương tác'}
                           </p>
                         </div>
                         <span className="hidden rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-500 sm:block">
@@ -470,12 +665,7 @@ export default function ExchangeAvailableTasks({
                   <p className="text-sm text-slate-500">
                     Đã chọn <strong className="text-blue-700">{selected.length}/{maxSelection}</strong>
                   </p>
-                  <div className="text-right">
-                    <p className="text-xs text-slate-500">Tổng thưởng dự kiến</p>
-                    <p className="text-xl font-black text-blue-700">
-                      {formatCoins(Number(task.reward_per_task || 0) * selected.length)}
-                    </p>
-                  </div>
+                  
                 </div>
               </div>
 
@@ -496,7 +686,7 @@ export default function ExchangeAvailableTasks({
                 >
                   {busyId === task.id
                     ? 'Đang xử lý...'
-                    : `Xác nhận nhận ${selected.length} nhiệm vụ`}
+                    : `Xác nhận tương tác (${selected.length} tài khoản)`}
                 </button>
               </div>
             </div>

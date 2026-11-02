@@ -14,6 +14,46 @@ function safeUrl(value) {
   }
 }
 
+
+// NOSCAM_POPUP_MULTILINK_V1
+function renderLinkedContent(content) {
+  const text = String(content || '')
+  const urlPattern = /https?:\/\/[^\s<>"']+/gi
+  const result = []
+  let lastIndex = 0
+  let match
+
+  while ((match = urlPattern.exec(text)) !== null) {
+    const raw = match[0]
+    const clean = raw.replace(/[.,;!?)}\]]+$/, '')
+    const href = safeUrl(clean)
+
+    if (!href) continue
+
+    result.push(text.slice(lastIndex, match.index))
+
+    result.push(
+      <a
+        key={`${match.index}-${clean}`}
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="font-semibold text-blue-600 underline underline-offset-4 hover:text-blue-800"
+      >
+        {clean}
+      </a>
+    )
+
+    const suffix = raw.slice(clean.length)
+    result.push(suffix)
+
+    lastIndex = match.index + raw.length
+  }
+
+  result.push(text.slice(lastIndex))
+  return result
+}
+
 export default function SitePopupViewer() {
   const location = useLocation()
   const [queue, setQueue] = useState([])
@@ -71,11 +111,11 @@ export default function SitePopupViewer() {
   if (!current) return null
 
   const image = current.image_url && safeUrl(current.image_url)
-  const link = current.button_url && safeUrl(current.button_url)
 
+  // NOSCAM_POPUP_VIEWER_DESIGN_V2
   return (
     <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/65 p-4"
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/65 p-4 backdrop-blur-[3px]"
       role="presentation"
       onMouseDown={event => {
         if (event.target === event.currentTarget) dismiss()
@@ -85,16 +125,17 @@ export default function SitePopupViewer() {
         role="dialog"
         aria-modal="true"
         aria-labelledby="noscam-popup-title"
-        className="relative w-full max-w-lg overflow-hidden rounded-3xl bg-white shadow-2xl"
+        aria-describedby="noscam-popup-content"
+        className="relative w-full max-w-[490px] overflow-hidden rounded-[28px] border border-white/70 bg-white shadow-[0_30px_100px_rgba(2,6,23,0.3)]"
       >
-        <button
-          type="button"
-          onClick={dismiss}
-          aria-label="Đóng thông báo"
-          className="absolute right-3 top-3 z-10 rounded-full bg-white/95 px-3 py-1.5 text-xl text-slate-700 shadow"
-        >
-          ×
-        </button>
+            <button
+              type="button"
+              onClick={dismiss}
+              aria-label="Đóng thông báo"
+              className="absolute right-4 top-4 z-20 shadow-md flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-xl text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
+            >
+              ×
+            </button>
 
         {image && (
           <img
@@ -106,41 +147,56 @@ export default function SitePopupViewer() {
         )}
 
         <div className="p-6 sm:p-8">
-          <p className="mb-2 text-xs font-bold uppercase tracking-widest text-blue-600">
+          <div className="mb-6 flex items-start justify-between gap-4">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
+                <path d="M10 21h4" />
+              </svg>
+            </div>
+
+
+          </div>
+
+          <p className="text-[11px] font-extrabold uppercase tracking-[0.17em] text-blue-600">
             Thông báo từ NoScam.vn
           </p>
 
           <h2
             id="noscam-popup-title"
-            className="pr-7 text-2xl font-bold text-slate-900"
+            className="mt-2 break-words text-2xl font-black tracking-tight text-slate-950"
           >
             {current.title}
           </h2>
 
-          <p className="mt-4 whitespace-pre-wrap break-words text-sm leading-7 text-slate-700">
-            {current.content}
+          <p
+            id="noscam-popup-content"
+            className="mt-4 whitespace-pre-wrap break-words text-[15px] leading-7 text-slate-600"
+          >
+            {renderLinkedContent(current.content)}
           </p>
 
-          <div className="mt-7 flex flex-wrap justify-end gap-3">
+
+
+          <div className="mt-7 flex justify-end border-t border-slate-100 pt-5">
             <button
               type="button"
               onClick={dismiss}
-              className="rounded-xl border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-700"
+              className="min-w-28 rounded-xl bg-blue-600 px-6 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-blue-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
             >
-              Đã hiểu
+              Đóng
             </button>
-
-            {link && current.button_text && (
-              <a
-                href={link}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={dismiss}
-                className="rounded-xl bg-blue-600 px-5 py-3 text-center text-sm font-semibold text-white"
-              >
-                {current.button_text}
-              </a>
-            )}
           </div>
         </div>
       </section>

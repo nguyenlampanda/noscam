@@ -124,7 +124,7 @@ function RiskScore({
         <div className="flex items-center justify-between">
           <div>
             <p className="text-[11px] font-bold uppercase tracking-[0.17em] text-slate-400">
-              NoScam Risk Score
+              NoScam Điểm rủi ro
             </p>
 
             <p className="mt-1 text-xs text-slate-500">

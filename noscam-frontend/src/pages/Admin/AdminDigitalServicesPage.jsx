@@ -174,7 +174,7 @@ function Dropdown({ value, onChange, options, placeholder = 'Tất cả' }) {
   )
 }
 
-export default function AdminDigitalServicesPage() {
+export default function AdminDigitalServicesPage({ activeTab = 'create', onNavigateTab }) {
   const { confirm } = useNoScamUI()
   const [items, setItems] = useState([])
   const [form, setForm] = useState(emptyForm)
@@ -442,12 +442,10 @@ export default function AdminDigitalServicesPage() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <AdminNav />
-      <main className="mx-auto max-w-7xl space-y-6 px-5 py-8 lg:px-8">
+      
+      <main className="space-y-6">
         <div>
-          <h1 className="text-2xl font-black text-slate-900">
-            Quản lý dịch vụ số
-          </h1>
+          
           <p className="mt-2 text-sm text-slate-500">
             Quản lý dịch vụ PR, hỗ trợ tài khoản và các dịch vụ khác.
             Dịch vụ mới mặc định tắt.
@@ -465,7 +463,8 @@ export default function AdminDigitalServicesPage() {
           </div>
         )}
 
-        <form onSubmit={save} className="space-y-5 rounded-2xl border border-slate-200 bg-white p-6">
+        {activeTab === 'create' && (
+<form onSubmit={save} className="space-y-5 rounded-2xl border border-slate-200 bg-white p-6">
           <h2 className="text-lg font-bold">
             {editingId === null ? 'Thêm dịch vụ' : `Chỉnh sửa dịch vụ #${editingId}`}
           </h2>
@@ -659,8 +658,10 @@ export default function AdminDigitalServicesPage() {
             )}
           </div>
         </form>
+)}
 
-        <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6">
+        {activeTab === 'list' && (
+<section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-lg font-bold">Danh sách dịch vụ ({items.length})</h2>
             <button type="button" onClick={load}
@@ -844,7 +845,7 @@ export default function AdminDigitalServicesPage() {
                       <div className="mt-auto flex flex-wrap gap-3 border-t border-slate-100 pt-4">
                         <button
                           type="button"
-                          onClick={() => edit(item)}
+                          onClick={() => { edit(item); onNavigateTab?.('create') }}
                           className="flex-1 rounded-xl border border-blue-200 bg-white px-4 py-3 text-sm font-bold text-blue-700 shadow-sm transition hover:border-blue-400 hover:bg-blue-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
                         >
                           Chỉnh sửa
@@ -899,6 +900,7 @@ export default function AdminDigitalServicesPage() {
             </div>
           )}
         </section>
+)}
       </main>
     </div>
   )

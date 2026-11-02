@@ -26,6 +26,13 @@ class ExchangeTaskClaim extends Model
         'finalized_at',
         'rejection_reason',
         'risk_hold',
+        'reciprocal_status',
+        'reciprocal_social_account_id',
+        'return_campaign_id',
+        'return_username',
+        'return_profile_url',
+        'reciprocal_submitted_at',
+        'reciprocal_confirmed_at',
     ];
 
     protected function casts(): array
@@ -39,6 +46,9 @@ class ExchangeTaskClaim extends Model
             'settled_at' => 'datetime',
             'finalized_at' => 'datetime',
             'risk_hold' => 'boolean',
+            'reciprocal_social_account_id' => 'integer',
+            'reciprocal_submitted_at' => 'datetime',
+            'reciprocal_confirmed_at' => 'datetime',
         ];
     }
 
@@ -57,6 +67,14 @@ class ExchangeTaskClaim extends Model
         return $this->belongsTo(
             ExchangeSocialAccount::class,
             'social_account_id'
+        );
+    }
+
+    public function reciprocalSocialAccount(): BelongsTo
+    {
+        return $this->belongsTo(
+            ExchangeSocialAccount::class,
+            'reciprocal_social_account_id'
         );
     }
 

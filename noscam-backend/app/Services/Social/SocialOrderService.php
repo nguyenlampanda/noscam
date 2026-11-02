@@ -69,7 +69,7 @@ class SocialOrderService
             (float) $service->sell_price_per_1000 <= 0
         ) {
             throw new RuntimeException(
-                'Dịch vụ hiện chưa thể xử lý. Vui lòng liên hệ Admin để được hỗ trợ.'
+                'Liên hệ Admin'
             );
         }
 
@@ -171,6 +171,56 @@ class SocialOrderService
                 'Số lượng tối đa của nhà cung cấp là '
                 .number_format((int) $providerMax, 0, ',', '.')
                 .'.'
+            );
+        }
+
+        // SOCIAL_API_BALANCE_GUARD_V1
+        // Kiểm tra số dư thực tế trước khi tạo đơn và trừ xu.
+        try {
+            $api = app(SocialProviderManager::class)
+                ->make($providerService->provider);
+
+            $balanceResponse = $api->balance();
+
+            $balance = null;
+
+            foreach ([
+                'balance',
+                'data.balance',
+                'data.user.balance',
+                'money',
+            ] as $path) {
+                $value = data_get($balanceResponse, $path);
+
+                if ($value !== null && is_numeric($value)) {
+                    $balance = (float) $value;
+                    break;
+                }
+            }
+
+            if ($balance === null || !is_finite($balance) || $balance < 0) {
+                throw new RuntimeException('Không xác minh được số dư API.');
+            }
+
+            $exchangeRate = (float) (
+                $providerService->provider->exchange_rate_to_vnd ?: 1
+            );
+
+            if (!is_finite($exchangeRate) || $exchangeRate <= 0) {
+                throw new RuntimeException('Tỷ giá API không hợp lệ.');
+            }
+
+            $availableVnd = $balance * $exchangeRate;
+
+            $requiredVnd = $providerService->costPriceVnd()
+                * $quantity / 1000;
+
+            if ($availableVnd < $requiredVnd) {
+                throw new RuntimeException('API không đủ số dư.');
+            }
+        } catch (\Throwable $e) {
+            throw new RuntimeException(
+                'Dịch vụ hiện chưa thể xử lý. Vui lòng liên hệ Admin để được hỗ trợ.'
             );
         }
 
@@ -339,6 +389,10 @@ class SocialOrderService
                 $locked = SocialOrder::query()
                     ->lockForUpdate()
                     ->findOrFail($order->id);
+                if ($locked->admin_no_refund) {
+                    throw new \RuntimeException('Đơn đã đóng không hoàn tiền.');
+                }
+
 
                 $sellAmount =
                     (float) $locked->sell_amount;
@@ -408,6 +462,10 @@ class SocialOrderService
                         ->findOrFail(
                             $order->id
                         );
+                if ($locked->admin_no_refund) {
+                    throw new \RuntimeException('Đơn đã đóng không hoàn tiền.');
+                }
+
 
                 $quantity =
                     max(

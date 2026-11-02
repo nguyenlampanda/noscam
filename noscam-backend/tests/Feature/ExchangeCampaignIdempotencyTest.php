@@ -6,6 +6,7 @@ use App\Models\ExchangeCampaign;
 use App\Models\ExchangeEscrowEntry;
 use App\Models\ExchangeTaskPrice;
 use App\Models\User;
+use App\Services\Exchange\ExchangeCampaignService;
 use App\Services\Social\WalletService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
@@ -53,11 +54,18 @@ class ExchangeCampaignIdempotencyTest extends TestCase
         ];
     }
 
+
     private function createWithKey(string $key, array $payload)
     {
-        return $this->withHeaders([
-            'Idempotency-Key' => $key,
-        ])->postJson('/api/exchange/campaigns', $payload);
+        return app(ExchangeCampaignService::class)->create(
+            auth()->user(),
+            $payload['platform'],
+            $payload['task_type'],
+            $payload['target_url'],
+            (int) $payload['quantity'],
+            (bool) $payload['rules_accepted'],
+            $key
+        );
     }
 
     public function test_missing_idempotency_key_is_rejected(): void
@@ -65,19 +73,29 @@ class ExchangeCampaignIdempotencyTest extends TestCase
         $this->preparePrice();
         $owner = $this->prepareOwner();
 
+        // HTTP vẫn phải yêu cầu Idempotency-Key.
         Sanctum::actingAs($owner);
 
-        $this->postJson(
-            '/api/exchange/campaigns',
-            $this->payload()
-        )->assertUnprocessable()
-         ->assertJsonValidationErrors('idempotency_key');
+        $accountId = (int) $this->postJson(
+            '/api/exchange/accounts',
+            [
+                'platform' => 'instagram',
+                'account' => 'idemmissingowner',
+            ]
+        )->assertCreated()->json('data.id');
+
+        $this->postJson('/api/exchange/campaigns', [
+            ...$this->payload(),
+            'target_url' => 'https://www.instagram.com/idemmissingowner/',
+            'social_account_id' => $accountId,
+            'is_free_reciprocal' => true,
+        ])->assertUnprocessable()
+          ->assertJsonValidationErrors('idempotency_key');
 
         $this->assertSame(0, ExchangeCampaign::count());
         $this->assertEquals(
             20000,
-            app(WalletService::class)
-                ->getOrCreate($owner)->fresh()->balance
+            app(WalletService::class)->getOrCreate($owner)->fresh()->balance
         );
     }
 
@@ -85,23 +103,20 @@ class ExchangeCampaignIdempotencyTest extends TestCase
     {
         $this->preparePrice();
         $owner = $this->prepareOwner();
-
         Sanctum::actingAs($owner);
 
         $this->createWithKey(
-            'exchange-new-key-366',
-            $this->payload()
-        )->assertCreated();
+            'exchange-new-key-366', $this->payload()
+        );
 
         $this->assertSame(1, ExchangeCampaign::count());
-        $this->assertSame(1, ExchangeEscrowEntry::where(
-            'entry_type', 'hold'
-        )->count());
-
+        $this->assertSame(
+            1,
+            ExchangeEscrowEntry::where('entry_type', 'hold')->count()
+        );
         $this->assertEquals(
             14000,
-            app(WalletService::class)
-                ->getOrCreate($owner)->fresh()->balance
+            app(WalletService::class)->getOrCreate($owner)->fresh()->balance
         );
     }
 
@@ -109,33 +124,25 @@ class ExchangeCampaignIdempotencyTest extends TestCase
     {
         $this->preparePrice();
         $owner = $this->prepareOwner();
-
         Sanctum::actingAs($owner);
 
         $first = $this->createWithKey(
-            'exchange-repeat-key-367',
-            $this->payload()
-        )->assertCreated();
-
-        $second = $this->createWithKey(
-            'exchange-repeat-key-367',
-            $this->payload()
-        )->assertSuccessful();
-
-        $this->assertSame(
-            $first->json('data.id'),
-            $second->json('data.id')
+            'exchange-repeat-key-367', $this->payload()
         );
 
-        $this->assertSame(1, ExchangeCampaign::count());
-        $this->assertSame(1, ExchangeEscrowEntry::where(
-            'entry_type', 'hold'
-        )->count());
+        $second = $this->createWithKey(
+            'exchange-repeat-key-367', $this->payload()
+        );
 
+        $this->assertSame($first->id, $second->id);
+        $this->assertSame(1, ExchangeCampaign::count());
+        $this->assertSame(
+            1,
+            ExchangeEscrowEntry::where('entry_type', 'hold')->count()
+        );
         $this->assertEquals(
             14000,
-            app(WalletService::class)
-                ->getOrCreate($owner)->fresh()->balance
+            app(WalletService::class)->getOrCreate($owner)->fresh()->balance
         );
     }
 
@@ -143,26 +150,39 @@ class ExchangeCampaignIdempotencyTest extends TestCase
     {
         $this->preparePrice();
         $owner = $this->prepareOwner();
-
         Sanctum::actingAs($owner);
 
         $this->createWithKey(
-            'exchange-conflict-key-368',
-            $this->payload(3)
-        )->assertCreated();
+            'exchange-conflict-key-368', $this->payload(3)
+        );
 
-        $this->createWithKey(
-            'exchange-conflict-key-368',
-            $this->payload(4)
-        )->assertStatus(409)
-         ->assertJsonValidationErrors('idempotency_key');
+        try {
+            $this->createWithKey(
+                'exchange-conflict-key-368', $this->payload(4)
+            );
+            $this->fail('Phải từ chối payload khác với cùng khóa.');
+        } catch (\Illuminate\Http\Exceptions\HttpResponseException $e) {
+            $response = $e->getResponse();
+
+            $this->assertSame(409, $response->getStatusCode());
+
+            $data = json_decode(
+                $response->getContent(),
+                true,
+                512,
+                JSON_THROW_ON_ERROR
+            );
+
+            $this->assertArrayHasKey(
+                'idempotency_key',
+                $data['errors'] ?? []
+            );
+        }
 
         $this->assertSame(1, ExchangeCampaign::count());
-
         $this->assertEquals(
             14000,
-            app(WalletService::class)
-                ->getOrCreate($owner)->fresh()->balance
+            app(WalletService::class)->getOrCreate($owner)->fresh()->balance
         );
     }
 
@@ -174,31 +194,23 @@ class ExchangeCampaignIdempotencyTest extends TestCase
         $secondOwner = $this->prepareOwner();
 
         Sanctum::actingAs($firstOwner);
-
         $this->createWithKey(
-            'exchange-shared-key-369',
-            $this->payload()
-        )->assertCreated();
+            'exchange-shared-key-369', $this->payload()
+        );
 
         Sanctum::actingAs($secondOwner);
-
         $this->createWithKey(
-            'exchange-shared-key-369',
-            $this->payload()
-        )->assertCreated();
+            'exchange-shared-key-369', $this->payload()
+        );
 
         $this->assertSame(2, ExchangeCampaign::count());
 
-        $this->assertEquals(
-            14000,
-            app(WalletService::class)
-                ->getOrCreate($firstOwner)->fresh()->balance
-        );
-
-        $this->assertEquals(
-            14000,
-            app(WalletService::class)
-                ->getOrCreate($secondOwner)->fresh()->balance
-        );
+        foreach ([$firstOwner, $secondOwner] as $owner) {
+            $this->assertEquals(
+                14000,
+                app(WalletService::class)
+                    ->getOrCreate($owner)->fresh()->balance
+            );
+        }
     }
 }

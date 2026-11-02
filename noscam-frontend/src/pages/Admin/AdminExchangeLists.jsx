@@ -124,7 +124,7 @@ export default function AdminExchangeLists({ type }) {
                   <div>
                     <p className="font-black text-slate-900">
                       {isCampaign
-                        ? `Chiến dịch #${item.id}`
+                        ? `${'NSC'}-${({follow:'FOL',like:'LIK',comment:'CMT'})[campaign.task_type] || 'TSK'}-${String(item.id).padStart(6,'0')}`
                         : `Khiếu nại #${item.id}`}
                     </p>
                     <p className="mt-1 text-sm text-slate-500">

@@ -38,6 +38,10 @@ class ExchangeAutoSettlementService
                 return null;
             }
 
+            if ((bool) $campaign->is_free_reciprocal) {
+                return null;
+            }
+
             $claim = ExchangeTaskClaim::query()
                 ->whereKey($claimId)
                 ->lockForUpdate()

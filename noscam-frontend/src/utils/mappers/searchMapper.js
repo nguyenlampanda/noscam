@@ -1,5 +1,5 @@
 const DEFAULT_DISCLAIMER =
-  'Risk Score chỉ mang tính cảnh báo dựa trên dữ liệu hệ thống, không phải kết luận một cá nhân hoặc tổ chức là lừa đảo.'
+  'Điểm rủi ro chỉ mang tính cảnh báo dựa trên dữ liệu hệ thống, không phải kết luận một cá nhân hoặc tổ chức là lừa đảo.'
 
 export function mapSearchResponse(response) {
   const data = response?.data ?? null
@@ -120,6 +120,11 @@ export function mapSearchResult(data) {
           'medium',
       }),
     ),
+
+    // NOSCAM_SEARCH_IMAGES_MAPPER_V1
+    publicImages: Array.isArray(data.public_images)
+      ? [...new Set(data.public_images.filter(Boolean))].slice(0, 3)
+      : [],
 
     relatedInformation: (
       data.related_information || []

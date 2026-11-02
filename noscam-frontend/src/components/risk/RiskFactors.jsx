@@ -2,22 +2,22 @@ import { motion } from 'motion/react'
 
 const severityStyles = {
   high: {
-    dot: 'bg-red-500',
+    dot: 'bg-blue-500',
     badge:
-      'bg-red-50 text-red-700 border-red-100',
-    label: 'Tín hiệu mạnh',
+      'bg-blue-50 text-blue-700 border-blue-100',
+    label: 'Thông tin liên quan',
   },
   medium: {
-    dot: 'bg-amber-500',
+    dot: 'bg-blue-500',
     badge:
-      'bg-amber-50 text-amber-700 border-amber-100',
-    label: 'Cần lưu ý',
+      'bg-blue-50 text-blue-700 border-blue-100',
+    label: 'Thông tin liên quan',
   },
   low: {
     dot: 'bg-blue-500',
     badge:
       'bg-blue-50 text-blue-700 border-blue-100',
-    label: 'Tín hiệu nhẹ',
+    label: 'Thông tin liên quan',
   },
 }
 
@@ -28,18 +28,17 @@ function RiskFactors({
     <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
       <div className="border-b border-slate-100 p-5 sm:p-6">
         <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-blue-600">
-          Risk analysis
+          Thông tin cảnh báo
         </p>
 
         <h2 className="mt-2 text-xl font-bold tracking-tight text-slate-950">
-          Vì sao có Risk Score này?
+          Vì sao thông tin này bị cảnh báo?
         </h2>
 
         <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
-          Điểm được tổng hợp từ những tín
-          hiệu mà hệ thống hiện ghi nhận.
-          Mỗi tín hiệu chỉ là một phần của
-          đánh giá tổng thể.
+          Dưới đây là các tín hiệu liên quan
+          đến những báo cáo đã được hệ thống
+          kiểm duyệt.
         </p>
       </div>
 

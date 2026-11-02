@@ -19,7 +19,7 @@ const steps = [
     number: '03',
     title: 'Đánh giá rủi ro',
     description:
-      'Xem Risk Score, số báo cáo, dữ liệu liên quan và các yếu tố cần lưu ý trước khi giao dịch.',
+      'Xem Điểm rủi ro, số báo cáo, dữ liệu liên quan và các yếu tố cần lưu ý trước khi giao dịch.',
   },
   {
     number: '04',

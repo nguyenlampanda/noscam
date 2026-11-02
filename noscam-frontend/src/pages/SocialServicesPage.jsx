@@ -10,8 +10,10 @@ import {
 import {
   AnimatePresence,
   motion,
+  useReducedMotion,
 } from 'motion/react'
 import PlatformIcon from '../components/social/PlatformIcon'
+import SocialGuideModal from '../components/social/SocialGuideModal'
 import customerService, {
   getCustomerToken,
 } from '../services/customerService'
@@ -80,20 +82,30 @@ function getOrderKey(serviceId, target, quantity) {
   }
 }
 
-const platformOptions = [
-  {
-    value: 'facebook',
-    label: 'Facebook',
-  },
-  {
-    value: 'instagram',
-    label: 'Instagram',
-  },
-  {
-    value: 'tiktok',
-    label: 'TikTok',
-  },
-]
+const platformLabels = {
+  facebook: 'Facebook',
+  instagram: 'Instagram',
+  tiktok: 'TikTok',
+  threads: 'Threads',
+  youtube: 'YouTube',
+  telegram: 'Telegram',
+  twitter: 'X (Twitter)',
+  discord: 'Discord',
+  spotify: 'Spotify',
+  soundcloud: 'SoundCloud',
+  pinterest: 'Pinterest',
+  linkedin: 'LinkedIn',
+  twitch: 'Twitch',
+  reddit: 'Reddit',
+  snapchat: 'Snapchat',
+  whatsapp: 'WhatsApp',
+  zalo: 'Zalo',
+  other: 'Khác',
+}
+
+const platformOptions = Object.entries(platformLabels).map(
+  ([value, label]) => ({ value, label })
+)
 
 const categoryLabels = {
   follow: 'Follow / Followers',
@@ -107,8 +119,99 @@ const categoryLabels = {
   other: 'Khác',
 }
 
+
+// NOSCAM_SOCIAL_ANIMATIONS_V1
+// NOSCAM_INTERACTION_UI_V2
+function AnimatedCategoryIcon({ category, className = '' }) {
+  const type = String(category || '').toLowerCase()
+
+  const paths = {
+    follow: (
+      <>
+        <circle cx="10" cy="8" r="3" />
+        <path d="M4 20v-2a6 6 0 0 1 12 0v2" />
+        <path d="M19 8v6M16 11h6" />
+      </>
+    ),
+    like: (
+      <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z" />
+    ),
+    share: (
+      <>
+        <path d="M12 16V3m0 0L7 8m5-5 5 5" />
+        <path d="M5 14v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5" />
+      </>
+    ),
+    comment: (
+      <>
+        <path d="M20 11.5a8 8 0 0 1-8 8 8.5 8.5 0 0 1-3.5-.8L4 20l1.3-4.5A8 8 0 1 1 20 11.5Z" />
+        <path d="M8 12h.01M12 12h.01M16 12h.01" strokeWidth="3" strokeLinecap="round" />
+      </>
+    ),
+    view: (
+      <>
+        <path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6S2 12 2 12Z" />
+        <circle cx="12" cy="12" r="3" />
+      </>
+    ),
+    reaction: (
+      <>
+        <circle cx="12" cy="12" r="9" />
+        <path d="M8 14c1 3 7 3 8 0M8.5 9h.01M15.5 9h.01" />
+      </>
+    ),
+    member: (
+      <>
+        <circle cx="9" cy="8" r="3" />
+        <path d="M3 20v-2a6 6 0 0 1 12 0v2M17 5a3 3 0 0 1 0 6M18 15a5 5 0 0 1 3 5" />
+      </>
+    ),
+    save: (
+      <path d="M6 3h12v18l-6-4-6 4V3Z" />
+    ),
+  }
+
+  return (
+    <motion.span
+      className={`inline-flex items-center justify-center ${className}`}
+      initial={false}
+      whileHover={{ scale: 1.12, rotate: type === 'share' ? 8 : 0 }}
+      whileTap={{ scale: 0.88 }}
+      transition={{ type: 'spring', stiffness: 380, damping: 18 }}
+      aria-hidden="true"
+    >
+      <svg
+        width="26"
+        height="26"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.9"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        {paths[type] || <circle cx="12" cy="12" r="8" />}
+      </svg>
+    </motion.span>
+  )
+}
+
 export default function SocialServicesPage() {
+  // NOSCAM_SOCIAL_GUIDE_V2
+  const [guideOpen, setGuideOpen] = useState(false)
   const navigate = useNavigate()
+  // NOSCAM_SOCIAL_MOTION_V3
+  const reduceMotion = useReducedMotion()
+  const rise = (delay = 0) => reduceMotion
+    ? { initial: false, animate: { opacity: 1 } }
+    : {
+        initial: { opacity: 0, y: 18 },
+        animate: { opacity: 1, y: 0 },
+        transition: { duration: 0.42, delay, ease: [0.22, 1, 0.36, 1] },
+      }
+  const hoverLift = reduceMotion
+    ? {}
+    : { whileHover: { y: -3 }, whileTap: { scale: 0.985 } }
 
   const [services, setServices] =
     useState([])
@@ -150,6 +253,28 @@ export default function SocialServicesPage() {
 
   const [confirmOpen, setConfirmOpen] =
     useState(false)
+
+  const [invalidFields, setInvalidFields] = useState([])
+
+  useEffect(() => {
+    if (!invalidFields.length) return
+    const timer = setTimeout(() => setInvalidFields([]), 3000)
+    return () => clearTimeout(timer)
+  }, [invalidFields])
+
+  function highlightInvalid(fields) {
+    setInvalidFields([...fields])
+    requestAnimationFrame(() => {
+      const first = fields[0]
+      const element = document.querySelector(
+        '[data-order-field="' + first + '"]'
+      )
+      element?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center'
+      })
+    })
+  }
 
   const isLoggedIn =
     Boolean(getCustomerToken())
@@ -224,17 +349,21 @@ export default function SocialServicesPage() {
 
   const availablePlatforms =
     useMemo(() => {
-      const values = new Set(
-        services.map(
-          (item) =>
-            item.platform,
+      const values = [
+        ...new Set(
+          services
+            .map((item) =>
+              String(item.platform || '').trim().toLowerCase()
+            )
+            .filter(Boolean)
         ),
-      )
+      ]
 
-      return platformOptions.filter(
-        (item) =>
-          values.has(item.value),
-      )
+      return values.map((value) => ({
+        value,
+        label: platformLabels[value] ||
+          value.charAt(0).toUpperCase() + value.slice(1),
+      }))
     }, [services])
 
   const platformServices =
@@ -551,6 +680,26 @@ export default function SocialServicesPage() {
     )
   }
 
+  function getServiceUnit(service) {
+    const name = String(
+      service?.name || service?.title || ''
+    ).toLowerCase()
+
+    if (/follow|follower|theo dõi/.test(name)) return 'follow'
+    if (/like|thích/.test(name)) return 'like'
+    if (/view|xem/.test(name)) return 'view'
+    if (/comment|bình luận/.test(name)) return 'comment'
+    if (/share|chia sẻ/.test(name)) return 'share'
+    if (/save|lưu bài/.test(name)) return 'save'
+    if (/subscribe|subscriber|đăng ký/.test(name)) return 'subscribe'
+    if (/reaction|cảm xúc/.test(name)) return 'reaction'
+    if (/member|thành viên/.test(name)) return 'member'
+    if (/vote|bình chọn/.test(name)) return 'vote'
+    if (/click|nhấp/.test(name)) return 'click'
+
+    return 'lượt'
+  }
+
   function prepareOrder(event) {
     event.preventDefault()
     setError('')
@@ -558,6 +707,29 @@ export default function SocialServicesPage() {
     if (!isLoggedIn) {
       navigate('/login')
       return
+    }
+
+    const invalid = []
+
+    if (!selected) invalid.push('service')
+    if (
+      !target.trim() ||
+      !/^https?:\/\/[^\s/]+\.[^\s/]+/i.test(target.trim())
+    ) invalid.push('target')
+    if (requiresComments && commentLines.length === 0) {
+      invalid.push('comments')
+    }
+
+    if (selected && (
+      !Number.isFinite(numericQuantity) ||
+      numericQuantity < Number(selected.min_quantity) ||
+      numericQuantity > Number(selected.max_quantity)
+    )) {
+      invalid.push('quantity')
+    }
+
+    if (invalid.length) {
+      highlightInvalid(invalid)
     }
 
     if (!selected) {
@@ -618,6 +790,14 @@ export default function SocialServicesPage() {
       setError(
         'Chức năng đặt Comment đang chờ kết nối Backend.'
       )
+      return
+    }
+
+    if (
+      !/^https?:\/\/[^\s/]+\.[^\s/]+/i.test(target.trim())
+    ) {
+      highlightInvalid(['target'])
+      setError('Link không hợp lệ. Vui lòng nhập đường dẫn đầy đủ.')
       return
     }
 
@@ -711,64 +891,155 @@ export default function SocialServicesPage() {
 
   return (
     <>
-      <main className="min-h-screen bg-slate-50 px-5 py-10">
-        <div className="mx-auto max-w-5xl">
-          <motion.div
-            initial={{
-              opacity: 0,
-              y: 15,
-            }}
-            animate={{
-              opacity: 1,
-              y: 0,
-            }}
-            className="rounded-[32px] bg-slate-950 px-7 py-8 text-white md:px-10"
+      <main className="bg-white min-h-screen px-4 py-8 sm:px-5 md:py-12">
+        <div className="mx-auto max-w-6xl">
+
+          {/* NOSCAM SOCIAL HOMEPAGE REDESIGN */}
+          <motion.section
+            {...rise(0)}
+            className="relative isolate overflow-hidden rounded-[26px] bg-gradient-to-br from-slate-950 via-[#10265c] to-blue-700 px-4 py-6 text-white shadow-2xl shadow-blue-950/15 sm:px-10 sm:py-10 md:py-12"
           >
-            <div className="flex flex-wrap items-center justify-between gap-6">
+            <div className="pointer-events-none absolute -right-24 -top-32 h-80 w-80 rounded-full bg-blue-400/20 blur-3xl" />
+            <div className="pointer-events-none absolute -bottom-32 left-1/3 h-72 w-72 rounded-full bg-cyan-400/10 blur-3xl" />
+
+            <div className="relative z-10 grid items-center gap-5 sm:gap-8 lg:grid-cols-[1.3fr_0.7fr]">
               <div>
-                <div className="text-sm font-black uppercase tracking-[0.2em] text-blue-400">
-                  NoScam Social
+                <div className="inline-flex items-center gap-2 rounded-full border border-blue-300/25 bg-white/10 px-4 py-2 text-xs font-bold tracking-widest text-blue-100">
+                  <span className="h-2 w-2 rounded-full bg-cyan-300" />
+                  NOSCAM SOCIAL
                 </div>
 
-                <h1 className="mt-2 text-3xl font-black md:text-4xl">
+                <h1 className="mt-4 max-w-2xl text-[27px] font-black leading-[1.2] sm:mt-6 sm:text-5xl tracking-tight sm:text-5xl">
                   Tăng tương tác
+                  <span className="mt-1 block bg-gradient-to-r from-blue-200 to-cyan-300 bg-clip-text text-transparent">
+                    mạng xã hội dễ dàng hơn
+                  </span>
                 </h1>
 
-                <p className="mt-3 text-sm text-slate-300">
-                  Chọn dịch vụ và tạo đơn nhanh chóng.
+                <p className="mt-3 max-w-xl text-[13px] leading-6 text-blue-100/85 sm:mt-5 sm:text-base sm:leading-8">
+                  Tăng người theo dõi, lượt thích và lượt xem
+                  trên nhiều nền tảng mạng xã hội.
+                  Chọn dịch vụ, nhập liên kết và đặt hàng
+                  chỉ với vài bước đơn giản.
                 </p>
+
+                <div className="mt-5 flex flex-wrap gap-2 sm:mt-8 sm:gap-3">
+                  <a
+                    href="#tao-don"
+                    className="inline-flex min-h-10 items-center justify-center rounded-xl sm:min-h-12 sm:rounded-2xl bg-white px-6 py-3 text-sm font-black text-blue-700 shadow-lg transition hover:-translate-y-1 hover:shadow-xl"
+                  >
+                    Tạo đơn ngay ↓
+                  </a>
+
+                  <Link
+                    to="/my-orders"
+                    className="inline-flex min-h-10 items-center justify-center rounded-xl sm:min-h-12 sm:rounded-2xl border border-white/30 bg-white/10 px-6 py-3 text-sm font-bold text-white transition hover:bg-white/20"
+                  >
+                    Xem đơn hàng
+                  </Link>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!isLoggedIn) {
+                        navigate('/login')
+                        return
+                      }
+                      setGuideOpen(true)
+                    }}
+                    className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-white/30 bg-white/10 px-6 py-3 text-sm font-bold text-white transition hover:bg-white/20 sm:min-h-12 sm:rounded-2xl"
+                  >
+                    
+                    Hướng dẫn sử dụng
+                  </button>
+                </div>
               </div>
 
-              {isLoggedIn && (
-                <div className="rounded-2xl border border-white/10 bg-white/10 px-5 py-3">
-                  <div className="text-xs font-bold uppercase text-slate-400">
-                    Số dư
+              <div className="space-y-4">
+                <motion.div
+                  {...hoverLift}
+                  className="rounded-2xl border border-white/20 bg-white/10 p-4 sm:rounded-3xl sm:p-6 shadow-xl backdrop-blur-md"
+                >
+                  <div className="text-xs font-bold uppercase tracking-widest text-blue-200">
+                    {isLoggedIn ? 'Số dư ví của bạn' : 'Bắt đầu sử dụng'}
                   </div>
 
-                  <div className="mt-1 text-2xl font-black">
-                    {balance === null
-                      ? '...'
-                      : money(balance)}
-                  </div>
+                  {isLoggedIn ? (
+                    <>
+                      <div className="mt-2 break-all text-2xl font-black sm:mt-3 sm:text-3xl">
+                        {balance === null ? '...' : money(balance)}
+                      </div>
+                      <p className="mt-2 text-sm text-blue-100/80">
+                        Dùng số dư để thanh toán đơn hàng.
+                      </p>
+                      <Link
+                        to="/wallet"
+                        className="mt-3 inline-flex rounded-xl bg-blue-500 px-4 py-2 sm:mt-5 sm:px-5 sm:py-3 text-sm font-bold text-white transition hover:bg-blue-400"
+                      >
+                        Nạp tiền vào ví →
+                      </Link>
+                    </>
+                  ) : (
+                    <>
+                      <p className="mt-3 text-lg font-bold">
+                        Đăng nhập để quản lý đơn hàng
+                      </p>
+                      <Link
+                        to="/login"
+                        className="mt-3 inline-flex rounded-xl bg-blue-500 px-4 py-2 sm:mt-5 sm:px-5 sm:py-3 text-sm font-bold text-white transition hover:bg-blue-400"
+                      >
+                        Đăng nhập →
+                      </Link>
+                    </>
+                  )}
+                </motion.div>
+
+                <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6 sm:gap-3">
+                  {availablePlatforms.map((item) => (
+                    <div
+                      key={item.value}
+                      className="flex flex-col items-center gap-2 rounded-xl border border-white/15 bg-white/10 px-2 py-2 sm:rounded-2xl sm:py-4 backdrop-blur-sm"
+                    >
+                      <PlatformIcon
+                        platform={item.value}
+                        className="h-8 w-8"
+                      />
+                      <span className="text-xs font-bold">
+                        {item.label}
+                      </span>
+                    </div>
+                  ))}
                 </div>
-              )}
+              </div>
             </div>
+          </motion.section>
 
-            <div className="mt-5 flex gap-2">
-              <Link
-                to="/wallet"
-                className="rounded-xl bg-white px-4 py-2.5 text-sm font-black text-slate-950"
+          <motion.div
+            {...rise(0.06)}
+            className="mt-4 grid grid-cols-3 gap-2 sm:mt-6 sm:gap-3"
+          >
+            {[
+              ['01', 'Chọn mạng xã hội', 'Chọn nền tảng có dịch vụ đang bán'],
+              ['02', 'Chọn dịch vụ', 'Chọn lượt theo dõi, thích hoặc xem'],
+              ['03', 'Xác nhận đặt hàng', 'Kiểm tra giá tiền trước khi thanh toán'],
+            ].map(([number, title, description]) => (
+              <div
+                key={number}
+                className="flex flex-col items-start gap-2 rounded-xl border border-slate-200 bg-white p-3 sm:flex-row sm:gap-4 sm:rounded-2xl sm:p-5 shadow-sm"
               >
-                Ví của tôi
-              </Link>
-
-              <Link
-                to="/my-orders"
-                className="rounded-xl border border-white/20 px-4 py-2.5 text-sm font-black"
-              >
-                Đơn của tôi
-              </Link>
-            </div>
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-50 sm:h-11 sm:w-11 sm:rounded-xl text-sm font-black text-blue-600">
+                  {number}
+                </div>
+                <div>
+                  <div className="font-black text-slate-900">
+                    {title}
+                  </div>
+                  <p className="mt-1 text-xs leading-5 text-slate-500">
+                    {description}
+                  </p>
+                </div>
+              </div>
+            ))}
           </motion.div>
 
           {error && (
@@ -778,30 +1049,42 @@ export default function SocialServicesPage() {
           )}
 
           <motion.form
-            initial={{
-              opacity: 0,
-              y: 12,
+            noValidate
+            id="tao-don"
+            {...rise(0.09)}
+            onSubmit={(event) => {
+              if (guideOpen) {
+                event.preventDefault()
+                event.stopPropagation()
+                return
+              }
+              prepareOrder(event)
             }}
-            animate={{
-              opacity: 1,
-              y: 0,
-            }}
-            onSubmit={prepareOrder}
-            className="mt-6 rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm md:p-8"
+            className="relative isolate mt-5 rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm sm:p-6 md:p-8"
           >
-            <div className="mb-7 flex items-center justify-between gap-4">
+            {/* NOSCAM_ORDER_LOGIN_GATE_V1 */}
+            <fieldset
+              disabled={!isLoggedIn}
+              className={
+                !isLoggedIn
+                  ? 'min-w-0 pointer-events-none select-none opacity-35 blur-[1.5px]'
+                  : 'min-w-0'
+              }
+            >
+
+            <div className="mb-5 flex items-center justify-between gap-3 sm:mb-7">
               <div>
-                <h2 className="text-2xl font-black text-slate-950">
-                  Tạo đơn mới
+                <h2 className="text-xl font-black text-slate-950 sm:text-2xl">
+                  Bắt đầu tạo đơn hàng
                 </h2>
 
                 <p className="mt-1 text-sm text-slate-400">
-                  Chọn lần lượt nền tảng và dịch vụ.
+                  Làm theo các bước bên dưới để đặt dịch vụ bạn cần.
                 </p>
               </div>
 
               <div className="rounded-xl bg-blue-50 px-3 py-2 text-xs font-black text-blue-600">
-                NEW ORDER
+                TẠO ĐƠN
               </div>
             </div>
 
@@ -816,7 +1099,7 @@ export default function SocialServicesPage() {
                     1. Chọn nền tảng
                   </label>
 
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 sm:gap-3">
                     {availablePlatforms.map(
                       (item) => {
                         const active =
@@ -834,36 +1117,43 @@ export default function SocialServicesPage() {
                           <motion.button
                             type="button"
                             key={item.value}
-                            whileHover={{
-                              y: -2,
-                            }}
-                            whileTap={{
-                              scale: 0.98,
-                            }}
+                            {...rise(0.13 + platformOptions.findIndex((p) => p.value === item.value) * 0.055)}
+                            {...(reduceMotion ? {} : {
+                              whileHover: { y: -4, scale: 1.015, boxShadow: '0 12px 28px rgba(15,23,42,0.10)' },
+                              whileTap: { scale: 0.98 },
+                            })}
                             onClick={() =>
                               changePlatform(
                                 item.value,
                               )
                             }
-                            className={`relative flex items-center gap-4 rounded-2xl border p-4 text-left transition ${
+                            className={`relative flex min-w-0 flex-col items-center justify-center gap-2 rounded-xl border p-2 text-center transition sm:flex-row sm:justify-start sm:gap-3 sm:rounded-2xl sm:p-4 sm:text-left ${
                               active
-                                ? 'border-blue-600 bg-blue-50 shadow-sm'
+                                ? item.value === 'facebook'
+                                  ? 'border-[#1877F2] bg-blue-50 shadow-md'
+                                  : item.value === 'instagram'
+                                    ? 'border-pink-500 bg-pink-50 shadow-md'
+                                    : 'border-slate-950 bg-slate-100 shadow-md'
                                 : 'border-slate-200 bg-white hover:border-blue-200'
                             }`}
                           >
                             <span
-                              className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${
+                              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl sm:h-12 sm:w-12 sm:rounded-2xl ${
                                 active
                                   ? 'bg-white'
                                   : 'bg-slate-50'
                               }`}
                             >
-                              <PlatformIcon
-                                platform={
-                                  item.value
-                                }
-                                className="h-7 w-7"
-                              />
+                              <motion.span
+                                className="inline-flex"
+                                animate={reduceMotion ? { scale: 1 } : active ? { scale: [1, 1.12, 1] } : { scale: 1 }}
+                                transition={{ duration: 0.4 }}
+                              >
+                                <PlatformIcon
+                                  platform={item.value}
+                                  className="h-7 w-7"
+                                />
+                              </motion.span>
                             </span>
 
                             <div className="min-w-0">
@@ -923,11 +1213,7 @@ export default function SocialServicesPage() {
                     {category ? (
                       <div className="flex min-w-0 items-center gap-3">
                         <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-xl font-black ${categoryColors(category).icon}`}>
-                          {
-                            getCategoryMeta(
-                              category,
-                            ).icon
-                          }
+                          <AnimatedCategoryIcon category={category} />
                         </span>
 
                         <div className="min-w-0">
@@ -1025,37 +1311,40 @@ export default function SocialServicesPage() {
                                   )
 
                                 return (
-                                  <button
+                                  <motion.button
                                     type="button"
-                                    key={
-                                      value
-                                    }
+                                    key={value}
+                                    {...(reduceMotion ? {} : {
+                                      initial: { opacity: 0, x: -8 },
+                                      animate: { opacity: 1, x: 0 },
+                                      transition: { duration: 0.2, delay: Math.min(availableCategories.indexOf(value), 8) * 0.025 },
+                                      whileHover: { x: 3 },
+                                      whileTap: { scale: 0.99 },
+                                    })}
                                     onClick={() =>
                                       changeCategory(
                                         value,
                                       )
                                     }
-                                    className={`flex w-full items-center gap-3 rounded-xl p-3 text-left transition ${
+                                    className={`group mb-2 flex w-full items-center gap-3 rounded-2xl border px-4 py-3.5 text-left transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${
                                       active
-                                        ? colors.active
-                                        : 'hover:bg-slate-50'
+                                         ? `${colors.active} border-blue-200 shadow-sm`
+                                         : 'border-slate-100 bg-white hover:border-slate-200 hover:bg-slate-50'
                                     }`}
                                   >
                                     <span
-                                      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-lg font-black ${
+                                      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl sm:h-12 sm:w-12 sm:rounded-2xl transition-transform duration-200 group-hover:scale-105 ${
                                         active
                                           ? `${colors.icon} shadow-sm`
                                           : colors.icon
                                       }`}
                                     >
-                                      {
-                                        meta.icon
-                                      }
+                                      <AnimatedCategoryIcon category={value} />
                                     </span>
 
-                                    <div className="min-w-0 flex-1">
+                                    <div className="min-w-0 flex-1 basis-[calc(100%-3.25rem)]">
                                       <div
-                                        className={`font-black ${
+                                        className={`text-sm font-extrabold tracking-tight ${
                                           active
                                             ? colors.text
                                             : 'text-slate-900'
@@ -1066,7 +1355,7 @@ export default function SocialServicesPage() {
                                         }
                                       </div>
 
-                                      <div className="mt-0.5 truncate text-xs text-slate-400">
+                                      <div className="mt-1 truncate text-xs leading-5 text-slate-500">
                                         {
                                           meta.description
                                         }
@@ -1075,7 +1364,7 @@ export default function SocialServicesPage() {
 
                                     <div className="ml-3 flex shrink-0 items-center gap-3">
                                       <span
-                                        className={`rounded-full px-2.5 py-1 text-xs font-black ${colors.badge}`}
+                                        className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${colors.badge}`}
                                       >
                                         {categoryCount(
                                           value,
@@ -1089,7 +1378,7 @@ export default function SocialServicesPage() {
                                         </span>
                                       )}
                                     </div>
-                                  </button>
+                                  </motion.button>
                                 )
                               },
                             )}
@@ -1099,178 +1388,35 @@ export default function SocialServicesPage() {
                   </AnimatePresence>
                 </div>
 
+                
                 <div className="relative z-20">
-                  <label className="mb-2 block text-sm font-black text-slate-700">
-                    3. Dịch vụ
-                  </label>
+                  {/* NOSCAM_VISIBLE_SERVICE_CARDS_V2 */}
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                    <label className="text-sm font-black text-slate-700">
+                      3. Dịch vụ
+                    </label>
 
-                  <button
-                    type="button"
-                    disabled={!category}
-                    onClick={() => {
-                      if (category) {
-                        setServiceOpen(
-                          (value) => !value,
-                        )
-                      }
-                    }}
-                    className={`flex w-full items-center justify-between gap-4 rounded-2xl border bg-white p-4 text-left transition ${
-                      serviceOpen
-                        ? 'border-blue-500 ring-4 ring-blue-50'
-                        : 'border-slate-200 hover:border-blue-300'
-                    } ${
-                      !category
-                        ? 'cursor-not-allowed bg-slate-50 opacity-60'
-                        : ''
-                    }`}
-                  >
-                    {selected ? (
-                      <>
-                        <div className="flex min-w-0 flex-1 items-center gap-3">
-                          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50">
-                            <PlatformIcon
-                              platform={
-                                selected.platform
-                              }
-                              className="h-6 w-6"
-                            />
-                          </span>
-
-                          <div className="min-w-0 flex-1">
-                            <div className="line-clamp-2 font-black leading-5 text-slate-950">
-                              {selected.name}
-                            </div>
-
-                            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-semibold text-slate-400">
-                              <span>
-                                Min:{' '}
-                                {Number(
-                                  selected.min_quantity,
-                                ).toLocaleString(
-                                  'vi-VN',
-                                )}
-                              </span>
-
-                              <span>
-                                Max:{' '}
-                                {Number(
-                                  selected.max_quantity,
-                                ).toLocaleString(
-                                  'vi-VN',
-                                )}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="shrink-0 text-right">
-                          <div className="font-black text-blue-600">
-                            {Number(selected.sell_price_per_1000) > 0
-                              ? moneyUnit(Number(selected.sell_price_per_1000) / 1000)
-                              : 'Liên hệ Admin'}
-                          </div>
-
-                          <div className="text-[11px] font-bold text-slate-400">
-                            / lượt
-                          </div>
-                        </div>
-                      </>
-                    ) : (
-                      <div className="flex items-center gap-3">
-                        <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-50 text-lg text-slate-400">
-                          ☆
-                        </span>
-
-                        <div>
-                          <div className="font-bold text-slate-500">
-                            {category
-                              ? 'Chọn dịch vụ'
-                              : 'Chọn loại dịch vụ trước'}
-                          </div>
-
-                          {category && (
-                            <div className="mt-0.5 text-xs text-slate-400">
-                              Có{' '}
-                              {
-                                categoryServices.length
-                              }{' '}
-                              dịch vụ khả dụng
-                            </div>
-                          )}
-                        </div>
-                      </div>
+                    {category && (
+                      <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">
+                        {categoryServices.length} dịch vụ khả dụng
+                      </span>
                     )}
+                  </div>
 
-                    <motion.span
-                      animate={{
-                        rotate:
-                          serviceOpen
-                            ? 180
-                            : 0,
-                      }}
-                      className="ml-2 shrink-0 text-sm font-black text-slate-400"
-                    >
-                      ▼
-                    </motion.span>
-                  </button>
-
-                  <AnimatePresence>
-                    {serviceOpen &&
-                      category && (
-                        <motion.div
-                          initial={{
-                            opacity: 0,
-                            y: -8,
-                            scale: 0.99,
-                          }}
-                          animate={{
-                            opacity: 1,
-                            y: 0,
-                            scale: 1,
-                          }}
-                          exit={{
-                            opacity: 0,
-                            y: -8,
-                            scale: 0.99,
-                          }}
-                          transition={{
-                            duration: 0.16,
-                          }}
-                          className="absolute left-0 right-0 top-[calc(100%+8px)] z-50 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
-                        >
-                          <div className="border-b border-slate-100 bg-slate-50/80 px-4 py-3">
-                            <div className="flex items-center justify-between gap-3">
-                              <div>
-                                <div className="text-xs font-black uppercase tracking-wide text-slate-400">
-                                  Chọn dịch vụ
-                                </div>
-
-                                <div className="mt-0.5 text-sm font-bold text-slate-700">
-                                  {
-                                    getCategoryMeta(
-                                      category,
-                                    ).label
-                                  }
-                                </div>
-                              </div>
-
-                              <span
-                                className={`rounded-full px-3 py-1 text-xs font-black ${
-                                  categoryColors(
-                                    category,
-                                  ).badge
-                                }`}
-                              >
-                                {
-                                  categoryServices.length
-                                }{' '}
-                                dịch vụ
-                              </span>
-                            </div>
-                          </div>
-
-                          <div className="max-h-[380px] overflow-y-auto p-2">
-                            {categoryServices.map(
+                  {!category ? (
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 text-sm text-slate-500">
+                      Vui lòng chọn loại dịch vụ ở bước 2.
+                    </div>
+                  ) : categoryServices.length === 0 ? (
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 text-sm text-slate-500">
+                      Chưa có dịch vụ khả dụng.
+                    </div>
+                  ) : (
+                    <div className="space-y-2 rounded-2xl border border-slate-200 bg-slate-50/50 p-3">
+                      <p className="px-1 pb-1 text-xs font-medium text-slate-500">
+                        Chọn một dịch vụ để tiếp tục đặt hàng.
+                      </p>
+{categoryServices.map(
                               (item) => {
                                 const active =
                                   String(
@@ -1286,11 +1432,16 @@ export default function SocialServicesPage() {
                                   )
 
                                 return (
-                                  <button
+                                  <motion.button
                                     type="button"
-                                    key={
-                                      item.id
-                                    }
+                                    key={item.id}
+                                    {...(reduceMotion ? {} : {
+                                      initial: { opacity: 0, y: 6 },
+                                      animate: { opacity: 1, y: 0 },
+                                      transition: { duration: 0.18 },
+                                      whileHover: { x: 3 },
+                                      whileTap: { scale: 0.99 },
+                                    })}
                                     onClick={() =>
                                       changeService(
                                         String(
@@ -1298,7 +1449,7 @@ export default function SocialServicesPage() {
                                         ),
                                       )
                                     }
-                                    className={`group flex w-full items-start gap-3 rounded-xl p-3 text-left transition ${
+                                    className={`group flex w-full min-w-0 flex-wrap items-start gap-x-3 gap-y-2 rounded-xl border border-slate-200 bg-white p-3 text-left transition-all duration-200 hover:border-blue-100 hover:bg-blue-50/50 ${
                                       active
                                         ? colors.active
                                         : 'hover:bg-slate-50'
@@ -1319,7 +1470,7 @@ export default function SocialServicesPage() {
                                       />
                                     </span>
 
-                                    <div className="min-w-0 flex-1">
+                                    <div className="min-w-0 flex-1 basis-[calc(100%-3.25rem)] sm:basis-auto">
                                       <div
                                         className={`text-sm font-black leading-5 ${
                                           active
@@ -1353,7 +1504,7 @@ export default function SocialServicesPage() {
                                       </div>
                                     </div>
 
-                                    <div className="ml-3 shrink-0 text-right">
+                                    <div className="ml-auto flex w-full items-center justify-end gap-2 border-t border-slate-100 pt-2 text-right sm:ml-3 sm:block sm:w-auto sm:border-0 sm:pt-0">
                                       <div
                                         className={`text-sm font-black ${
                                           active
@@ -1367,7 +1518,7 @@ export default function SocialServicesPage() {
                                       </div>
 
                                       <div className="text-[10px] font-bold text-slate-400">
-                                        / lượt
+                                        / {getServiceUnit(selected)}
                                       </div>
 
                                       {active && (
@@ -1378,24 +1529,28 @@ export default function SocialServicesPage() {
                                         </span>
                                       )}
                                     </div>
-                                  </button>
+                                  </motion.button>
                                 )
                               },
                             )}
-                          </div>
-                        </motion.div>
-                      )}
-                  </AnimatePresence>
+                    </div>
+                  )}
                 </div>
 
+                <AnimatePresence mode="wait">
                 {selected && (
-                  <>
+                  <motion.div
+                    key={String(selected.id)}
+                    {...rise(0)}
+                    exit={reduceMotion ? undefined : { opacity: 0, y: -8 }}
+                    className="space-y-6"
+                  >
                     <div>
                       <label className="mb-2 block text-sm font-black text-slate-700">
-                        4. Link / Username / ID
+                        4. Link
                       </label>
 
-                      <input
+                      <input data-order-field="target"
                         required
                         value={target}
                         onChange={(e) =>
@@ -1403,9 +1558,16 @@ export default function SocialServicesPage() {
                             e.target.value,
                           )
                         }
-                        placeholder="Nhập link, username hoặc ID..."
-                        className="w-full rounded-2xl border border-slate-200 px-4 py-4 outline-none transition focus:border-blue-500"
+                        placeholder="Nhập đường dẫn https://..."
+                        className={`w-full rounded-2xl border px-4 py-4 outline-none transition ${invalidFields.includes("target") ? 'border-red-500 bg-red-50 ring-2 ring-red-200' : 'border-slate-200 focus:border-blue-500'}`}
                       />
+                        {invalidFields.includes('target') && (
+                          <p className="mt-2 text-sm font-semibold text-red-600">
+                            {!target.trim()
+                              ? 'Vui lòng nhập link.'
+                              : 'Link không hợp lệ. Vui lòng nhập đường dẫn đầy đủ.'}
+                          </p>
+                        )}
                     </div>
                     {requiresComments && (
                       <div>
@@ -1413,12 +1575,12 @@ export default function SocialServicesPage() {
                           5. Nội dung bình luận
                         </label>
 
-                        <textarea
+                        <textarea data-order-field="comments"
                           value={comments}
                           onChange={(e) => setComments(e.target.value)}
                           rows={6}
                           placeholder={"Mỗi dòng là một bình luận..."}
-                          className="w-full rounded-2xl border border-slate-200 px-4 py-4 outline-none transition focus:border-blue-500"
+                          className={`w-full rounded-2xl border px-4 py-4 outline-none transition ${invalidFields.includes("comments") ? 'border-red-500 bg-red-50 ring-2 ring-red-200' : 'border-slate-200 focus:border-blue-500'}`}
                         />
 
                         <p className="mt-2 text-sm font-semibold text-blue-600">
@@ -1446,7 +1608,7 @@ export default function SocialServicesPage() {
                         5. Số lượng
                       </label>
 
-                      <input
+                      <input data-order-field="quantity"
                         required
                         type="number"
                         min={
@@ -1466,8 +1628,15 @@ export default function SocialServicesPage() {
                             e.target.value,
                           )
                         }
-                        className="w-full rounded-2xl border border-slate-200 px-4 py-4 text-lg font-black outline-none transition focus:border-blue-500"
+                        className={`w-full rounded-2xl border px-4 py-4 outline-none transition ${invalidFields.includes("quantity") ? 'border-red-500 bg-red-50 ring-2 ring-red-200' : 'border-slate-200 focus:border-blue-500'}`}
                       />
+                        {invalidFields.includes('quantity') && (
+                          <p className="mt-2 text-sm font-semibold text-red-600">
+                            {numericQuantity < Number(selected.min_quantity)
+                              ? `Số lượng tối thiểu là ${Number(selected.min_quantity).toLocaleString('vi-VN')} lượt.`
+                              : `Số lượng tối đa là ${Number(selected.max_quantity).toLocaleString('vi-VN')} lượt.`}
+                          </p>
+                        )}
 
                       <div className="mt-2 flex justify-between text-xs font-semibold text-slate-400">
                         <span>
@@ -1493,7 +1662,7 @@ export default function SocialServicesPage() {
                     <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
                       <div className="flex items-center justify-between gap-4">
                         <span className="font-bold text-slate-500">
-                          Đơn giá / 1 lượt
+                          Đơn giá / 1 {getServiceUnit(selected)}
                         </span>
 
                         <span className="font-black">
@@ -1521,9 +1690,16 @@ export default function SocialServicesPage() {
                             Tổng tiền
                           </span>
 
-                          <span className="text-3xl font-black text-blue-600">
+                          <motion.span
+                            key={money(total)}
+                            initial={reduceMotion ? false : { opacity: 0.5, y: 5 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.2 }}
+                            className="text-3xl font-black text-blue-600"
+                            aria-live="polite"
+                          >
                             {money(total)}
-                          </span>
+                          </motion.span>
                         </div>
                       </div>
 
@@ -1589,21 +1765,74 @@ export default function SocialServicesPage() {
                     ) : (
                       <button
                         type="submit"
-                        disabled={
-                          balance ===
-                            null ||
-                          total <= 0
-                        }
+                        disabled={submitting}
                         className="w-full rounded-2xl bg-blue-600 px-5 py-4 text-base font-black text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
                       >
                         Tiếp tục đặt đơn
                       </button>
                     )}
-                  </>
+                  </motion.div>
                 )}
+                </AnimatePresence>
               </div>
             )}
-          </motion.form>
+          
+            </fieldset>
+
+            {!isLoggedIn && (
+              <div
+                className="absolute inset-0 z-30 flex items-center justify-center rounded-[24px] bg-white/30 p-4 sm:p-6"
+                aria-label="Yêu cầu đăng nhập để tạo đơn hàng"
+              >
+                <div className="w-full max-w-md rounded-3xl border border-blue-100 bg-white p-6 text-center shadow-[0_20px_70px_rgba(15,23,42,0.15)] sm:p-8">
+                  <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="h-7 w-7"
+                    >
+                      <rect x="4" y="10" width="16" height="11" rx="2" />
+                      <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+                    </svg>
+                  </div>
+
+                  <h3 className="mt-4 text-xl font-black text-slate-950">
+                    Đăng nhập để tạo đơn hàng
+                  </h3>
+
+                  <p className="mt-2 text-sm leading-6 text-slate-500">
+                    Vui lòng đăng nhập hoặc đăng ký tài khoản NoScam.vn
+                    để chọn dịch vụ và đặt hàng.
+                  </p>
+
+                  <div className="mt-6 grid grid-cols-2 gap-3">
+                    <Link
+                      to="/login"
+                      className="flex min-h-12 items-center justify-center rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-blue-700"
+                    >
+                      Đăng nhập
+                    </Link>
+
+                    <Link
+                      to="/register"
+                      className="flex min-h-12 items-center justify-center rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-bold text-blue-700 transition hover:bg-blue-100"
+                    >
+                      Đăng ký
+                    </Link>
+                  </div>
+
+                  <p className="mt-4 text-xs text-slate-400">
+                    Đăng nhập để mở khóa toàn bộ chức năng tạo đơn.
+                  </p>
+                </div>
+              </div>
+            )}
+</motion.form>
         </div>
       {adminNotice && (
         <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-slate-950/60 p-4">
@@ -1640,15 +1869,9 @@ export default function SocialServicesPage() {
         {confirmOpen &&
           selected && (
             <motion.div
-              initial={{
-                opacity: 0,
-              }}
-              animate={{
-                opacity: 1,
-              }}
-              exit={{
-                opacity: 0,
-              }}
+              initial={reduceMotion ? false : { opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={reduceMotion ? undefined : { opacity: 0 }}
               className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/60 p-5 backdrop-blur-sm"
               onClick={() => {
                 if (!submitting) {
@@ -1659,21 +1882,9 @@ export default function SocialServicesPage() {
               }}
             >
               <motion.div
-                initial={{
-                  opacity: 0,
-                  scale: 0.96,
-                  y: 15,
-                }}
-                animate={{
-                  opacity: 1,
-                  scale: 1,
-                  y: 0,
-                }}
-                exit={{
-                  opacity: 0,
-                  scale: 0.96,
-                  y: 15,
-                }}
+                initial={reduceMotion ? false : { opacity: 0, scale: 0.96, y: 15 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={reduceMotion ? undefined : { opacity: 0, scale: 0.96, y: 15 }}
                 onClick={(e) =>
                   e.stopPropagation()
                 }
@@ -1781,6 +1992,20 @@ export default function SocialServicesPage() {
             </motion.div>
           )}
       </AnimatePresence>
+
+      <SocialGuideModal
+        open={guideOpen}
+        onClose={() => setGuideOpen(false)}
+        platform={platform}
+        category={category}
+        selectedId={selectedId}
+        target={target}
+        quantity={quantity}
+        categoryOpen={categoryOpen}
+        serviceOpen={serviceOpen}
+        requiresComments={requiresComments}
+        comments={comments}
+      />
     </>
   )
 }

@@ -4,7 +4,7 @@ namespace App\Services\Social;
 
 use App\Models\SocialProvider;
 use App\Services\Social\Providers\HackLike17Provider;
-use App\Services\Social\Providers\NganHangSubProvider;
+use App\Services\Social\Providers\Subs24hProvider;
 use App\Services\Social\Providers\VietnamFbProvider;
 use InvalidArgumentException;
 
@@ -14,8 +14,8 @@ class SocialProviderManager
         SocialProvider $provider
     ): SocialProviderInterface {
         return match ($provider->driver) {
-            'nganhangsub' =>
-                new NganHangSubProvider(
+            'subs24h' =>
+                new Subs24hProvider(
                     $provider->api_url,
                     $provider->api_key
                 ),

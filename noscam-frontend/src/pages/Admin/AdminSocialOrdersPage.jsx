@@ -1,3 +1,4 @@
+
 import NoScamSelect from '../../components/ui/NoScamSelect'
 import {
   useCallback,
@@ -53,7 +54,13 @@ function safeTarget(target) {
   return `https://${value}`
 }
 
+// NOSCAM_API_RECONCILIATION_BADGE_V1
+// NOSCAM_SOCIAL_ORDER_FILTER_V3
 const statusMap = {
+  api_reconciliation: [
+    'Chờ đối soát API',
+    'bg-orange-100 text-orange-800',
+  ],
   pending: [
     'Chờ xử lý',
     'bg-amber-50 text-amber-700',
@@ -112,6 +119,18 @@ function ApiBadge({ item }) {
     )
   }
 
+  if (
+    item.status === 'pending' &&
+    Number(item.attempts || 0) >= 1 &&
+    !item.provider_order_id
+  ) {
+    return (
+      <span className="inline-flex whitespace-nowrap rounded-full bg-orange-100 px-2.5 py-1 text-[11px] font-black text-orange-800">
+        Cần đối soát API
+      </span>
+    )
+  }
+
   if (item.provider_error) {
     return (
       <span className="inline-flex whitespace-nowrap rounded-full bg-red-50 px-2.5 py-1 text-[11px] font-black text-red-600">
@@ -164,6 +183,11 @@ export default function AdminSocialOrdersPage() {
     useState(0)
 
   const [auditOrder, setAuditOrder] = useState(null)
+
+  const [noRefundOrder, setNoRefundOrder] = useState(null)
+  const [noRefundReason, setNoRefundReason] = useState('')
+  const [noRefundConfirm, setNoRefundConfirm] = useState(false)
+  const [noRefundError, setNoRefundError] = useState('')
 
   const [busyId, setBusyId] =
     useState(null)
@@ -247,6 +271,37 @@ export default function AdminSocialOrdersPage() {
     loadAuditCount()
   }, [loadAuditCount])
 
+  async function confirmNoRefund() {
+    // NOSCAM_NO_REFUND_AUTO_REASON_V1
+    if (!noRefundOrder?.id || !noRefundConfirm) return
+    setBusyId(noRefundOrder.id)
+    setNoRefundError('')
+    try {
+      await adminService.cancelSocialOrderWithoutRefund(noRefundOrder.id, 'Admin hủy đơn không hoàn tiền')
+      setNoRefundOrder(null)
+      setNoRefundReason('')
+      setNoRefundConfirm(false)
+      await load()
+      await loadAuditCount()
+    } catch (err) {
+      setNoRefundError(err?.response?.data?.message || err?.data?.message || err?.message || 'Không thể đóng đơn.')
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+
+  const isOrderFinal = (order) => {
+    const status = String(order?.status || '').toLowerCase()
+    return [
+      'completed',
+      'cancelled',
+      'canceled',
+      'admin_closed',
+      'failed',
+    ].includes(status) || Boolean(order?.admin_no_refund)
+  }
+
   async function confirmCancel() {
     if (!cancelOrder?.id) return
 
@@ -278,7 +333,7 @@ export default function AdminSocialOrdersPage() {
     <div className="min-h-screen bg-slate-50">
       <AdminNav />
 
-      <main className="mx-auto max-w-[1600px] px-5 py-8 lg:px-8">
+      <main className="mx-auto max-w-7xl px-5 py-8 lg:px-8">
         <div>
           <div className="text-sm font-bold uppercase tracking-[0.18em] text-blue-600">
             Social Services
@@ -394,310 +449,188 @@ export default function AdminSocialOrdersPage() {
           }}
           className="mt-5 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm"
         >
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[1750px] text-left">
-              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-400">
-                <tr>
-                  <th className="px-5 py-4">
-                    Đơn
-                  </th>
+          <div className="divide-y divide-slate-100">
+            {loading ? (
+              <div className="px-5 py-16 text-center text-sm font-semibold text-slate-400">
+                Đang tải...
+              </div>
+            ) : items.length === 0 ? (
+              <div className="px-5 py-16 text-center text-sm font-semibold text-slate-400">
+                Chưa có đơn hàng.
+              </div>
+            ) : (
+              items.map((item) => {
+                const profitMargin = margin(item)
 
-                  <th className="px-5 py-4">
-                    Dịch vụ
-                  </th>
+                return (
+                  <article
+                    key={item.id}
+                    className="p-4 transition hover:bg-slate-50/70 sm:p-5"
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 pb-4">
+                      <div className="min-w-0">
+                        <div className="text-base font-black text-slate-950">
+                          {item.code}
+                        </div>
+                        <div className="mt-1 text-xs text-slate-400">
+                          #{item.id}
+                          {item.user?.username
+                            ? ` · @${item.user.username}`
+                            : ''}
+                        </div>
+                      </div>
 
-                  <th className="px-5 py-4">
-                    Link
-                  </th>
+                      <div className="flex flex-col items-end gap-1">
+                        <StatusBadge
+                          status={
+                            item.status === 'pending' &&
+                            Number(item.attempts || 0) >= 1 &&
+                            !item.provider_order_id
+                              ? 'api_reconciliation'
+                              : item.status
+                          }
+                        />
+                        <span className="text-[11px] font-medium text-slate-400">
+                          {item.provider_order_id
+                            ? 'Đã gửi API'
+                            : 'Chưa có mã đơn API'}
+                        </span>
+                      </div>
+                    </div>
 
-                  <th className="px-5 py-4">
-                    SL
-                  </th>
-
-                  <th className="px-5 py-4">
-                    Giá vốn
-                  </th>
-
-                  <th className="px-5 py-4">
-                    Giá bán
-                  </th>
-
-                  <th className="px-5 py-4">
-                    Lợi nhuận
-                  </th>
-
-                  <th className="px-5 py-4">
-                    Nguồn API
-                  </th>
-
-                  <th className="px-5 py-4">
-                    API Order
-                  </th>
-
-                  <th className="px-5 py-4">
-                    Trạng thái
-                  </th>
-
-                  <th className="px-5 py-4">
-                    Hành động
-                  </th>
-                </tr>
-              </thead>
-
-              <tbody className="divide-y divide-slate-100">
-                {loading ? (
-                  <tr>
-                    <td
-                      colSpan="11"
-                      className="px-5 py-16 text-center font-semibold text-slate-400"
-                    >
-                      Đang tải...
-                    </td>
-                  </tr>
-                ) : items.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan="11"
-                      className="px-5 py-16 text-center font-semibold text-slate-400"
-                    >
-                      Chưa có đơn hàng.
-                    </td>
-                  </tr>
-                ) : (
-                  items.map((item) => {
-                    const profitMargin =
-                      margin(item)
-
-                    return (
-                      <tr
-                        key={item.id}
-                        className="align-top transition hover:bg-slate-50/70"
-                      >
-                        <td className="px-5 py-4">
-                          <div className="font-black text-slate-900">
-                            {item.code}
-                          </div>
-
-                          <div className="mt-1 text-xs text-slate-400">
-                            #{item.id}
-                          </div>
-
-                          {item.user?.username && (
-                            <div className="mt-2 text-xs font-bold text-blue-600">
-                              @{item.user.username}
+                    <div className="mt-4 grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+                      <div className="min-w-0">
+                        <div className="flex items-start gap-3">
+                          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100">
+                            <PlatformIcon
+                              platform={item.service?.platform || 'other'}
+                              className="h-5 w-5"
+                            />
+                          </span>
+                          <div className="min-w-0">
+                            <div className="break-words text-sm font-bold text-slate-900">
+                              {item.service?.name || '—'}
                             </div>
-                          )}
-                        </td>
-
-                        <td className="px-5 py-4">
-                          <div className="flex max-w-[260px] gap-3">
-                            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-50">
-                              <PlatformIcon
-                                platform={
-                                  item.service
-                                    ?.platform ||
-                                  'other'
-                                }
-                                className="h-5 w-5"
-                              />
-                            </span>
-
-                            <div className="min-w-0">
-                              <div className="font-bold leading-5 text-slate-800">
-                                {item.service
-                                  ?.name || '—'}
-                              </div>
-
-                              <div className="mt-1 text-xs font-black uppercase text-slate-400">
-                                {item.service
-                                  ?.category || ''}
-                              </div>
+                            <div className="mt-1 text-xs font-semibold uppercase text-slate-400">
+                              {item.service?.category || ''}
                             </div>
                           </div>
-                        </td>
+                        </div>
 
-                        <td className="px-5 py-4">
+                        <div className="mt-3 min-w-0">
+                          <div className="text-xs font-semibold text-slate-400">
+                            Liên kết
+                          </div>
                           {item.target ? (
                             <a
-                              href={safeTarget(
-                                item.target,
-                              )}
+                              href={safeTarget(item.target)}
                               target="_blank"
                               rel="noopener noreferrer"
                               title={item.target}
-                              className="block max-w-[230px] truncate text-sm font-bold text-blue-600 underline decoration-blue-200 underline-offset-4 transition hover:text-blue-800"
+                              className="mt-1 block max-w-full break-all text-sm font-semibold text-blue-600 hover:underline"
                             >
                               {item.target}
                             </a>
                           ) : (
-                            <span className="text-slate-400">
-                              —
+                            <span className="text-sm text-slate-400">—</span>
+                          )}
+                        </div>
+
+                        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
+                          <span className="text-slate-500">
+                            Số lượng: <strong className="text-slate-900">{number(item.quantity)}</strong>
+                          </span>
+                          <span className="text-slate-500">
+                            API: <strong className="text-slate-900">{item.provider?.name || '—'}</strong>
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-2">
+                        <div className="rounded-xl bg-slate-50 p-3">
+                          <div className="text-[11px] font-semibold text-slate-500">Giá vốn</div>
+                          <div className="mt-1 text-sm font-black text-slate-800">{money(item.cost_amount)}</div>
+                        </div>
+                        <div className="rounded-xl bg-blue-50 p-3">
+                          <div className="text-[11px] font-semibold text-blue-600">Giá bán</div>
+                          <div className="mt-1 text-sm font-black text-slate-950">{money(item.sell_amount)}</div>
+                        </div>
+                        <div className="col-span-2 rounded-xl bg-emerald-50 p-3 sm:col-span-1 lg:col-span-2">
+                          <div className="text-[11px] font-semibold text-emerald-700">Lợi nhuận dự kiến</div>
+                          <div className="mt-1 flex flex-wrap items-center gap-2">
+                            <span className={`text-sm font-black ${Number(item.profit_amount) >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
+                              {money(item.profit_amount)}
                             </span>
-                          )}
-
-                          <div className="mt-1 text-[11px] font-semibold text-slate-400">
-                            Mở liên kết ↗
-                          </div>
-                        </td>
-
-                        <td className="px-5 py-4 font-black text-slate-800">
-                          {number(
-                            item.quantity,
-                          )}
-                        </td>
-
-                        <td className="px-5 py-4">
-                          <div className="font-bold text-slate-500">
-                            {money(
-                              item.cost_amount,
-                            )}
-                          </div>
-                        </td>
-
-                        <td className="px-5 py-4">
-                          <div className="font-black text-slate-950">
-                            {money(
-                              item.sell_amount,
-                            )}
-                          </div>
-                        </td>
-
-                        <td className="px-5 py-4">
-                          <div
-                            className={`font-black ${
-                              Number(
-                                item.profit_amount,
-                              ) >= 0
-                                ? 'text-emerald-600'
-                                : 'text-red-600'
-                            }`}
-                          >
-                            {money(
-                              item.profit_amount,
-                            )}
-                          </div>
-
-                          <div className="mt-1 text-xs font-black text-slate-400">
-                            {profitMargin.toLocaleString(
-                              'vi-VN',
-                              {
-                                maximumFractionDigits: 1,
-                              },
-                            )}
-                            %
-                          </div>
-                        </td>
-
-                        <td className="px-5 py-4">
-                          <div className="font-black text-slate-800">
-                            {item.provider
-                              ?.name || '—'}
-                          </div>
-
-                          {item.providerService && (
-                            <>
-                              <div className="mt-1 text-xs font-bold text-blue-600">
-                                #
-                                {
-                                  item
-                                    .providerService
-                                    .provider_service_id
-                                }
-                              </div>
-
-                              <div className="mt-1 max-w-[220px] text-xs leading-4 text-slate-400">
-                                {item
-                                  .providerService
-                                  .provider_service_name ||
-                                  ''}
-                              </div>
-                            </>
-                          )}
-                        </td>
-
-                        <td className="px-5 py-4">
-                          <ApiBadge
-                            item={item}
-                          />
-
-                          {item.provider_order_id && (
-                            <div className="mt-2 max-w-[150px] break-all text-xs font-black text-slate-700">
-                              {
-                                item.provider_order_id
-                              }
-                            </div>
-                          )}
-
-                          {item.provider_error && (
-                            <div
-                              title={
-                                item.provider_error
-                              }
-                              className="mt-2 max-w-[180px] truncate text-xs font-semibold text-red-500"
-                            >
-                              {
-                                item.provider_error
-                              }
-                            </div>
-                          )}
-                        </td>
-
-                        <td className="px-5 py-4">
-                          <StatusBadge
-                            status={
-                              item.status
-                            }
-                          />
-
-                          {item.provider_order_id ? (
-                            <div className="mt-2 text-[11px] font-semibold text-slate-400">
-                              Đồng bộ từ API
-                            </div>
-                          ) : (
-                            <div className="mt-2 text-[11px] font-semibold text-slate-400">
-                              Chờ gửi API
-                            </div>
-                          )}
-                        </td>
-
-                        <td className="px-5 py-4">
-                          <div className="flex flex-col items-start gap-2">
-                            <button
-                              type="button"
-                              onClick={() => setAuditOrder(item)}
-                              className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-2 text-xs font-black text-blue-700 transition hover:bg-blue-600 hover:text-white"
-                            >
-                              Đối soát
-                            </button>
-                          {canCancel(item) ? (
-                            <button
-                              type="button"
-                              disabled={
-                                busyId ===
-                                item.id
-                              }
-                              onClick={() =>
-                                setCancelOrder(
-                                  item,
-                                )
-                              }
-                              className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-xs font-black text-red-600 transition hover:border-red-600 hover:bg-red-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
-                            >
-                              Hủy
-                            </button>
-                          ) : (
-                            <span className="text-xs font-bold text-slate-300">
-                              —
+                            <span className="text-xs font-semibold text-emerald-700">
+                              {profitMargin.toLocaleString('vi-VN', { maximumFractionDigits: 1 })}%
                             </span>
-                          )}
                           </div>
-                        </td>
-                      </tr>
-                    )
-                  })
-                )}
-              </tbody>
-            </table>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-100 bg-slate-50/70 p-3">
+                      <div className="min-w-0">
+                        <ApiBadge item={item} />
+                        {item.provider_order_id && (
+                          <div className="mt-1 break-all text-xs font-semibold text-slate-600">
+                            API Order: {item.provider_order_id}
+                          </div>
+                        )}
+                        {item.providerService && (
+                          <div className="mt-1 break-words text-xs text-slate-500">
+                            Dịch vụ nguồn #{item.providerService.provider_service_id}
+                            {item.providerService.provider_service_name
+                              ? ` · ${item.providerService.provider_service_name}`
+                              : ''}
+                          </div>
+                        )}
+                        {item.provider_error && (
+                          <div className="mt-1 break-words text-xs font-semibold text-red-600">
+                            {item.provider_error}
+                          </div>
+                        )}
+                      </div>
+
+                      
+<div className="flex w-full flex-wrap gap-2 sm:w-auto">
+<button
+                          type="button"
+                          onClick={() => setAuditOrder(item)}
+                          className="flex-1 rounded-xl border border-blue-200 bg-white px-4 py-2.5 text-xs font-black text-blue-700 transition hover:bg-blue-50 sm:flex-none"
+                        >
+                          Đối soát
+                        </button>
+
+{!(['completed', 'cancelled', 'canceled', 'admin_closed'].includes(String(item.status || '').toLowerCase()) || Boolean(item.admin_no_refund)) && (
+  <>
+
+    <button
+      type="button"
+      disabled={busyId === item.id}
+      onClick={() => setNoRefundOrder(item)}
+      className="flex-1 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs font-black text-amber-800 transition hover:bg-amber-100 disabled:opacity-50 sm:flex-none"
+    >
+      Hủy không hoàn tiền
+    </button>
+
+    <button
+      type="button"
+      disabled={busyId === item.id}
+      onClick={() => setCancelOrder(item)}
+      className="flex-1 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-xs font-black text-red-700 transition hover:bg-red-100 disabled:opacity-50 sm:flex-none"
+    >
+      Hủy &amp; hoàn tiền
+    </button>
+  </>
+)}
+</div>
+
+                    </div>
+                  </article>
+                )
+              })
+            )}
           </div>
         </motion.div>
 
@@ -750,6 +683,25 @@ export default function AdminSocialOrdersPage() {
           order={auditOrder}
           onClose={() => setAuditOrder(null)}
         />
+      )}
+
+      {noRefundOrder && createPortal(
+        <div className="fixed inset-0 z-[100000] flex items-center justify-center bg-slate-950/70 p-4">
+          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl">
+            <h2 className="text-xl font-black text-slate-950">Hủy không hoàn tiền</h2>
+            <p className="mt-2 text-sm text-slate-600">Đơn {noRefundOrder.code}. Chỉ đóng trong NoScam, không hoàn xu và không gửi yêu cầu hủy tới nhà cung cấp. Dịch vụ có thể vẫn tiếp tục chạy.</p>
+            <label className="mt-3 flex gap-2 text-sm font-semibold text-rose-800">
+              <input type="checkbox" checked={noRefundConfirm} onChange={(e) => setNoRefundConfirm(e.target.checked)} />
+              Tôi xác nhận không hoàn tiền cho đơn này.
+            </label>
+            {noRefundError && <p className="mt-2 text-sm font-bold text-red-600">{noRefundError}</p>}
+            <div className="mt-5 grid grid-cols-2 gap-3">
+              <button type="button" disabled={busyId === noRefundOrder.id} onClick={() => setNoRefundOrder(null)} className="rounded-xl border border-slate-200 p-3 font-bold">Quay lại</button>
+              <button type="button" disabled={busyId === noRefundOrder.id || !noRefundConfirm} onClick={confirmNoRefund} className="rounded-xl bg-rose-800 p-3 font-bold text-white disabled:opacity-40">{busyId === noRefundOrder.id ? 'Đang xử lý...' : 'Xác nhận hủy'}</button>
+            </div>
+          </div>
+        </div>,
+        document.body,
       )}
 
       {cancelOrder &&

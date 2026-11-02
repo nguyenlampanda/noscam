@@ -17,6 +17,7 @@ class AdminSocialProviderController extends Controller
     public function index(): JsonResponse
     {
         $providers = SocialProvider::query()
+            ->where('driver', '!=', 'nganhangsub')
             ->withCount(['services', 'orders'])
             ->orderBy('priority')
             ->orderBy('id')

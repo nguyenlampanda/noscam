@@ -328,22 +328,10 @@ function ProviderCard({
             </div>
 
             <div className="mt-1 text-lg font-black text-slate-950">
-              {providerBalanceOriginal(
+              {providerBalanceVnd(
                 provider,
               )}
             </div>
-
-            {String(
-              provider.currency,
-            ).toUpperCase() !==
-              'VND' && (
-              <div className="mt-1 text-xs font-semibold text-slate-400">
-                ≈{' '}
-                {providerBalanceVnd(
-                  provider,
-                )}
-              </div>
-            )}
           </div>
 
           <div className="rounded-2xl bg-slate-50 p-4">

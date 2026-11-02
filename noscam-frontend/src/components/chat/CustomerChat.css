@@ -1,0 +1,201 @@
+
+/* NOSCAM CUSTOMER CHAT PREMIUM V1 */
+
+/* Khung chat */
+.noscam-chat-panel {
+  border-radius: 24px;
+  border: 1px solid #dbeafe;
+  background: #ffffff;
+  box-shadow:
+    0 30px 80px rgba(15, 23, 42, .18),
+    0 8px 24px rgba(37, 99, 235, .08);
+  transform-origin: bottom right;
+  animation: noscamChatOpen .32s cubic-bezier(.2,.8,.2,1) both;
+}
+
+/* Header */
+.noscam-chat-header {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(115deg, #071638 0%, #1643ac 58%, #2563eb 100%);
+  padding: 19px 18px;
+}
+
+.noscam-chat-header::after {
+  content: "";
+  position: absolute;
+  width: 180px;
+  height: 180px;
+  top: -110px;
+  right: -60px;
+  border-radius: 50%;
+  background: rgba(255,255,255,.10);
+  pointer-events: none;
+}
+
+.noscam-chat-header h2 {
+  font-size: 15px;
+  letter-spacing: -.02em;
+}
+
+.noscam-chat-header p {
+  margin-top: 4px;
+  color: #dbeafe;
+}
+
+/* Chấm trạng thái */
+.noscam-chat-header p::before {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 7px;
+  border-radius: 50%;
+  background: #86efac;
+  box-shadow: 0 0 0 3px rgba(134,239,172,.15);
+  animation: noscamChatStatus 2.2s ease-in-out infinite;
+}
+
+/* Nội dung chat */
+.noscam-chat-panel .noscam-chat-messages {
+  background:
+    radial-gradient(circle at top left, rgba(219,234,254,.28), transparent 55%),
+    #f8fafc;
+  scroll-behavior: smooth;
+}
+
+/* Bong bóng tin nhắn */
+.noscam-chat-panel .noscam-chat-bubble {
+  max-width: 86%;
+  border-radius: 18px;
+  padding: 10px 14px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+  box-shadow: 0 3px 10px rgba(15,23,42,.045);
+  animation: noscamChatMessage .26s ease-out both;
+}
+
+/* Bong bóng của khách */
+.noscam-chat-panel .noscam-chat-bubble--mine {
+  border-bottom-right-radius: 6px;
+  background: linear-gradient(135deg, #2563eb, #1553df);
+  color: #ffffff;
+  box-shadow: 0 5px 15px rgba(37,99,235,.18);
+}
+
+/* Bong bóng của Admin */
+.noscam-chat-panel .noscam-chat-bubble--other {
+  border: 1px solid #e2e8f0;
+  border-bottom-left-radius: 6px;
+  background: #ffffff;
+  color: #334155;
+}
+
+/* Vùng nhập */
+.noscam-chat-form {
+  background: #ffffff;
+  border-top: 1px solid #e2e8f0;
+  padding: 12px;
+  gap: 9px;
+}
+
+.noscam-chat-form input {
+  min-height: 43px;
+  border-radius: 14px;
+  border: 1px solid #dbe3ee;
+  background: #f8fafc;
+  padding: 0 13px;
+  transition: border-color .2s ease, box-shadow .2s ease;
+}
+
+.noscam-chat-form input:focus {
+  background: #ffffff;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37,99,235,.11);
+}
+
+.noscam-chat-form button[type="submit"] {
+  min-height: 43px;
+  border-radius: 13px;
+  background: linear-gradient(135deg, #2563eb, #1643d7);
+  color: #ffffff;
+  font-weight: 700;
+  padding: 0 16px;
+  transition: transform .2s ease, box-shadow .2s ease;
+}
+
+.noscam-chat-form button[type="submit"]:not(:disabled):hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 18px rgba(37,99,235,.25);
+}
+
+.noscam-chat-form button[type="submit"]:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}
+
+/* Nút mở chat */
+.noscam-chat-trigger {
+  box-shadow: 0 10px 28px rgba(37,99,235,.24);
+  transition: transform .2s ease, box-shadow .2s ease;
+}
+
+.noscam-chat-trigger:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 14px 30px rgba(37,99,235,.32);
+}
+
+/* Animation */
+@keyframes noscamChatOpen {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes noscamChatMessage {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes noscamChatStatus {
+  50% {
+    box-shadow: 0 0 0 7px rgba(134,239,172,0);
+  }
+}
+
+/* Mobile */
+@media (max-width: 640px) {
+  .noscam-chat-panel {
+    border-radius: 20px;
+  }
+
+  .noscam-chat-header {
+    padding: 16px;
+  }
+
+  .noscam-chat-panel .noscam-chat-bubble {
+    max-width: 90%;
+    font-size: 13px;
+  }
+}
+
+/* Giảm chuyển động */
+@media (prefers-reduced-motion: reduce) {
+  .noscam-chat-panel,
+  .noscam-chat-panel *,
+  .noscam-chat-panel *::before {
+    animation: none !important;
+    transition: none !important;
+  }
+}

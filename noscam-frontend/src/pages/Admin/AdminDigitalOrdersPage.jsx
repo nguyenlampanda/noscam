@@ -66,6 +66,38 @@ function Field({ label, children }) {
   )
 }
 
+
+// NOSCAM_ADMIN_ZALO_LINK_V1
+function digitalOrderCode(id) {
+  if (id === null || id === undefined || id === '') return '—'
+  return `NSD-${String(id).padStart(6, '0')}`
+}
+
+function ZaloLink({ phone }) {
+  const value = String(phone ?? '').trim()
+  const digits = value.replace(/[^0-9]/g, '')
+  const normalized = digits.startsWith('84') && digits.length === 11
+    ? '0' + digits.slice(2)
+    : digits
+
+  if (!/^0[0-9]{9}$/.test(normalized)) {
+    return <span className="text-slate-400">{value || '—'}</span>
+  }
+
+  return (
+    <a
+      href={`https://zalo.me/${normalized}`}
+      target="_blank"
+      rel="noopener noreferrer"
+      title="Mở Zalo để tìm khách hàng"
+      className="inline-flex items-center gap-1 font-bold text-blue-600 underline-offset-4 transition hover:text-blue-800 hover:underline"
+    >
+      {value}
+      <span aria-hidden="true">↗</span>
+    </a>
+  )
+}
+
 export default function AdminDigitalOrdersPage() {
   const { confirm } = useNoScamUI()
   const [items, setItems] = useState([])
@@ -381,29 +413,17 @@ export default function AdminDigitalOrdersPage() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <AdminNav />
+      
 
-      <main className="mx-auto max-w-7xl space-y-6 px-5 py-8 lg:px-8">
+      <main className="space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-black text-slate-950">
-              Đơn dịch vụ số
-            </h1>
+            
             <p className="mt-1 text-sm text-slate-500">
-              Theo dõi yêu cầu và cập nhật tiến độ xử lý đơn dịch vụ số.
+              
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => {
-              setLoading(true)
-              setError('')
-              setReload(value => value + 1)
-            }}
-            className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold hover:bg-blue-50"
-          >
-            Làm mới
-          </button>
+          
         </div>
 
         <form onSubmit={applySearch} className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 md:grid-cols-[1fr_auto]">
@@ -473,7 +493,7 @@ export default function AdminDigitalOrdersPage() {
               <table className="w-full min-w-[800px] text-left text-sm">
                 <thead className="bg-slate-50 text-xs text-slate-500">
                   <tr>
-                    {['Mã đơn', 'Khách hàng', 'Dịch vụ', 'Giá', 'Xử lý', 'Thanh toán', 'Ngày tạo', ''].map(label => (
+                    {['Mã đơn', 'Khách hàng', 'Zalo', 'Dịch vụ', 'Giá', 'Xử lý', 'Thanh toán', 'Ngày tạo', ''].map(label => (
                       <th key={label} className="px-4 py-3 font-bold">
                         {label}
                       </th>
@@ -483,10 +503,13 @@ export default function AdminDigitalOrdersPage() {
                 <tbody className="divide-y divide-slate-100">
                   {items.map(item => (
                     <tr key={item.id} className="hover:bg-slate-50">
-                      <td className="px-4 py-4 font-bold">#{item.id}</td>
+                      <td className="px-4 py-4 font-bold">{digitalOrderCode(item.id)}</td>
                       <td className="px-4 py-4">{item.user?.username ||
                           item.guest_name ||
                           (item.user_id ? `#${item.user_id}` : 'Khách vãng lai')}</td>
+                       <td className="px-4 py-4 whitespace-nowrap">
+                         <ZaloLink phone={item.request_data?.zalo_phone || item.request_data?.zalo} />
+                       </td>
                       <td className="px-4 py-4">{item.service?.name || '—'}</td>
                       <td className="px-4 py-4">{money(item.amount_vnd)}</td>
                       <td className="px-4 py-4">{labelFor(statusOptions, item.status)}</td>
@@ -562,7 +585,7 @@ export default function AdminDigitalOrdersPage() {
                   id="digital-order-dialog-title"
                   className="text-xl font-black text-slate-950"
                 >
-                  Chi tiết đơn #{selected.id}
+                  Chi tiết đơn {digitalOrderCode(selected.id)}
                 </h2>
                 <p className="mt-1 text-xs text-slate-500">
                   Thông tin yêu cầu dịch vụ số
@@ -608,6 +631,14 @@ export default function AdminDigitalOrdersPage() {
                       </Field>
                     </>
                   )}
+                  <Field label="Số Zalo">
+                    <ZaloLink
+                      phone={
+                        selected.request_data?.zalo_phone ||
+                        selected.request_data?.zalo
+                      }
+                    />
+                  </Field>
                   <Field label="Dịch vụ">{selected.service?.name}</Field>
                   <Field label="Trạng thái xử lý">
                     {labelFor(statusOptions, selected.status)}
@@ -626,10 +657,14 @@ export default function AdminDigitalOrdersPage() {
                   <div className="grid gap-3">
                     {Object.entries(selected.request_data || {}).length ? (
                       Object.entries(selected.request_data).map(([key, value]) => (
-                        <Field key={key} label={key}>
-                          {typeof value === 'object'
-                            ? JSON.stringify(value)
-                            : String(value ?? '—')}
+                        <Field key={key} label={key === 'zalo_phone' ? 'Số Zalo' : key}>
+                          {key === 'zalo_phone' ? (
+                            <ZaloLink phone={value} />
+                          ) : typeof value === 'object' ? (
+                            JSON.stringify(value)
+                          ) : (
+                            String(value ?? '—')
+                          )}
                         </Field>
                       ))
                     ) : (

@@ -5,12 +5,28 @@ import { useEffect, useMemo, useState } from 'react'
 import adminExchangeService from '../../services/adminExchangeService'
 
 const platforms = {
+  youtube: 'YouTube',
+  threads: 'Threads',
+  twitter: 'X (Twitter)',
+  telegram: 'Telegram',
+  zalo: 'Zalo',
+  pinterest: 'Pinterest',
+  linkedin: 'LinkedIn',
+  reddit: 'Reddit',
   instagram: 'Instagram',
   tiktok: 'TikTok',
   facebook: 'Facebook',
 }
 
 const taskTypes = {
+  view: 'Lượt xem',
+  share: 'Chia sẻ',
+  subscribe: 'Đăng ký',
+  repost: 'Đăng lại',
+  join: 'Tham gia',
+  reaction: 'Cảm xúc',
+  save: 'Lưu',
+  upvote: 'Bình chọn',
   follow: 'Theo dõi',
   like: 'Thích',
   comment: 'Bình luận',
@@ -100,6 +116,7 @@ function TargetLink({ url }) {
   )
 }
 
+// NOSCAM_CAMPAIGN_ACTION_SAFE_V2
 function CampaignDetails({ campaign, onClose, onChanged }) {
   const { confirm, prompt } = useNoScamUI()
   const c = campaign
@@ -114,7 +131,14 @@ function CampaignDetails({ campaign, onClose, onChanged }) {
   const total = Math.max(0, number(c.quantity))
   const approved = Math.max(0, number(c.approved_count))
   const progress = total ? Math.min(100, approved / total * 100) : 0
-  const hasStats = c.claims_count !== undefined && c.claims_count !== null
+  // NOSCAM_CAMPAIGN_DETAILS_V3
+  const remaining = Math.max(0, total - approved)
+  const hasLegacyBudget = [
+    c.budget_total,
+    c.budget_held,
+    c.budget_settled,
+    c.budget_refunded,
+  ].some((value) => Number(value || 0) > 0)
 
   useEffect(() => {
     const onKey = (event) => {
@@ -246,7 +270,7 @@ const verb = action === 'pause' ? 'TẠM DỪNG' : 'TIẾP TỤC'
               Quản trị chiến dịch
             </p>
             <h3 className="mt-1 text-xl font-black text-slate-950">
-              Chiến dịch #{c.id}
+              {adminCampaignCode(c)}
             </h3>
             <p className="mt-1 text-sm text-slate-500">
               {platforms[c.platform] || c.platform} · {taskTypes[c.task_type] || c.task_type}
@@ -265,133 +289,190 @@ const verb = action === 'pause' ? 'TẠM DỪNG' : 'TIẾP TỤC'
           </div>
         </header>
 
-        <div className="space-y-6 overflow-y-auto p-5 sm:p-6">
-          <div>
-            <h4 className="mb-3 font-black text-slate-900">Người tạo chiến dịch</h4>
-            <div className="grid gap-3 sm:grid-cols-3">
-              <Info label="Tên người tạo">{c.user?.name || 'Chưa có tên'}</Info>
-              <Info label="User ID">#{c.user_id}</Info>
-              <Info label="Email">{c.user?.email || 'Chưa có dữ liệu'}</Info>
-            </div>
-          </div>
+        <div className="flex-1 space-y-6 overflow-y-auto bg-slate-50/70 p-4 sm:p-6">
 
-          <div>
-            <h4 className="mb-3 font-black text-slate-900">Thông tin nhiệm vụ</h4>
-            <div className="grid gap-3 sm:grid-cols-3">
-              <Info label="Nền tảng">{platforms[c.platform] || c.platform}</Info>
-              <Info label="Loại nhiệm vụ">{taskTypes[c.task_type] || c.task_type}</Info>
-              <Info label="Số lượng yêu cầu">{total.toLocaleString('vi-VN')}</Info>
-              <Info label="Giá mỗi lượt">{money(c.cost_per_task)}</Info>
-              <Info label="Thưởng mỗi lượt">{money(c.reward_per_task)}</Info>
-              <Info label="Tài khoản đích">
-                {c.social_account_id
-                  ? `#${c.social_account_id}`
-                  : c.social_account?.username || 'Chưa có dữ liệu'}
-              </Info>
-            </div>
-            <div className="mt-3 rounded-xl border border-slate-200 p-4">
-              <p className="mb-2 text-xs font-medium text-slate-500">Liên kết mục tiêu</p>
-              <TargetLink url={c.target_url} />
-            </div>
-          </div>
+          {/* NOSCAM_CAMPAIGN_DETAILS_V3 */}
 
-          <div>
-            <h4 className="mb-3 font-black text-slate-900">Tiến độ nhiệm vụ</h4>
-            {hasStats ? (
-              <>
-                <div className="rounded-xl border border-blue-100 bg-blue-50 p-4">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="font-semibold text-slate-700">Được duyệt / Mục tiêu</span>
-                    <strong className="text-blue-700">{approved}/{total}</strong>
-                  </div>
-                  <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-blue-100">
-                    <div
-                      className="h-full rounded-full bg-blue-600"
-                      style={{ width: `${progress}%` }}
-                    />
-                  </div>
-                </div>
-                <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
-                  <Info label="Tổng claim">{number(c.claims_count)}</Info>
-                <div className="col-span-full">
-                  <AdminCampaignClaimAccounts
-                    campaignId={c.id}
-                    quantity={c.quantity}
-                  />
-                </div>
-                  {claimLabels.map(([key, label]) => (
-                    <Info key={key} label={label}>
-                      {c[key] === undefined ? 'Chưa có dữ liệu' : number(c[key])}
-                    </Info>
-                  ))}
-                </div>
-              </>
-            ) : (
-              <p className="rounded-xl bg-amber-50 p-4 text-sm text-amber-800">
-                API chưa trả về thống kê claim. Cần hoàn tất phần backend 1044A để xem tiến độ.
+          <section className="overflow-hidden rounded-2xl border border-blue-100 bg-white shadow-sm">
+            <div className="bg-gradient-to-r from-blue-700 to-blue-500 p-5 text-white sm:p-6">
+              <p className="text-xs font-bold uppercase tracking-widest text-blue-100">
+                Tổng quan chiến dịch
               </p>
-            )}
-          </div>
+              <div className="mt-3 flex flex-wrap items-end justify-between gap-4">
+                <div>
+                  <p className="text-3xl font-black">
+                    {approved.toLocaleString('vi-VN')}
+                    <span className="text-lg font-medium text-blue-100">
+                      {' / '}{total.toLocaleString('vi-VN')}
+                    </span>
+                  </p>
+                  <p className="mt-1 text-sm text-blue-100">
+                    Lượt tương tác đã hoàn thành
+                  </p>
+                </div>
+                <div className="rounded-xl bg-white/15 px-4 py-2 text-right">
+                  <p className="text-2xl font-black">
+                    {progress.toFixed(1)}%
+                  </p>
+                  <p className="text-xs text-blue-100">
+                    Tiến độ
+                  </p>
+                </div>
+              </div>
+              <div className="mt-5 h-2.5 overflow-hidden rounded-full bg-white/25">
+                <div
+                  className="h-full rounded-full bg-white transition-all"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+            </div>
 
+            <div className="grid grid-cols-2 gap-px bg-slate-100 sm:grid-cols-4">
+              {[
+                ['Mục tiêu', total],
+                ['Hoàn thành', approved],
+                ['Còn lại', remaining],
+                ['Tiến độ', `${progress.toFixed(1)}%`],
+              ].map(([label, value]) => (
+                <div key={label} className="bg-white px-4 py-4">
+                  <p className="text-xs font-medium text-slate-500">
+                    {label}
+                  </p>
+                  <p className="mt-2 text-xl font-black text-slate-900">
+                    {typeof value === 'number'
+                      ? value.toLocaleString('vi-VN')
+                      : value}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </section>
 
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:p-5">
-            <h4 className="text-base font-black text-slate-900">
-              Tình trạng xử lý chiến dịch
-            </h4>
-
-            <div className="mt-3 flex flex-wrap items-center gap-3">
-              <Status value={c.status} />
-
-              <span className="text-sm text-slate-600">
-                {c.status === 'active'
-                  ? 'Đang nhận nhiệm vụ mới.'
-                  : c.status === 'paused'
-                    ? 'Đã tạm dừng nhận nhiệm vụ mới.'
-                    : c.status === 'cancelling'
-                      ? 'Đang chờ hoàn tất xử lý trước khi kết thúc.'
-                      : c.status === 'cancelled'
-                        ? 'Chiến dịch đã kết thúc quy trình hủy.'
-                        : 'Xem thông tin trạng thái chi tiết.'}
+          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <h4 className="text-base font-black text-slate-950">
+                Thông tin chiến dịch
+              </h4>
+              <span className="rounded-lg bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">
+                #{c.id}
               </span>
             </div>
 
-            {c.status === 'cancelling' && (
-              <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-                Chiến dịch đang trong quá trình hủy.
-                Các nhiệm vụ chưa xử lý xong có thể khiến việc hoàn ngân sách chưa thực hiện được.
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Info label="Nền tảng">
+                {platforms[c.platform] || c.platform}
+              </Info>
+              <Info label="Loại tương tác">
+                {taskTypes[c.task_type] || c.task_type}
+              </Info>
+              <Info label="Trạng thái">
+                <Status value={c.status} />
+              </Info>
+              {/* NOSCAM_RECIPROCAL_DETAILS_V1 */}
+              <Info label="Tài khoản nhận tương tác">
+                {c.social_account?.username
+                  ? `@${String(c.social_account.username).replace(/^@/, '')}`
+                  : c.social_account_id
+                    ? `Tài khoản liên kết #${c.social_account_id}`
+                    : 'Chưa có dữ liệu'}
+              </Info>
+              <Info label="Tài khoản mục tiêu">
+                {c.social_account?.username ||
+                  (c.social_account_id
+                    ? `#${c.social_account_id}`
+                    : 'Chưa có dữ liệu')}
+              </Info>
+            </div>
+
+            <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50/40 p-4">
+              <p className="mb-2 text-xs font-bold text-slate-600">
+                Liên kết mục tiêu
               </p>
-            )}
+              <TargetLink url={c.target_url} />
+            </div>
+          </section>
 
-            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-              <Info label="Đã hoàn thành">
-                {approved.toLocaleString('vi-VN')} / {total.toLocaleString('vi-VN')}
+          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <h4 className="mb-4 text-base font-black text-slate-950">
+              Người tạo chiến dịch
+            </h4>
+
+            <div className="grid gap-3 sm:grid-cols-3">
+              <Info label="Tên người tạo">
+                {c.user?.name || 'Chưa có tên'}
               </Info>
-
-              <Info label="Tỷ lệ hoàn thành">
-                {progress.toFixed(1)}%
+              <Info label="User ID">
+                #{c.user_id}
               </Info>
-
-              <Info label="Trạng thái ngân sách">
-                {number(c.budget_held) > 0
-                  ? 'Còn xu ký quỹ'
-                  : 'Không còn xu ký quỹ'}
+              <Info label="Email">
+                {c.user?.email || 'Chưa có dữ liệu'}
               </Info>
             </div>
-          </div>
+          </section>
 
-          <div>
-            <h4 className="mb-3 font-black text-slate-900">Ngân sách chiến dịch</h4>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <Info label="Tổng ngân sách">{money(c.budget_total)}</Info>
-              <Info label="Đang giữ">{money(c.budget_held)}</Info>
-              <Info label="Đã quyết toán">{money(c.budget_settled)}</Info>
-              <Info label="Đã hoàn">{money(c.budget_refunded)}</Info>
+          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <h4 className="mb-4 text-base font-black text-slate-950">
+              Trạng thái và thời gian
+            </h4>
+
+            <div className="flex flex-wrap items-center gap-3">
+              <Status value={c.status} />
+              <span className="text-sm text-slate-600">
+                {c.status === 'active'
+                  ? 'Chiến dịch đang hoạt động.'
+                  : c.status === 'paused'
+                    ? 'Chiến dịch đã được tạm dừng.'
+                    : c.status === 'completed'
+                      ? 'Chiến dịch đã hoàn thành mục tiêu.'
+                      : c.status === 'cancelling'
+                        ? 'Chiến dịch đang trong quy trình hủy.'
+                        : c.status === 'cancelled'
+                          ? 'Chiến dịch đã bị hủy.'
+                          : 'Chiến dịch chưa được kích hoạt.'}
+              </span>
             </div>
-          </div>
 
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Info label="Ngày tạo">{date(c.created_at)}</Info>
-            <Info label="Cập nhật gần nhất">{date(c.updated_at)}</Info>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <Info label="Ngày tạo">
+                {date(c.created_at)}
+              </Info>
+              <Info label="Cập nhật gần nhất">
+                {date(c.updated_at)}
+              </Info>
+            </div>
+          </section>
+
+          {!c.is_free_reciprocal && hasLegacyBudget && (
+            <section className="rounded-2xl border border-amber-200 bg-amber-50/50 p-5">
+              <h4 className="text-base font-black text-slate-950">
+                Dữ liệu ngân sách chiến dịch cũ
+              </h4>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                Chiến dịch này có dữ liệu xu. Thông tin được giữ
+                để Admin đối chiếu khi xử lý hủy hoặc hoàn ngân sách.
+              </p>
+
+              <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <Info label="Tổng ngân sách">
+                  {money(c.budget_total)}
+                </Info>
+                <Info label="Đang giữ">
+                  {money(c.budget_held)}
+                </Info>
+                <Info label="Đã quyết toán">
+                  {money(c.budget_settled)}
+                </Info>
+                <Info label="Đã hoàn">
+                  {money(c.budget_refunded)}
+                </Info>
+              </div>
+            </section>
+          )}
+
+          <div className="rounded-xl border border-blue-100 bg-blue-50/60 p-4 text-sm leading-6 text-slate-700">
+            Các thông tin trên được lấy từ dữ liệu chiến dịch.
+            Thay đổi trạng thái chỉ có hiệu lực khi máy chủ
+            xác nhận thành công.
           </div>
 
           {['active', 'paused'].includes(c.status) && (
@@ -442,7 +523,7 @@ const verb = action === 'pause' ? 'TẠM DỪNG' : 'TIẾP TỤC'
                   ? 'Đang xử lý...'
                   : c.status === 'active'
                     ? 'Tạm dừng nhận nhiệm vụ (không hoàn xu)'
-                    : 'Tiếp tục nhận nhiệm vụ'}
+                    : 'Tiếp tục chiến dịch'}
               </button>
 
             </div>
@@ -515,7 +596,7 @@ const verb = action === 'pause' ? 'TẠM DỪNG' : 'TIẾP TỤC'
 
               <div className="mt-4 space-y-3 rounded-xl border border-red-200 bg-white p-4">
                 <h5 className="font-black text-red-800">
-                  Hoàn tất hủy và hoàn xu còn lại
+                  Hoàn tất hủy chiến dịch
                 </h5>
 
                 <p className="text-sm leading-6 text-slate-700">
@@ -575,7 +656,7 @@ const verb = action === 'pause' ? 'TẠM DỪNG' : 'TIẾP TỤC'
                 >
                   {saving
                     ? 'Đang kiểm tra và xử lý...'
-                    : 'Hoàn tất hủy và hoàn xu còn lại'}
+                    : 'Hoàn tất hủy chiến dịch'}
                 </button>
               </div>
             </section>
@@ -585,7 +666,7 @@ const verb = action === 'pause' ? 'TẠM DỪNG' : 'TIẾP TỤC'
             <section className="space-y-3 rounded-2xl border border-red-200 bg-red-50/50 p-4">
               <div>
                 <h4 className="font-black text-red-800">
-                  Hủy chiến dịch và hoàn xu còn lại
+                  Hủy chiến dịch
                 </h4>
                 <p className="mt-2 text-sm leading-6 text-slate-700">
                   Backend sẽ kiểm tra điều kiện trước khi hủy.
@@ -598,7 +679,7 @@ const verb = action === 'pause' ? 'TẠM DỪNG' : 'TIẾP TỤC'
                 htmlFor="campaign-cancel-reason"
                 className="block text-sm font-semibold text-slate-700"
               >
-                Lý do hủy và hoàn xu
+                Lý do hủy chiến dịch
               </label>
 
               <textarea
@@ -626,7 +707,7 @@ const verb = action === 'pause' ? 'TẠM DỪNG' : 'TIẾP TỤC'
                 onClick={requestCancellation}
                 className="rounded-xl bg-red-600 px-5 py-3 text-sm font-bold text-white hover:bg-red-700 disabled:opacity-50"
               >
-                {saving ? 'Đang xử lý...' : 'Hủy chiến dịch và hoàn xu còn lại'}
+                {saving ? 'Đang xử lý...' : 'Hủy chiến dịch'}
               </button>
             </section>
           )}
@@ -653,28 +734,27 @@ const verb = action === 'pause' ? 'TẠM DỪNG' : 'TIẾP TỤC'
 }
 
 
+
+// NOSCAM_ADMIN_INTERACTION_AUDIT_UI_V1
 function AdminCampaignClaimAccounts({ campaignId, quantity }) {
-  const [claims, setClaims] = ReactClaimAccounts.useState([])
+  const [payload, setPayload] = ReactClaimAccounts.useState(null)
   const [loading, setLoading] = ReactClaimAccounts.useState(true)
   const [error, setError] = ReactClaimAccounts.useState('')
 
   ReactClaimAccounts.useEffect(() => {
     let active = true
-
     setLoading(true)
     setError('')
-    setClaims([])
+    setPayload(null)
 
     adminExchangeService.campaignClaims(campaignId)
       .then((response) => {
         if (!active) return
-
-        const payload = response?.data?.data ?? response?.data ?? response
-        setClaims(Array.isArray(payload?.claims) ? payload.claims : [])
+        setPayload(response?.data?.data ?? response?.data ?? response)
       })
       .catch((err) => {
         if (active) {
-          setError(err?.response?.data?.message || err?.message || 'Không tải được tài khoản.')
+          setError(err?.response?.data?.message || err?.message || 'Không tải được lịch sử.')
         }
       })
       .finally(() => {
@@ -684,95 +764,191 @@ function AdminCampaignClaimAccounts({ campaignId, quantity }) {
     return () => { active = false }
   }, [campaignId])
 
-  const total = Math.max(0, Number(quantity) || 0)
-  const remaining = Math.max(0, total - claims.length)
+  const claims = Array.isArray(payload?.claims) ? payload.claims : []
+  const history = Array.isArray(payload?.performed_history)
+    ? payload.performed_history : []
 
-  const statusLabels = {
-    claimed: 'Đã nhận',
-    submitted: 'Đã gửi',
-    approved: 'Đã duyệt',
-    rejected: 'Bị từ chối',
-    settled: 'Đã quyết toán',
-    refunded: 'Đã hoàn',
-  }
-
-  const safeProfileUrl = (value) => {
+  const safeUrl = (value) => {
+    if (!value) return null
     try {
-      const url = new URL(value)
+      const url = new URL(String(value))
       return ['https:', 'http:'].includes(url.protocol) ? url.href : null
     } catch {
       return null
     }
   }
 
-  return (
-    <section className="mt-5 rounded-2xl border border-slate-200 bg-white p-4">
-      <h3 className="text-base font-black text-slate-900">
-        Tài khoản thực hiện nhiệm vụ
-      </h3>
-      <p className="mt-1 text-sm text-slate-500">
-        {loading ? 'Đang tải...' : `${claims.length} lượt nhận / ${total} lượt yêu cầu`}
-      </p>
+  const showDate = (value) => {
+    if (!value) return 'Chưa có dữ liệu'
+    const date = new Date(value)
+    return Number.isNaN(date.getTime())
+      ? 'Chưa có dữ liệu'
+      : date.toLocaleString('vi-VN')
+  }
 
-      {error && (
-        <p role="alert" className="mt-3 text-sm text-red-600">{error}</p>
-      )}
+  const username = (value) => value
+    ? `@${String(value).replace(/^@/, '')}`
+    : 'Chưa có dữ liệu'
 
-      {!loading && !error && (
-        <div className="mt-4 space-y-2">
-          {claims.map((claim, index) => {
-            const profileUrl = safeProfileUrl(claim.profile_url)
+  const link = (value) => {
+    const url = safeUrl(value)
+    return url
+      ? <a href={url} target="_blank" rel="noopener noreferrer"
+          className="break-all font-semibold text-blue-600 underline">
+          {url}
+        </a>
+      : <span className="text-slate-400">Chưa có dữ liệu</span>
+  }
 
-            return (
-              <div
-                key={claim.id}
-                className="rounded-xl border border-slate-200 bg-slate-50 p-3"
-              >
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="font-bold text-slate-900">
-                    {index + 1}. {claim.account_username || 'Chưa có tên tài khoản'}
-                  </span>
-                  <span className="rounded-lg bg-white px-2 py-1 text-xs font-semibold text-slate-600">
-                    {statusLabels[claim.status] || claim.status || 'Chưa rõ'}
-                  </span>
-                </div>
+  const statusName = (value) => ({
+    claimed: 'Đã nhận nhiệm vụ',
+    submitted: 'Đã gửi thực hiện',
+    approved: 'Đã duyệt',
+    rejected: 'Đã từ chối',
+    confirmed: 'Đã xác nhận',
+    pending_review: 'Chờ xác nhận',
+    pending: 'Đang chờ',
+    settled: 'Đã quyết toán',
+    refunded: 'Đã hoàn',
+  }[value] || value || 'Chưa có dữ liệu')
 
-                <p className="mt-1 text-xs text-slate-600">
-                  Người thực hiện: {claim.worker?.username || claim.worker?.name || `User #${claim.worker?.id ?? '?'}`}
-                </p>
+  const info = (label, content) => (
+    <div className="min-w-0 rounded-xl bg-slate-50 p-3">
+      <p className="mb-1 text-xs font-semibold text-slate-500">{label}</p>
+      <div className="break-words text-sm text-slate-900">{content}</div>
+    </div>
+  )
 
-                {profileUrl && (
-                  <a
-                    href={profileUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-2 inline-block break-all text-sm font-semibold text-blue-600 underline"
-                  >
-                    {profileUrl}
-                  </a>
-                )}
-              </div>
-            )
-          })}
+  const renderClaim = (claim, index, outgoing = false) => (
+    <article key={claim.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+        <strong className="text-sm text-slate-900">
+          Lượt #{claim.id} · {outgoing ? 'Đã thực hiện cho người khác' : `Lượt nhận ${index + 1}`}
+        </strong>
+        <span className="rounded-lg bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">
+          {statusName(claim.status)}
+        </span>
+      </div>
 
-          {remaining > 0 && (
-            <p className="rounded-xl bg-slate-100 p-3 text-sm text-slate-600">
-              Còn {remaining} vị trí chưa có lượt nhận nhiệm vụ.
-            </p>
-          )}
+      <div className="grid gap-3 sm:grid-cols-2">
+        {info('Người thực hiện trên NoScam',
+          claim.worker?.username || claim.worker?.name ||
+          (claim.worker?.id ? `User #${claim.worker.id}` : 'Chưa có dữ liệu'))}
+        {info('Username mạng xã hội thực hiện', username(claim.account_username))}
+        {info('Link tài khoản thực hiện', link(claim.profile_url))}
+        {info('Username tài khoản nhận', username(
+          outgoing ? claim.target_username : payload?.receiver?.username
+        ))}
+        {info('Link đích nhận tương tác',
+          link(claim.target_url || (outgoing ? null : payload?.receiver?.target_url)))}
+        {info('Mã chiến dịch đích', claim.campaign_id
+          ? `NSC-${({follow:'FOL',like:'LIK',comment:'CMT'}[claim.task_type] || 'TSK')}-${String(claim.campaign_id).padStart(6, '0')}`
+          : 'Chưa có dữ liệu')}
+        {info('Ngày nhận nhiệm vụ', showDate(claim.claimed_at))}
+        {info('Ngày gửi thực hiện', showDate(claim.submitted_at))}
+        {info('Trạng thái xác nhận', statusName(claim.reciprocal_status))}
+        {info('Ngày xác nhận', showDate(claim.reciprocal_confirmed_at))}
+      </div>
 
-          {claims.length === 0 && remaining === 0 && (
-            <p className="text-sm text-slate-500">Không có lượt nhận nhiệm vụ.</p>
-          )}
+      {!outgoing && (
+        <div className="mt-3 rounded-xl border border-blue-100 bg-blue-50/50 p-3">
+          <p className="mb-2 text-sm font-bold text-blue-900">
+            Thông tin tài khoản nhận khi xác nhận lượt
+          </p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {info('Username nhận', username(claim.return_username))}
+            {info('Link tài khoản nhận', link(claim.return_profile_url))}
+          </div>
+          <p className="mt-2 text-xs text-slate-500">
+            Đây là tài khoản nhận tương tác được ghi nhận khi xác nhận,
+            không phải lịch sử chủ chiến dịch thực hiện cho người khác.
+          </p>
         </div>
+      )}
+    </article>
+  )
+
+  return (
+    <section className="mt-5 space-y-5">
+      {loading && <p className="rounded-xl bg-white p-4">Đang tải lịch sử tương tác...</p>}
+      {error && <p role="alert" className="rounded-xl bg-red-50 p-4 text-red-700">{error}</p>}
+
+      {!loading && !error && payload && (
+        <>
+          <div className="rounded-2xl border border-blue-100 bg-white p-4">
+            <h3 className="text-base font-black text-slate-950">
+              1. Người khác thực hiện cho chiến dịch này
+            </h3>
+            <p className="mt-1 text-sm text-slate-500">
+              {claims.length} lượt ghi nhận · Mục tiêu {quantity} lượt
+            </p>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              {info('Chủ chiến dịch NoScam',
+                payload.creator?.username || payload.creator?.name || 'Chưa có dữ liệu')}
+              {info('Tài khoản nhận tương tác', username(payload.receiver?.username))}
+              {info('Link tài khoản nhận', link(payload.receiver?.profile_url))}
+              {info('Link đích chiến dịch', link(payload.receiver?.target_url))}
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            {claims.map((claim, index) => renderClaim(claim, index))}
+            {claims.length === 0 && (
+              <p className="rounded-xl bg-slate-50 p-4 text-sm text-slate-500">
+                Chưa có lượt thực hiện nào.
+              </p>
+            )}
+          </div>
+
+          {payload.is_free_reciprocal && (
+            <div className="space-y-3">
+              <div className="rounded-2xl border border-blue-100 bg-white p-4">
+                <h3 className="text-base font-black text-slate-950">
+                  2. Chủ chiến dịch đã thực hiện cho người khác
+                </h3>
+                <p className="mt-1 text-sm text-slate-500">
+                  {history.length} lượt gần nhất được trả về.
+                  Mỗi lượt có tài khoản thực hiện và link đích riêng.
+                </p>
+              </div>
+
+              {history.map((claim, index) => renderClaim(claim, index, true))}
+
+              {history.length === 0 && (
+                <p className="rounded-xl bg-slate-50 p-4 text-sm text-slate-500">
+                  Chưa có lịch sử thực hiện tương tác chéo.
+                </p>
+              )}
+
+              {history.length >= (payload.performed_history_limit || 100) && (
+                <p className="text-xs text-amber-700">
+                  Chỉ đang hiển thị tối đa 100 lượt gần nhất, chưa phải toàn bộ lịch sử.
+                </p>
+              )}
+            </div>
+          )}
+        </>
       )}
     </section>
   )
 }
 
+// NOSCAM_CAMPAIGN_FULLNAME_CLICK_V2
+function adminCampaignCode(c) {
+  const type = {
+    follow: 'FOL',
+    like: 'LIK',
+    comment: 'CMT',
+  }[c.task_type] || 'TSK'
+
+  return `NSC-${type}-${String(c.id).padStart(6, '0')}`
+}
+
 export default function ExchangeCampaignList() {
   const [items, setItems] = useState([])
+  // NOSCAM_CAMPAIGN_ADMIN_V2
   const [platform, setPlatform] = useState('')
+  const [taskType, setTaskType] = useState('')
   const [status, setStatus] = useState('')
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
@@ -781,12 +957,15 @@ export default function ExchangeCampaignList() {
   const [error, setError] = useState('')
   const [refresh, setRefresh] = useState(0)
   const [selected, setSelected] = useState(null)
+  // NOSCAM_ADMIN_STATS_INTERACTIVE_V1
+  const [statView, setStatView] = useState('all')
+
 
   useEffect(() => {
     let active = true
     setLoading(true)
 
-    adminExchangeService.campaigns({ platform, status, page })
+    adminExchangeService.campaigns({ platform, taskType, status, page })
       .then((response) => {
         if (!active) return
         setItems(Array.isArray(response?.data) ? response.data : [])
@@ -803,26 +982,46 @@ export default function ExchangeCampaignList() {
       })
 
     return () => { active = false }
-  }, [platform, status, page, refresh])
+  }, [platform, taskType, status, page, refresh])
 
   const filtered = useMemo(() => {
     const keyword = search.trim().toLowerCase()
     if (!keyword) return items
 
     return items.filter((c) => [
+      adminCampaignCode(c),
+      adminCampaignCode(c).replace(/0+(?=\d+$)/, ''),
       c.id, c.user_id, c.user?.name, c.user?.email,
       c.platform, c.task_type, c.target_url,
       c.social_account?.username,
     ].some((value) => String(value ?? '').toLowerCase().includes(keyword)))
   }, [items, search])
 
+  const visibleCampaigns = useMemo(() => {
+    if (statView === 'active') {
+      return filtered.filter(c => c.status === 'active')
+    }
+    if (statView === 'completed') {
+      return filtered.filter(c => Number(c.approved_count || 0) > 0)
+    }
+    return filtered
+  }, [filtered, statView])
+
+  const openStatView = (view) => {
+    setStatView(current => current === view ? 'all' : view)
+  }
+
   const changeFilter = (setter, value) => {
     setPage(1)
     setter(value)
   }
 
-  const totalHeld = filtered.reduce((sum, c) => sum + number(c.budget_held), 0)
-  const totalSettled = filtered.reduce((sum, c) => sum + number(c.budget_settled), 0)
+  const totalRequested = filtered.reduce(
+    (sum, c) => sum + Math.max(0, number(c.quantity)), 0
+  )
+  const totalCompleted = filtered.reduce(
+    (sum, c) => sum + Math.max(0, number(c.approved_count)), 0
+  )
 
   return (
     <section className="w-full min-w-0 space-y-5">
@@ -830,7 +1029,7 @@ export default function ExchangeCampaignList() {
         <div>
           <h2 className="text-2xl font-black text-slate-950">Quản lý chiến dịch</h2>
           <p className="mt-1 text-sm text-slate-500">
-            Theo dõi người tạo, nhiệm vụ, tiến độ và ngân sách.
+            Theo dõi người tạo, nền tảng, loại tương tác và tiến độ thực hiện.
           </p>
         </div>
         <button
@@ -846,15 +1045,34 @@ export default function ExchangeCampaignList() {
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {[
-          ['Chiến dịch hiển thị', filtered.length],
-          ['Đang hoạt động', filtered.filter((c) => c.status === 'active').length],
-          ['Ngân sách đang giữ', money(totalHeld)],
-          ['Đã quyết toán', money(totalSettled)],
-        ].map(([label, value]) => (
-          <div key={label} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          ['all', 'Chiến dịch hiển thị', filtered.length],
+          ['active', 'Đang hoạt động',
+            filtered.filter(c => c.status === 'active').length],
+          ['requested', 'Lượt yêu cầu',
+            totalRequested.toLocaleString('vi-VN')],
+          ['completed', 'Lượt hoàn thành',
+            totalCompleted.toLocaleString('vi-VN')],
+        ].map(([key, label, value]) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => openStatView(key)}
+            aria-pressed={statView === key}
+            className={`rounded-2xl border p-4 text-left shadow-sm transition
+              hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-md
+              focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-100
+              ${statView === key
+                ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-200'
+                : 'border-slate-200 bg-white'}`}
+          >
             <p className="text-xs font-semibold text-slate-500">{label}</p>
-            <p className="mt-2 break-words text-xl font-black text-slate-900">{value}</p>
-          </div>
+            <p className="mt-2 break-words text-xl font-black text-slate-900">
+              {value}
+            </p>
+            <p className="mt-2 text-xs font-semibold text-blue-600">
+              {statView === key ? 'Đang xem · Bấm để bỏ lọc' : 'Bấm để xem chi tiết'}
+            </p>
+          </button>
         ))}
       </div>
       <p className="text-xs text-slate-500">
@@ -862,7 +1080,7 @@ export default function ExchangeCampaignList() {
         không phải tổng toàn hệ thống.
       </p>
 
-      <div className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:grid-cols-3">
+      <div className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-4">
         <input
           type="search"
           value={search}
@@ -880,6 +1098,23 @@ export default function ExchangeCampaignList() {
           <option value="">Tất cả nền tảng</option>
           {Object.entries(platforms).map(([id, name]) => (
             <option key={id} value={id}>{name}</option>
+          ))}
+        </NoScamSelect>
+        <NoScamSelect
+          aria-label="Lọc loại tương tác"
+          value={taskType}
+          onChange={(event) => changeFilter(setTaskType, event.target.value)}
+          className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm"
+        >
+          <option value="">Tất cả tương tác</option>
+          {[
+            'follow', 'like', 'comment', 'view', 'share',
+            'subscribe', 'repost', 'join', 'reaction',
+            'save', 'upvote'
+          ].map((type) => (
+            <option key={type} value={type}>
+              {type.charAt(0).toUpperCase() + type.slice(1)}
+            </option>
           ))}
         </NoScamSelect>
         <NoScamSelect
@@ -903,101 +1138,224 @@ export default function ExchangeCampaignList() {
         <p role="alert" className="rounded-xl bg-red-50 p-4 text-sm text-red-700">{error}</p>
       )}
       {loading && <p className="p-5 text-sm text-slate-500">Đang tải chiến dịch...</p>}
-      {!loading && !error && filtered.length === 0 && (
+      {!loading && !error && visibleCampaigns.length === 0 && (
         <p className="rounded-2xl bg-white p-8 text-center text-sm text-slate-500">
           Không tìm thấy chiến dịch phù hợp.
         </p>
       )}
 
-      {!loading && !error && filtered.length > 0 && (
-        <div className="grid grid-cols-1 items-stretch gap-5 md:grid-cols-2 xl:grid-cols-3">
-          {filtered.map((c) => {
+      {/* NOSCAM_CAMPAIGN_HORIZONTAL_V3 */}
+      {!loading && !error && visibleCampaigns.length > 0 && (
+        <div className="space-y-3">
+          {visibleCampaigns.map((c) => {
             const total = Math.max(0, number(c.quantity))
             const approved = Math.max(0, number(c.approved_count))
-            const hasStats = c.claims_count !== undefined && c.claims_count !== null
-            const progress = total ? Math.min(100, approved / total * 100) : 0
+            const remaining = Math.max(0, total - approved)
+            const progress = total
+              ? Math.min(100, approved / total * 100)
+              : 0
+
+            const platformName = platforms[c.platform] || c.platform
+            const taskName = taskTypes[c.task_type] || c.task_type
+
+            const themes = {
+              instagram: 'from-purple-600 via-fuchsia-600 to-pink-500',
+              tiktok: 'from-slate-950 to-cyan-800',
+              facebook: 'from-blue-700 to-blue-500',
+              youtube: 'from-red-700 to-red-500',
+              threads: 'from-slate-900 to-slate-600',
+              twitter: 'from-slate-900 to-slate-600',
+              telegram: 'from-sky-600 to-cyan-500',
+              zalo: 'from-blue-600 to-sky-500',
+              pinterest: 'from-red-700 to-rose-500',
+              linkedin: 'from-blue-800 to-blue-600',
+              reddit: 'from-orange-600 to-orange-400',
+            }
+
+            const theme = themes[c.platform] ||
+              'from-slate-700 to-slate-500'
 
             return (
               <article
                 key={c.id}
-                className="flex h-full min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-blue-300 hover:shadow-md sm:p-5"
+                role="button"
+                tabIndex={0}
+                aria-label={`Xem chi tiết chiến dịch ${adminCampaignCode(c)}`}
+                onClick={() => setSelected(c)}
+                onKeyDown={(event) => {
+                  if (event.target !== event.currentTarget) return
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault()
+                    setSelected(c)
+                  }
+                }}
+                className="cursor-pointer rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-blue-300 hover:shadow-md sm:p-5"
               >
-                <div className={`rounded-xl bg-gradient-to-br p-4 text-white ${
-                  String(c.platform || '').toLowerCase() === 'tiktok'
-                    ? 'from-slate-950 via-slate-900 to-cyan-800'
-                    : String(c.platform || '').toLowerCase() === 'instagram'
-                      ? 'from-purple-800 via-fuchsia-700 to-pink-500'
-                      : String(c.platform || '').toLowerCase() === 'facebook'
-                        ? 'from-blue-900 via-blue-700 to-blue-500'
-                        : 'from-slate-900 via-slate-800 to-blue-900'
-                }`}>
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="rounded-lg bg-white/15 px-2.5 py-1 text-xs font-bold">
-                      CHIẾN DỊCH #{c.id}
-                    </span>
-                    <span className="text-2xl font-black opacity-80">
-                      {String(c.platform || '').toLowerCase() === 'tiktok'
-                        ? '♪'
-                        : String(c.platform || '').toLowerCase() === 'instagram'
-                          ? '◎'
-                          : '◉'}
-                    </span>
-                  </div>
-                  <h3 className="mt-5 text-xl font-black">
-                    {platforms[c.platform] || c.platform}
-                  </h3>
-                  <p className="mt-1 text-sm text-slate-200">
-                    {taskTypes[c.task_type] || c.task_type}
-                  </p>
-                </div>
+                <div className="flex flex-col gap-5 xl:flex-row xl:items-center">
 
-                <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-                  <Status value={c.status} />
-                  <span className="text-xs text-slate-500">
-                    {date(c.created_at)}
-                  </span>
-                </div>
+                  {/* Nền tảng */}
+                  <div className="flex min-w-0 items-center gap-3 xl:w-64 xl:shrink-0">
+                    <div
+                      className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br ${theme} text-xl font-black text-white`}
+                      aria-hidden="true"
+                    >
+                      {platformName.charAt(0).toUpperCase()}
+                    </div>
 
-                <div className="mt-4 grid grid-cols-2 gap-3">
-                  <Info label="Người tạo">
-                    {c.user?.name || `User #${c.user_id}`}
-                    {c.user?.email && (
-                      <p className="mt-1 break-all text-xs font-normal text-slate-500">
-                        {c.user.email}
+
+
+
+                    <div className="min-w-0">
+                      <p className="truncate text-base font-black text-slate-950">
+                        {platformName}
                       </p>
-                    )}
-                  </Info>
-                  <Info label="Số lượng yêu cầu">{total.toLocaleString('vi-VN')}</Info>
-                  <Info label="Thưởng mỗi lượt">{money(c.reward_per_task)}</Info>
-                  <Info label="Ngân sách đang giữ">{money(c.budget_held)}</Info>
-                </div>
-
-                <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs font-semibold text-slate-500">
-                      {hasStats
-                        ? `Được duyệt ${approved}/${total} · Đã nhận ${number(c.claims_count)} claim`
-                        : 'Chưa có dữ liệu tiến độ từ API'}
-                    </p>
-                    <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
-                      <div
-                        className="h-full rounded-full bg-blue-600"
-                        style={{ width: `${hasStats ? progress : 0}%` }}
-                      />
+                      <button
+                        type="button"
+                        onClick={() => setSelected(c)}
+                        className="mt-0.5 block max-w-full text-left text-blue-600 hover:text-blue-800 hover:underline block max-w-full text-left text-[13px] font-semibold leading-6 tracking-normal text-blue-600 hover:text-blue-700 whitespace-normal"
+                        title="Xem toàn bộ thông tin chiến dịch"
+                      >
+                        <span className="block text-xs font-medium text-slate-500">
+                        {taskName}
+                      </span>
+                      <span className="block whitespace-nowrap font-mono text-[12px] font-semibold tracking-tight text-blue-600">
+                        {adminCampaignCode(c)}
+                      </span>
+                      </button>
+                      <div className="mt-2">
+                        <Status value={c.status} />
+                      </div>
                     </div>
                   </div>
-                  <div className="text-right text-xs text-slate-500">
-                    <p>Đã quyết toán: {money(c.budget_settled)}</p>
-                    <p className="mt-1">Đã hoàn: {money(c.budget_refunded)}</p>
+
+                  {/* Thông tin chiến dịch */}
+                  <div className="min-w-0 flex-1 border-t border-slate-100 pt-4 xl:border-l xl:border-t-0 xl:py-1 xl:pl-5">
+                    {/* NOSCAM_ADMIN_TARGET_LINK_LAYOUT_V3 */}
+                    <div className="mb-4 min-w-0 rounded-xl border border-blue-100 bg-blue-50/50 px-3 py-2">
+                      <p className="mb-1 text-[11px] font-semibold text-slate-500">
+                        Liên kết nhận tương tác
+                      </p>
+                      {c.target_url ? (
+                        <a
+                          href={c.target_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(event) => event.stopPropagation()}
+                          title={c.target_url}
+                          className="block max-w-full truncate text-xs font-semibold text-blue-600 hover:underline"
+                        >
+                          {c.target_url}
+                        </a>
+                      ) : (
+                        <span className="text-xs text-slate-400">
+                          Chưa có liên kết
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-4 sm:grid-cols-4">
+
+                    <div className="min-w-0">
+                      <p className="flex items-center gap-1.5 text-xs text-slate-500">
+                        <svg width="15" height="15" viewBox="0 0 24 24"
+                          fill="none" stroke="currentColor" strokeWidth="1.8"
+                          strokeLinecap="round" strokeLinejoin="round"
+                          aria-hidden="true">
+                          <circle cx="12" cy="8" r="4" />
+                          <path d="M4 21v-2a8 8 0 0 1 16 0v2" />
+                        </svg>
+                        Người tạo
+                      </p>
+                      <p className="mt-1 truncate text-sm font-bold text-slate-900">
+                        {c.user?.name || `User #${c.user_id}`}
+                      </p>
+                    </div>
+
+                    <div>
+                      <p className="flex items-center gap-1.5 text-xs text-slate-500">
+                        <svg width="15" height="15" viewBox="0 0 24 24"
+                          fill="none" stroke="currentColor" strokeWidth="1.8"
+                          strokeLinecap="round" strokeLinejoin="round"
+                          aria-hidden="true">
+                          <circle cx="12" cy="12" r="9" />
+                          <circle cx="12" cy="12" r="5" />
+                          <circle cx="12" cy="12" r="1" />
+                        </svg>
+                        Mục tiêu
+                      </p>
+                      <p className="mt-1 text-sm font-bold text-slate-900">
+                        {total.toLocaleString('vi-VN')}
+                      </p>
+                    </div>
+
+                    <div>
+                      <p className="flex items-center gap-1.5 text-xs text-slate-500">
+                        <svg width="15" height="15" viewBox="0 0 24 24"
+                          fill="none" stroke="currentColor" strokeWidth="1.8"
+                          strokeLinecap="round" strokeLinejoin="round"
+                          aria-hidden="true">
+                          <circle cx="12" cy="12" r="9" />
+                          <path d="m8 12 3 3 5-6" />
+                        </svg>
+                        Hoàn thành
+                      </p>
+                      <p className="mt-1 text-sm font-bold text-slate-900">
+                        {approved.toLocaleString('vi-VN')}
+                        <span className="font-normal text-slate-400">
+                          {' / '}{total.toLocaleString('vi-VN')}
+                        </span>
+                      </p>
+                    </div>
+
+                    <div>
+                      <p className="flex items-center gap-1.5 text-xs text-slate-500">
+                        <svg width="15" height="15" viewBox="0 0 24 24"
+                          fill="none" stroke="currentColor" strokeWidth="1.8"
+                          strokeLinecap="round" strokeLinejoin="round"
+                          aria-hidden="true">
+                          <rect x="3" y="5" width="18" height="16" rx="2" />
+                          <path d="M7 3v4M17 3v4M3 10h18" />
+                        </svg>
+                        Ngày tạo
+                      </p>
+                      <p className="mt-1 text-xs font-semibold text-slate-800">
+                        {date(c.created_at)}
+                      </p>
+                    </div>
                   </div>
+
+                  </div>
+
+                  {/* Tiến độ */}
+                  <div className="min-w-0 xl:w-32 xl:shrink-0">
+                    <div className="mb-2 flex justify-between gap-2 text-xs">
+                      <span className="text-slate-500">Tiến độ</span>
+                      <strong className="text-blue-700">
+                        {progress.toFixed(0)}%
+                      </strong>
+                    </div>
+
+                    <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+                      <div
+                        className="h-full rounded-full bg-blue-600 transition-all"
+                        style={{ width: `${progress}%` }}
+                      />
+                    </div>
+
+                    <p className="mt-1.5 text-xs text-slate-400">
+                      Còn {remaining.toLocaleString('vi-VN')} lượt
+                    </p>
+                  </div>
+
+                  {/* Xem chi tiết */}
+                  <button
+                    type="button"
+                    onClick={() => setSelected(c)}
+                    className="shrink-0 rounded-xl bg-blue-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-blue-700"
+                  >
+                    Xem chi tiết
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setSelected(c)}
-                  className="mt-auto w-full rounded-xl bg-blue-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-blue-700"
-                >
-                  Xem chi tiết chiến dịch
-                </button>
               </article>
             )
           })}
@@ -1028,57 +1386,17 @@ export default function ExchangeCampaignList() {
 
       <div className="rounded-2xl border border-blue-200 bg-blue-50/60 p-5">
         <h3 className="text-base font-black text-slate-900">
-          Hướng dẫn trạng thái và ngân sách
+          Hướng dẫn quản lý chiến dịch
         </h3>
-
-        <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          <div className="rounded-xl bg-white p-4">
-            <p className="font-bold text-emerald-700">Đang hoạt động</p>
-            <p className="mt-1 text-sm text-slate-600">
-              Chiến dịch đang nhận nhiệm vụ mới.
-            </p>
-          </div>
-
-          <div className="rounded-xl bg-white p-4">
-            <p className="font-bold text-amber-700">Tạm dừng</p>
-            <p className="mt-1 text-sm text-slate-600">
-              Không nhận nhiệm vụ mới; nhiệm vụ đã nhận vẫn cần xử lý.
-            </p>
-          </div>
-
-          <div className="rounded-xl bg-white p-4">
-            <p className="font-bold text-orange-700">Đang hủy</p>
-            <p className="mt-1 text-sm text-slate-600">
-              Đang chờ kiểm tra và quyết toán các nhiệm vụ còn tồn.
-            </p>
-          </div>
-
-          <div className="rounded-xl bg-white p-4">
-            <p className="font-bold text-slate-700">Đã hủy</p>
-            <p className="mt-1 text-sm text-slate-600">
-              Chiến dịch đã kết thúc quy trình hủy.
-              Kiểm tra mục Đã hoàn để biết số xu được hoàn.
-            </p>
-          </div>
-        </div>
-
-        <div className="mt-4 rounded-xl border border-blue-100 bg-white p-4">
-          <p className="font-bold text-slate-900">Cách đọc ngân sách</p>
-          <p className="mt-2 text-sm leading-6 text-slate-700">
-            <strong>Tổng ngân sách:</strong> số xu dành cho chiến dịch.
-            <br />
-            <strong>Đang giữ:</strong> số xu còn nằm trong ký quỹ.
-            <br />
-            <strong>Đã quyết toán:</strong> số xu đã được ghi nhận thanh toán.
-            <br />
-            <strong>Đã hoàn:</strong> số xu đã hoàn lại cho người tạo.
-          </p>
-        </div>
-
-        <p className="mt-3 text-xs leading-5 text-slate-600">
-          Admin có thể hủy chiến dịch và hoàn xu còn lại trong một thao tác.
-          Backend chỉ hoàn xu khi các nhiệm vụ đã quyết toán
-          và dữ liệu ngân sách hợp lệ.
+        <p className="mt-2 text-sm leading-6 text-slate-700">
+          Chiến dịch đang hoạt động có thể nhận nhiệm vụ mới.
+          Chiến dịch tạm dừng không nhận nhiệm vụ mới nhưng
+          những nhiệm vụ đã nhận vẫn cần xử lý.
+        </p>
+        <p className="mt-2 text-sm leading-6 text-slate-700">
+          Các chiến dịch cũ có ngân sách vẫn được xử lý theo
+          quy trình quyết toán và hoàn tiền hiện tại.
+          Thông tin tài chính được giữ trong phần chi tiết.
         </p>
       </div>
 

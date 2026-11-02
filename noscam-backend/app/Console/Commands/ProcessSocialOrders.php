@@ -62,7 +62,7 @@ class ProcessSocialOrders extends Command
                             ->whereIn(
                                 'driver',
                                 [
-                                    'nganhangsub',
+                        'subs24h',
                                     'hacklike17',
             'vietnamfb',
         ]
@@ -142,7 +142,7 @@ class ProcessSocialOrders extends Command
                             ->whereIn(
                                 'driver',
                                 [
-                                    'nganhangsub',
+                        'subs24h',
                                     'hacklike17',
             'vietnamfb',
         ]

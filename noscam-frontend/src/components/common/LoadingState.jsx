@@ -8,7 +8,7 @@ const steps = [
   'Chuẩn hóa dữ liệu',
   'Đối chiếu báo cáo',
   'Phân tích liên kết',
-  'Tính Risk Score',
+  'Tính Điểm rủi ro',
 ]
 
 function LoadingState() {

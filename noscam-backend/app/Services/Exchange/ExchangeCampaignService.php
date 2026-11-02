@@ -5,6 +5,7 @@ namespace App\Services\Exchange;
 use App\Models\ExchangeCampaign;
 use App\Models\ExchangeTaskPrice;
 use App\Models\User;
+use App\Models\ExchangeSocialAccount;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Validation\ValidationException;
@@ -20,7 +21,9 @@ class ExchangeCampaignService
         int $quantity,
         bool $rulesAccepted,
         ?string $idempotencyKey = null,
-        ?int $maxBudget = null
+        ?int $maxBudget = null,
+        bool $freeReciprocal = false,
+        ?int $receiveAccountId = null
     ): ExchangeCampaign {
         if (!in_array($platform, [
             'instagram', 'tiktok', 'facebook',
@@ -35,6 +38,31 @@ class ExchangeCampaignService
         ], true)) {
             throw ValidationException::withMessages([
                 'task_type' => 'Loại nhiệm vụ không hợp lệ.',
+            ]);
+        }
+
+        // NOSCAM_EXCHANGE_TOGGLE_V2
+        // Chỉ kiểm tra lúc tạo chiến dịch mới.
+        // Không tác động chiến dịch đã tồn tại hoặc quyết toán.
+        $platformSetting = DB::table('exchange_toggle_settings')
+            ->where('platform', $platform)
+            ->where('task_type', '__platform__')
+            ->value('is_enabled');
+
+        if ($platformSetting !== null && !(bool) $platformSetting) {
+            throw ValidationException::withMessages([
+                'platform' => 'Nền tảng đang tạm tắt.',
+            ]);
+        }
+
+        $taskSetting = DB::table('exchange_toggle_settings')
+            ->where('platform', $platform)
+            ->where('task_type', $taskType)
+            ->value('is_enabled');
+
+        if ($taskSetting !== null && !(bool) $taskSetting) {
+            throw ValidationException::withMessages([
+                'task_type' => 'Loại tương tác đang tạm tắt.',
             ]);
         }
 
@@ -69,6 +97,9 @@ class ExchangeCampaignService
                 'target_url' => $targetUrl,
                 'quantity' => $quantity,
                 'rules_accepted' => $rulesAccepted,
+                ...($freeReciprocal
+                    ? ['is_free_reciprocal' => true, 'receive_account_id' => $receiveAccountId]
+                    : []),
             ], JSON_THROW_ON_ERROR));
 
         if (
@@ -122,7 +153,9 @@ class ExchangeCampaignService
             $quantity,
             $idempotencyKey,
             $requestHash,
-            $maxBudget
+            $maxBudget,
+            $freeReciprocal,
+            $receiveAccountId
         ) {
             // Serialize campaign creation for this owner.
             User::query()
@@ -153,6 +186,54 @@ class ExchangeCampaignService
 
                     return $existing;
                 }
+            }
+
+            $receiveAccount = null;
+            if ($freeReciprocal) {
+                $receiveAccount = ExchangeSocialAccount::query()
+                    ->whereKey($receiveAccountId)
+                    ->where('user_id', $owner->id)
+                    ->where('platform', $platform)
+                    ->where('is_active', true)
+                    ->where('can_receive', true)
+                    ->lockForUpdate()
+                    ->first();
+                if (!$receiveAccount) {
+                    throw ValidationException::withMessages([
+                        'social_account_id' => 'Chọn tài khoản nhận tương tác hợp lệ.',
+                    ]);
+                }
+                if ($taskType === 'follow' &&
+                    rtrim($targetUrl, '/') !== rtrim($receiveAccount->profile_url, '/')) {
+                    throw ValidationException::withMessages([
+                        'target_url' => 'Link Follow phải trùng hồ sơ tài khoản nhận.',
+                    ]);
+                }
+            }
+
+            // FREE_RECIPROCAL_STEP8
+            // Chua kich hoat cho den khi xu ly hai chieu hoan tat.
+            if ($freeReciprocal) {
+                return ExchangeCampaign::create([
+                    'user_id' => $owner->id,
+                    'social_account_id' => $receiveAccount->id,
+                    'platform' => $platform,
+                    'task_type' => $taskType,
+                    'target_url' => $targetUrl,
+                    'quantity' => $quantity,
+                    'cost_per_task' => 0,
+                    'reward_per_task' => 0,
+                    'budget_total' => 0,
+                    'budget_held' => 0,
+                    'budget_settled' => 0,
+                    'budget_refunded' => 0,
+                    'status' => 'active',
+                    'is_free_reciprocal' => true,
+                    'rules_accepted' => true,
+                    'rules_accepted_at' => now(),
+                    'idempotency_key' => $idempotencyKey,
+                    'request_hash' => $requestHash,
+                ]);
             }
 
             $price = ExchangeTaskPrice::query()

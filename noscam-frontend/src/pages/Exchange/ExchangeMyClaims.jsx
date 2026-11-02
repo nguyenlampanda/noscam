@@ -159,7 +159,7 @@ export default function ExchangeMyClaims({
     <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-xl font-black">Nhiệm vụ của tôi</h2>
+          <h2 className="text-xl font-black">Lịch sử tương tác</h2>
           <p className="mt-1 text-sm text-slate-500">
             Theo dõi nhiệm vụ đã nhận và gửi xác nhận sau khi thực hiện.
             Danh sách hiển thị tối đa 15 nhiệm vụ mới nhất.

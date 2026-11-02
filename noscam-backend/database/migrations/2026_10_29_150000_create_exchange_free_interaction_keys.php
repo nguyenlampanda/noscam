@@ -1,0 +1,40 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('exchange_free_interaction_keys', function (Blueprint $table) {
+            $table->id();
+
+            $table->foreignId('social_account_id')
+                ->constrained('exchange_social_accounts')
+                ->restrictOnDelete();
+
+            $table->foreignId('claim_id')
+                ->nullable()
+                ->constrained('exchange_task_claims')
+                ->nullOnDelete();
+
+            $table->char('target_hash', 64);
+
+            $table->timestamps();
+
+            $table->unique(
+                ['social_account_id', 'target_hash'],
+                'exchange_free_account_target_unique'
+            );
+
+            $table->index('claim_id');
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('exchange_free_interaction_keys');
+    }
+};

@@ -68,6 +68,9 @@ Route::get(
     'throttle:public-search'
 );
 
+// NOSCAM_PUBLIC_EVIDENCE_V1: chỉ ảnh đã xác nhận công khai
+Route::get('/alerts/public-images/{id}', [\App\Http\Controllers\Api\PublicEvidenceController::class, 'image'])->whereNumber('id')->middleware('throttle:public-search');
+
 Route::get(
     '/alerts',
     [AlertController::class, 'index']
@@ -346,6 +349,28 @@ Route::middleware([
         [\App\Http\Controllers\Api\ExchangeCampaignController::class, 'store']
     );
 
+    
+    // NOSCAM_RECIPROCAL_PENDING_V1
+    Route::get(
+        '/exchange/reciprocal/campaigns/{campaignId}/users',
+        [\App\Http\Controllers\Api\ExchangeReciprocalController::class, 'campaignReciprocalUsers']
+    )->whereNumber('campaignId');
+
+Route::get(
+        '/exchange/reciprocal',
+        [\App\Http\Controllers\Api\ExchangeReciprocalController::class, 'index']
+    );
+
+    Route::post(
+        '/exchange/reciprocal/{campaignId}/tick',
+        [\App\Http\Controllers\Api\ExchangeReciprocalController::class, 'tick']
+    )->whereNumber('campaignId');
+
+    Route::post(
+        '/exchange/reciprocal/claims/{claimId}/return',
+        [\App\Http\Controllers\Api\ExchangeReciprocalController::class, 'confirmReturn']
+    )->whereNumber('claimId');
+
     Route::get(
         '/exchange/tasks',
         [\App\Http\Controllers\Api\ExchangeTaskController::class, 'index']
@@ -395,6 +420,16 @@ Route::middleware([
         '/exchange/accounts',
         [\App\Http\Controllers\Api\ExchangeSocialAccountController::class, 'store']
     );
+
+    Route::patch(
+        '/exchange/accounts/{id}',
+        [\App\Http\Controllers\Api\ExchangeSocialAccountController::class, 'update']
+    )->whereNumber('id');
+
+    Route::patch(
+        '/exchange/accounts/{id}/roles',
+        [\App\Http\Controllers\Api\ExchangeSocialAccountController::class, 'updateRoles']
+    )->whereNumber('id');
 
     Route::patch(
         '/exchange/accounts/{id}/default',
@@ -524,6 +559,16 @@ Route::prefix('admin')
         Route::post(
             '/exchange/campaigns/{campaignId}/cancel-finalize',
             [\App\Http\Controllers\Api\AdminExchangeCampaignController::class, 'finalizeCancellation']
+        );
+
+        // NOSCAM_EXCHANGE_TOGGLE_V2
+        Route::get(
+            '/exchange/toggles',
+            [\App\Http\Controllers\Api\AdminExchangeToggleController::class, 'index']
+        );
+        Route::put(
+            '/exchange/toggles',
+            [\App\Http\Controllers\Api\AdminExchangeToggleController::class, 'update']
         );
 
         Route::get(
@@ -817,6 +862,11 @@ Route::prefix('admin')
             [AdminSocialOrderController::class, 'cancel']
         );
 
+        Route::post(
+            '/social/orders/{order}/cancel-no-refund',
+            [AdminSocialOrderController::class, 'cancelWithoutRefund']
+        );
+
         Route::patch(
             '/social/orders/{order}/status',
             [AdminSocialOrderController::class, 'updateStatus']
@@ -831,6 +881,17 @@ Route::prefix('admin')
             '/social/customers/{user}',
             [AdminSocialCustomerController::class, 'show']
         );
+
+        /* NOSCAM_ADMIN_USERS_V1 */
+        Route::put(
+            '/social/customers/{user}/profile',
+            [AdminSocialCustomerController::class, 'updateProfile']
+        )->whereNumber('user');
+
+        Route::post(
+            '/social/customers/{user}/revoke-sessions',
+            [AdminSocialCustomerController::class, 'revokeSessions']
+        )->whereNumber('user');
 
         Route::post(
             '/social/customers/{user}/wallet',
@@ -923,6 +984,13 @@ Route::prefix('admin')
         |--------------------------------------------------------------------------
         */
 
+        // NOSCAM_PUBLIC_EVIDENCE_V1: chỉ Admin được quản lý bản sao đã che
+        Route::get('/evidences/{evidence}/public-status', [\App\Http\Controllers\Api\PublicEvidenceController::class, 'status']);
+        Route::get('/evidences/{evidence}/public-preview', [\App\Http\Controllers\Api\PublicEvidenceController::class, 'preview']);
+        Route::post('/evidences/{evidence}/public-copy', [\App\Http\Controllers\Api\PublicEvidenceController::class, 'upload']);
+        Route::post('/evidences/{evidence}/publish', [\App\Http\Controllers\Api\PublicEvidenceController::class, 'publish']);
+        Route::delete('/evidences/{evidence}/publish', [\App\Http\Controllers\Api\PublicEvidenceController::class, 'revoke']);
+
         Route::get(
             '/evidences/{evidence}',
             [
@@ -1002,7 +1070,13 @@ Route::prefix('admin')
 ]);
 
 
-/* NOSCAM_SITE_POPUPS_V1 */
+// NOSCAM_POPUP_IMAGE_UPLOAD_V1
+Route::get(
+    '/site-popups/images/{filename}',
+    [\App\Http\Controllers\Api\SitePopupController::class, 'publicImage']
+)->where('filename', '[A-Za-z0-9_-]+\\.(?:jpg|jpeg|png|webp)');
+
+ /* NOSCAM_SITE_POPUPS_V1 */
 Route::get(
     '/site-popups',
     [\App\Http\Controllers\Api\SitePopupController::class, 'publicIndex']
@@ -1022,6 +1096,10 @@ Route::middleware([
         '/site-popups',
         [\App\Http\Controllers\Api\SitePopupController::class, 'store']
     );
+    Route::post(
+        '/site-popups/upload-image',
+        [\App\Http\Controllers\Api\SitePopupController::class, 'uploadImage']
+    );
     Route::put(
         '/site-popups/{popup}',
         [\App\Http\Controllers\Api\SitePopupController::class, 'update']
@@ -1032,3 +1110,27 @@ Route::middleware([
     )->whereNumber('popup');
 });
 
+
+
+// NOSCAM_HEADER_MANAGER_V1
+// Public: chỉ đọc cấu hình hiển thị.
+\Illuminate\Support\Facades\Route::get(
+    '/header-settings',
+    [\App\Http\Controllers\Api\HeaderSettingsController::class, 'index']
+)->middleware('throttle:public-search');
+
+// Admin: chỉ moderator đã đăng nhập mới có quyền sửa.
+\Illuminate\Support\Facades\Route::middleware([
+    'auth:sanctum',
+    'moderator',
+    'throttle:admin-api',
+])->prefix('admin')->group(function () {
+    \Illuminate\Support\Facades\Route::put(
+        '/header-settings',
+        [\App\Http\Controllers\Api\HeaderSettingsController::class, 'update']
+    );
+    \Illuminate\Support\Facades\Route::delete(
+        '/header-settings',
+        [\App\Http\Controllers\Api\HeaderSettingsController::class, 'reset']
+    );
+});

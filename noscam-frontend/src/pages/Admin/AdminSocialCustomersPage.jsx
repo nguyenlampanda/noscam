@@ -52,6 +52,27 @@ export default function AdminSocialCustomersPage() {
   const [success, setSuccess] = useState('')
   const [confirmOpen, setConfirmOpen] = useState(false)
 
+  // NOSCAM_USER_WALLET_QUICK_V1
+  const [quickWallet, setQuickWallet] = useState(null)
+  const [quickAmount, setQuickAmount] = useState('')
+  const [quickNote, setQuickNote] = useState('')
+  // NOSCAM_WALLET_REASON_OPTIONS_V2
+  // NOSCAM_WALLET_DEFAULT_REASON_V3
+  const [quickReason, setQuickReason] = useState('')
+  const [quickBusy, setQuickBusy] = useState(false)
+  const [quickConfirmOpen, setQuickConfirmOpen] = useState(false)
+  const [quickError, setQuickError] = useState('')
+
+
+  /* NOSCAM_ADMIN_USERS_V1 */
+  const [profile, setProfile] = useState({
+    name: '',
+    email: '',
+    phone: '',
+  })
+  const [profileBusy, setProfileBusy] = useState(false)
+  const [sessionBusy, setSessionBusy] = useState(false)
+
   const load = useCallback(async () => {
     setLoading(true)
     setError('')
@@ -100,15 +121,20 @@ export default function AdminSocialCustomersPage() {
       clearTimeout(timer)
   }, [load])
 
-  async function openCustomer(user) {
+  async function openCustomer(user, walletAction = 'credit') {
     setSelected(user)
+    setProfile({
+      name: user.name || user.username || '',
+      email: user.email || '',
+      phone: user.phone || '',
+    })
     setDetail(null)
     setDetailLoading(true)
     setError('')
     setSuccess('')
     setAmount('')
     setNote('')
-    setDirection('credit')
+    setDirection(walletAction)
 
     try {
       const response =
@@ -116,11 +142,19 @@ export default function AdminSocialCustomersPage() {
           user.id,
         )
 
-      setDetail(
+      const nextDetail =
         response?.data?.data ||
-          response?.data ||
-          null,
-      )
+        response?.data ||
+        null
+
+      setDetail(nextDetail)
+      if (nextDetail?.user) {
+        setProfile({
+          name: nextDetail.user.name || '',
+          email: nextDetail.user.email || '',
+          phone: nextDetail.user.phone || '',
+        })
+      }
     } catch (err) {
       setError(
         err?.data?.message ||
@@ -129,6 +163,151 @@ export default function AdminSocialCustomersPage() {
       )
     } finally {
       setDetailLoading(false)
+    }
+  }
+
+  /* NOSCAM_ADMIN_USERS_V1 */
+  async function saveProfile(e) {
+    e.preventDefault()
+    if (!selected?.id || profileBusy) return
+
+    setProfileBusy(true)
+    setError('')
+    setSuccess('')
+
+    try {
+      await adminService.updateSocialCustomerProfile(
+        selected.id,
+        profile,
+      )
+      await openCustomer(selected)
+      await load()
+      setSuccess('Đã cập nhật hồ sơ người dùng.')
+    } catch (err) {
+      setError(
+        err?.data?.message ||
+        err?.message ||
+        'Không cập nhật được hồ sơ.',
+      )
+    } finally {
+      setProfileBusy(false)
+    }
+  }
+
+  async function revokeSessions() {
+    if (!selected?.id || sessionBusy) return
+
+    const accepted = window.confirm(
+      `Thu hồi toàn bộ phiên đăng nhập của @${selected.username}?`,
+    )
+    if (!accepted) return
+
+    setSessionBusy(true)
+    setError('')
+    setSuccess('')
+
+    try {
+      await adminService.revokeSocialCustomerSessions(
+        selected.id,
+      )
+      setSuccess('Đã thu hồi phiên đăng nhập.')
+    } catch (err) {
+      setError(
+        err?.data?.message ||
+        err?.message ||
+        'Không thu hồi được phiên đăng nhập.',
+      )
+    } finally {
+      setSessionBusy(false)
+    }
+  }
+
+
+  function openQuickWallet(user, action) {
+    setQuickConfirmOpen(false)
+    setQuickWallet({ user, action })
+    setQuickAmount('')
+    setQuickNote('')
+    setQuickReason(action === 'credit' ? 'deposit' : 'order')
+    setQuickError('')
+  }
+
+  async function submitQuickWallet(e) {
+    e.preventDefault()
+
+    if (!quickWallet || quickBusy) return
+
+    const value = Number(quickAmount)
+
+    if (!Number.isSafeInteger(value) || value <= 0) {
+      setQuickError('Vui lòng nhập số tiền hợp lệ.')
+      return
+    }
+
+    if (!quickReason) {
+      setQuickError('Vui lòng chọn lý do.')
+      return
+    }
+
+    if (quickReason === 'other' && !quickNote.trim()) {
+      setQuickError('Vui lòng nhập lý do khác.')
+      return
+    }
+
+    if (!['deposit', 'order', 'other'].includes(quickReason)) {
+      setQuickError('Vui lòng chọn lý do hợp lệ.')
+      return
+    }
+
+    if (quickReason === 'other' && !quickNote.trim()) {
+      setQuickError('Vui lòng nhập lý do khác.')
+      return
+    }
+
+    setQuickError('')
+    setQuickConfirmOpen(true)
+  }
+
+  // NOSCAM_QUICK_WALLET_CONFIRM_V1
+  async function confirmQuickWallet() {
+    if (!quickWallet || quickBusy || !quickConfirmOpen) return
+
+    const value = Number(quickAmount)
+    if (!Number.isSafeInteger(value) || value <= 0) return
+
+    const walletReason =
+      quickReason === 'other'
+        ? quickNote.trim()
+        : quickReason === 'deposit'
+          ? 'Nạp tiền vào ví'
+          : 'Trừ tiền order'
+
+    setQuickBusy(true)
+    setQuickError('')
+
+    try {
+      await adminService.adjustSocialCustomerWallet(
+        quickWallet.user.id,
+        {
+          direction: quickWallet.action,
+          amount: value,
+          note: walletReason,
+        },
+      )
+
+      setQuickConfirmOpen(false)
+      setQuickWallet(null)
+      setQuickAmount('')
+      setQuickNote('')
+      await load()
+    } catch (err) {
+      setQuickError(
+        err?.data?.message ||
+        err?.message ||
+        'Không thể điều chỉnh số dư.',
+      )
+    } finally {
+      setQuickBusy(false)
     }
   }
 
@@ -213,16 +392,14 @@ export default function AdminSocialCustomersPage() {
             Social Services
           </div>
 
-          <h1 className="mt-2 text-3xl font-black text-slate-950">
-            Khách hàng
-          </h1>
+          <h1 className="mt-2 text-3xl font-black text-slate-950">Người dùng</h1>
 
           <p className="mt-2 text-sm text-slate-500">
             Quản lý tài khoản, số dư ví và lịch sử giao dịch.
           </p>
         </div>
 
-        <SocialAdminNav />
+        
 
         <div className="mt-6">
           <input
@@ -268,7 +445,7 @@ export default function AdminSocialCustomersPage() {
           className="mt-4 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm"
         >
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1000px] text-left">
+            <table className="w-full min-w-[1150px] text-left">
               <thead className="bg-slate-50 text-xs uppercase text-slate-400">
                 <tr>
                   <th className="px-5 py-4">
@@ -369,8 +546,26 @@ export default function AdminSocialCustomersPage() {
                         )}
                       </td>
 
+                      {/* NOSCAM_USER_WALLET_ACTIONS_V1 */}
                       <td className="px-5 py-4 text-right">
-                        <button
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => openQuickWallet(item, 'credit')}
+                            className="whitespace-nowrap rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100"
+                          >
+                            + Cộng tiền
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => openQuickWallet(item, 'debit')}
+                            className="whitespace-nowrap rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-600 transition hover:bg-red-100"
+                          >
+                            − Trừ tiền
+                          </button>
+
+                          <button
                           type="button"
                           onClick={() =>
                             openCustomer(item)
@@ -378,7 +573,8 @@ export default function AdminSocialCustomersPage() {
                           className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-2 text-xs font-black text-blue-600 transition hover:border-blue-600 hover:bg-blue-600 hover:text-white!"
                         >
                           Quản lý
-                        </button>
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -416,6 +612,125 @@ export default function AdminSocialCustomersPage() {
             Sau
           </button>
         </div>
+
+
+        {quickWallet && (
+          <div
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/50 p-4"
+            onMouseDown={(e) => {
+              if (e.target === e.currentTarget && !quickBusy) {
+                setQuickWallet(null)
+              }
+            }}
+          >
+            <form
+              onSubmit={submitQuickWallet}
+              className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl"
+            >
+              <h2 className="text-xl font-black text-slate-950">
+                {quickWallet.action === 'credit'
+                  ? 'Cộng tiền'
+                  : 'Trừ tiền'}
+              </h2>
+
+              <p className="mt-2 text-sm text-slate-500">
+                Người dùng:
+                <strong className="ml-1 text-slate-900">
+                  @{quickWallet.user.username}
+                </strong>
+              </p>
+
+              <label className="mt-5 block text-sm font-bold text-slate-700">
+                Số tiền (VNĐ)
+                <input
+                  autoFocus
+                  required
+                  type="text"
+                  inputMode="numeric"
+                  value={
+                    quickAmount
+                      ? Number(quickAmount).toLocaleString('vi-VN')
+                      : ''
+                  }
+                  onChange={(e) =>
+                    setQuickAmount(
+                      e.target.value.replace(/\D/g, '')
+                    )
+                  }
+                  placeholder="Nhập số tiền"
+                  className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-blue-500"
+                />
+              </label>
+
+
+
+              <label className="mt-4 block text-sm font-bold text-slate-700">
+                Lý do
+                <select
+                  required
+                  value={quickReason}
+                  onChange={(e) => {
+                    setQuickReason(e.target.value)
+                    setQuickNote('')
+                  }}
+                  className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3"
+                >
+                  
+                  {quickWallet.action === 'credit' && (
+                    <option value="deposit">Nạp tiền vào ví</option>
+                  )}
+                  {quickWallet.action === 'debit' && (
+                    <option value="order">Trừ tiền order</option>
+                  )}
+                  <option value="other">Lý do khác</option>
+                </select>
+              </label>
+
+              {quickReason === 'other' && (
+                <label className="mt-4 block text-sm font-bold text-slate-700">
+                  Nhập lý do khác
+                  <textarea
+                    required
+                    rows={2}
+                    value={quickNote}
+                    onChange={(e) => setQuickNote(e.target.value)}
+                    className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3"
+                    placeholder="Nhập nội dung..."
+                  />
+                </label>
+              )}
+
+              {quickError && (
+                <p className="mt-3 text-sm font-semibold text-red-600">
+                  {quickError}
+                </p>
+              )}
+
+              <div className="mt-6 flex gap-3">
+                <button
+                  type="button"
+                  disabled={quickBusy}
+                  onClick={() => setQuickWallet(null)}
+                  className="flex-1 rounded-xl border border-slate-200 px-4 py-3 font-bold text-slate-600 disabled:opacity-50"
+                >
+                  Hủy
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={quickBusy}
+                  className={`flex-1 rounded-xl px-4 py-3 font-bold text-white disabled:opacity-50 ${
+                    quickWallet.action === 'credit'
+                      ? 'bg-emerald-600'
+                      : 'bg-red-600'
+                  }`}
+                >
+                  {quickBusy ? 'Đang xử lý...' : 'Xác nhận'}
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
 
         {selected && !confirmOpen && (
           <div
@@ -509,6 +824,90 @@ export default function AdminSocialCustomersPage() {
                       </div>
                     </div>
                   </div>
+
+                  {/* NOSCAM_ADMIN_USERS_V1 */}
+                  <form
+                    onSubmit={saveProfile}
+                    className="mt-5 rounded-3xl border border-slate-200 p-5"
+                  >
+                    <h3 className="font-black text-slate-950">
+                      Thông tin tài khoản
+                    </h3>
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                      {[
+                        ['name', 'Họ và tên'],
+                        ['email', 'Email'],
+                        ['phone', 'Số điện thoại'],
+                      ].map(([field, label]) => (
+                        <label key={field} className="block">
+                          <span className="text-xs font-bold text-slate-500">
+                            {label}
+                          </span>
+                          <input
+                            value={profile[field]}
+                            onChange={(e) =>
+                              setProfile((previous) => ({
+                                ...previous,
+                                [field]: e.target.value,
+                              }))
+                            }
+                            className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-3 text-sm"
+                          />
+                        </label>
+                      ))}
+                    </div>
+                    <div className="mt-4 flex flex-wrap gap-3">
+                      <button
+                        type="submit"
+                        disabled={profileBusy}
+                        className="rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold text-white disabled:opacity-50"
+                      >
+                        {profileBusy ? 'Đang lưu...' : 'Lưu thông tin'}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={sessionBusy}
+                        onClick={revokeSessions}
+                        className="rounded-xl border border-red-200 px-4 py-3 text-sm font-bold text-red-600 disabled:opacity-50"
+                      >
+                        {sessionBusy
+                          ? 'Đang xử lý...'
+                          : 'Đăng xuất khỏi các thiết bị'}
+                      </button>
+                    </div>
+                  </form>
+
+                  <section className="mt-5 rounded-3xl border border-slate-200 p-5">
+                    <h3 className="font-black text-slate-950">
+                      Đơn tăng tương tác gần đây
+                    </h3>
+                    <div className="mt-3 space-y-2">
+                      {detail?.orders?.length ? (
+                        detail.orders.map((order) => (
+                          <div
+                            key={order.id}
+                            className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-slate-50 p-3 text-sm"
+                          >
+                            <div>
+                              <div className="font-bold">
+                                Đơn #{order.id}
+                              </div>
+                              <div className="text-xs text-slate-500">
+                                {order.service?.name || 'Dịch vụ'}
+                              </div>
+                            </div>
+                            <span className="font-semibold text-slate-600">
+                              {order.status || '—'}
+                            </span>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-sm text-slate-400">
+                          Chưa có đơn tăng tương tác.
+                        </p>
+                      )}
+                    </div>
+                  </section>
 
                   <form
                     onSubmit={requestAdjustWallet}
@@ -797,6 +1196,104 @@ export default function AdminSocialCustomersPage() {
             </div>,
             document.body,
           )}
+
+        {/* NOSCAM_QUICK_WALLET_CONFIRM_V1 */}
+        {quickWallet && quickConfirmOpen && createPortal(
+          <div className="fixed inset-0 z-[2147483647] flex items-center justify-center bg-slate-950/60 p-4">
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="quick-wallet-confirm-title"
+              className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl"
+            >
+              <div className={`flex h-14 w-14 items-center justify-center rounded-2xl text-2xl font-black ${
+                quickWallet.action === 'credit'
+                  ? 'bg-emerald-50 text-emerald-600'
+                  : 'bg-red-50 text-red-600'
+              }`}>
+                {quickWallet.action === 'credit' ? '+' : '−'}
+              </div>
+
+              <h2
+                id="quick-wallet-confirm-title"
+                className="mt-5 text-2xl font-black text-slate-950"
+              >
+                {quickWallet.action === 'credit'
+                  ? 'Xác nhận cộng tiền'
+                  : 'Xác nhận trừ tiền'}
+              </h2>
+
+              <p className="mt-2 text-sm text-slate-500">
+                Kiểm tra lại thông tin trước khi cập nhật số dư ví.
+              </p>
+
+              <div className="mt-5 overflow-hidden rounded-2xl border border-slate-200">
+                <div className="flex justify-between gap-4 border-b border-slate-100 px-4 py-3">
+                  <span className="text-sm text-slate-500">Khách hàng</span>
+                  <strong>@{quickWallet.user.username}</strong>
+                </div>
+
+                <div className="flex justify-between gap-4 border-b border-slate-100 px-4 py-3">
+                  <span className="text-sm text-slate-500">Thao tác</span>
+                  <strong className={quickWallet.action === 'credit' ? 'text-emerald-600' : 'text-red-600'}>
+                    {quickWallet.action === 'credit' ? 'Cộng tiền' : 'Trừ tiền'}
+                  </strong>
+                </div>
+
+                <div className="flex items-center justify-between gap-4 px-4 py-4">
+                  <span className="text-sm text-slate-500">Số tiền</span>
+                  <strong className={`text-2xl font-black ${
+                    quickWallet.action === 'credit' ? 'text-emerald-600' : 'text-red-600'
+                  }`}>
+                    {quickWallet.action === 'credit' ? '+' : '−'}
+                    {money(quickAmount)}
+                  </strong>
+                </div>
+              </div>
+
+              <div className="mt-4 rounded-2xl bg-slate-50 p-4">
+                <div className="text-xs font-bold uppercase text-slate-400">Lý do</div>
+                <div className="mt-1 text-sm font-semibold text-slate-800">
+                  {quickReason === 'other'
+                    ? quickNote.trim()
+                    : quickReason === 'deposit'
+                      ? 'Nạp tiền vào ví'
+                      : 'Trừ tiền order'}
+                </div>
+              </div>
+
+              {quickError && (
+                <p className="mt-4 text-sm font-semibold text-red-600">
+                  {quickError}
+                </p>
+              )}
+
+              <div className="mt-6 grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  disabled={quickBusy}
+                  onClick={() => setQuickConfirmOpen(false)}
+                  className="rounded-2xl border border-slate-200 px-4 py-3 font-bold text-slate-600 disabled:opacity-50"
+                >
+                  Quay lại
+                </button>
+                <button
+                  type="button"
+                  disabled={quickBusy}
+                  onClick={confirmQuickWallet}
+                  className={`rounded-2xl px-4 py-3 font-bold text-white disabled:opacity-50 ${
+                    quickWallet.action === 'credit'
+                      ? 'bg-emerald-600 hover:bg-emerald-700'
+                      : 'bg-red-600 hover:bg-red-700'
+                  }`}
+                >
+                  {quickBusy ? 'Đang xử lý...' : 'Xác nhận'}
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
       </main>
     </div>
   )

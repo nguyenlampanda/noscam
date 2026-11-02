@@ -1,5 +1,8 @@
 export function mapAlert(data) {
   return {
+    publicImages: Array.isArray(data.public_images)
+      ? data.public_images.slice(0, 3)
+      : [],
     id:
       data.id,
 

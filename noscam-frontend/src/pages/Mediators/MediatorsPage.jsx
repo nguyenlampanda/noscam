@@ -16,8 +16,12 @@ function money(value) {
 }
 
 function MediatorsPage() {
+  // NOSCAM_PAGINATION_V2
   const [items, setItems] =
     useState([])
+  const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalItems, setTotalItems] = useState(0)
 
   const [search, setSearch] =
     useState('')
@@ -33,11 +37,28 @@ function MediatorsPage() {
         try {
           const response =
             await mediatorService
-              .list(search)
+              .list(search, page)
 
-          setItems(
-            response?.data?.data ||
-            [],
+          const payload = response?.data || {}
+          const list = Array.isArray(payload.data)
+            ? payload.data
+            : Array.isArray(payload)
+              ? payload
+              : []
+
+          setItems(list)
+          const total = Number(payload.total)
+          const last = Number(payload.last_page)
+
+          setTotalPages(
+            Number.isFinite(last) && last > 0
+              ? last
+              : 1
+          )
+          setTotalItems(
+            Number.isFinite(total) && total >= 0
+              ? total
+              : list.length
           )
         } finally {
           setLoading(false)
@@ -48,6 +69,10 @@ function MediatorsPage() {
 
     return () =>
       clearTimeout(timer)
+  }, [search, page])
+
+  useEffect(() => {
+    setPage(1)
   }, [search])
 
   return (
@@ -169,6 +194,46 @@ function MediatorsPage() {
                 ),
               )}
             </div>
+          )}
+
+          {!loading && totalPages > 1 && (
+            <nav aria-label="Phân trang trung gian" className="mt-8 flex flex-col items-center gap-3">
+              <p className="text-sm text-slate-500">
+                Trang {page}/{totalPages} · {totalItems} hồ sơ
+              </p>
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                <button type="button" disabled={page <= 1}
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-bold disabled:opacity-40">
+                  ‹ Trước
+                </button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter(n => n === 1 || n === totalPages || Math.abs(n - page) <= 1)
+                  .reduce((result, n, i, pages) => {
+                    if (i && n - pages[i - 1] > 1) result.push('dots-' + n)
+                    result.push(n)
+                    return result
+                  }, [])
+                  .map(n => typeof n === 'string' ? (
+                    <span key={n} className="px-1 text-slate-400">...</span>
+                  ) : (
+                    <button key={n} type="button"
+                      aria-current={page === n ? 'page' : undefined}
+                      onClick={() => setPage(n)}
+                      className={'min-w-10 rounded-xl border px-3 py-2 text-sm font-bold ' +
+                        (page === n
+                          ? 'border-blue-600 bg-blue-600 text-white'
+                          : 'border-slate-200 bg-white text-slate-700')}>
+                      {n}
+                    </button>
+                  ))}
+                <button type="button" disabled={page >= totalPages}
+                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                  className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-bold disabled:opacity-40">
+                  Tiếp ›
+                </button>
+              </div>
+            </nav>
           )}
 
           <p className="mx-auto mt-10 max-w-3xl text-center text-xs leading-5 text-slate-400">

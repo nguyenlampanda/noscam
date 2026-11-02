@@ -6,341 +6,124 @@ import AdminNav from '../../components/admin/AdminNav'
 import AdminExchangeLists from './AdminExchangeLists'
 import adminExchangeService from '../../services/adminExchangeService'
 
-const platforms = [
-  { id: 'instagram', name: 'Instagram' },
-  { id: 'tiktok', name: 'TikTok' },
-  { id: 'facebook', name: 'Facebook' },
-]
 
-const taskTypes = [
-  { id: 'follow', name: 'Follow' },
-  { id: 'like', name: 'Like' },
-  { id: 'comment', name: 'Comment' },
-]
-
-const formatCoins = (value) =>
-  new Intl.NumberFormat('vi-VN', {
-    maximumFractionDigits: 0,
-  }).format(Number(value || 0))
-
-function PriceCard({ platform, task, saved, onSaved, onDirtyChange }) {
-  const { confirm, notify } = useNoScamUI()
-  const [cost, setCost] = useState(
-    String(saved?.cost_per_task ?? 2000),
-  )
-  const [reward, setReward] = useState(
-    String(saved?.reward_per_task ?? 1000),
-  )
-  const [minQuantity, setMinQuantity] = useState(
-    String(saved?.min_quantity ?? 10),
-  )
-  const [enabled, setEnabled] = useState(
-    saved?.is_enabled ?? false,
-  )
-  const [confirmed, setConfirmed] = useState({
-    cost: String(saved?.cost_per_task ?? 2000),
-    reward: String(saved?.reward_per_task ?? 1000),
-    enabled: saved?.is_enabled ?? false,
-    minQuantity: String(saved?.min_quantity ?? 10),
-  })
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
-  const locked = useRef(false)
-
-  const dirty =
-    cost !== confirmed.cost ||
-    reward !== confirmed.reward ||
-    minQuantity !== confirmed.minQuantity ||
-    enabled !== confirmed.enabled
-
-  useEffect(() => {
-    onDirtyChange(platform.id, task.id, dirty)
-  }, [platform.id, task.id, dirty, onDirtyChange])
-
-  const costNumber = Number(cost)
-  const rewardNumber = Number(reward)
-  const minQuantityNumber = Number(minQuantity)
-
-  const valid =
-    /^\d+$/.test(cost) &&
-    /^\d+$/.test(reward) &&
-    Number.isSafeInteger(costNumber) &&
-    Number.isSafeInteger(rewardNumber) &&
-    costNumber >= 1 &&
-    costNumber <= 999999999 &&
-    rewardNumber >= 1 &&
-    rewardNumber <= costNumber &&
-    /^\d+$/.test(minQuantity) &&
-    Number.isSafeInteger(minQuantityNumber) &&
-    minQuantityNumber >= 1 &&
-    minQuantityNumber <= 100000
-
-  const fee = valid ? costNumber - rewardNumber : null
-
-  async function save() {
-    if (locked.current || busy) return
-
-    setError('')
-    setSuccess('')
-
-    if (!valid) {
-      setError('Giá và thưởng phải là số nguyên dương; thưởng không vượt quá giá.')
-      return
-    }
-
-    if (!(await confirm(
-      `Lưu giá ${platform.name} - ${task.name}?\\n` +
-      `Giá: ${formatCoins(costNumber)} xu\\n` +
-      `Thưởng: ${formatCoins(rewardNumber)} xu\\n` +
-      `Phí: ${formatCoins(fee)} xu\\n` +
-      `Trạng thái: ${enabled ? 'Bật' : 'Tắt'}`
-    ))) return
-
-    locked.current = true
-    setBusy(true)
-
-    try {
-      const response = await adminExchangeService.updatePrice({
-        platform: platform.id,
-        task_type: task.id,
-        cost_per_task: costNumber,
-        reward_per_task: rewardNumber,
-        min_quantity: minQuantityNumber,
-        is_enabled: enabled,
-      })
-
-      const serverPrice = response?.data
-
-      if (
-        serverPrice?.platform !== platform.id ||
-        serverPrice?.task_type !== task.id ||
-        Number(serverPrice?.cost_per_task) !== costNumber ||
-        Number(serverPrice?.reward_per_task) !== rewardNumber ||
-        Number(serverPrice?.min_quantity) !== minQuantityNumber ||
-        Boolean(serverPrice?.is_enabled) !== enabled
-      ) {
-        throw new Error(
-          'Máy chủ chưa xác nhận đầy đủ giá vừa lưu. Vui lòng tải lại để kiểm tra.'
-        )
-      }
-
-      setConfirmed({
-        cost: String(serverPrice.cost_per_task),
-        reward: String(serverPrice.reward_per_task),
-        minQuantity: String(serverPrice.min_quantity),
-        enabled: Boolean(serverPrice.is_enabled),
-      })
-
-      const updated = await onSaved({
-        platform: platform.id,
-        task_type: task.id,
-        cost_per_task: costNumber,
-        reward_per_task: rewardNumber,
-        min_quantity: minQuantityNumber,
-        is_enabled: enabled,
-      })
-      if (updated) {
-        setSuccess('Đã lưu giá thành công.')
-        notify('Đã lưu giá thành công.', 'success')
-      }
-    } catch (err) {
-      setError(err?.message || 'Không thể xác nhận cập nhật.')
-      notify(err?.message || 'Không thể xác nhận cập nhật.', 'error')
-    } finally {
-      locked.current = false
-      setBusy(false)
-    }
-  }
-
-  return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <h3 className="text-lg font-bold text-slate-900">{task.name}</h3>
-        <span className={`rounded-full px-3 py-1 text-xs font-bold ${
-          enabled ? 'bg-green-50 text-green-700' : 'bg-slate-100 text-slate-600'
-        }`}>
-          {enabled ? 'Đang bật' : 'Đang tắt'}
-        </span>
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-2">
-        <label className="block text-sm font-semibold text-slate-700">
-          Giá người tạo trả (xu)
-          <input
-            type="number"
-            min="1"
-            max="999999999"
-            step="1"
-            value={cost}
-            disabled={busy}
-            onChange={(event) => setCost(event.target.value)}
-            className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-3"
-          />
-        </label>
-
-        <label className="block text-sm font-semibold text-slate-700">
-          Thưởng người làm (xu)
-          <input
-            type="number"
-            min="1"
-            max="999999999"
-            step="1"
-            value={reward}
-            disabled={busy}
-            onChange={(event) => setReward(event.target.value)}
-            className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-3"
-          />
-        </label>
-      </div>
-
-      <label className="mt-4 block text-sm font-semibold text-slate-700">
-        Số lượng tối thiểu (lượt)
-        <input
-          type="number"
-          min="1"
-          max="100000"
-          step="1"
-          value={minQuantity}
-          disabled={busy}
-          onChange={(event) => setMinQuantity(event.target.value)}
-          className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-3"
-        />
-      </label>
-
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="text-sm text-slate-600">
-          Phí nền tảng:
-          <strong className="ml-2 text-blue-700">
-            {fee === null ? 'Không hợp lệ' : `${formatCoins(fee)} xu`}
-          </strong>
-        </div>
-
-        <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-          <input
-            type="checkbox"
-            checked={enabled}
-            disabled={busy}
-            onChange={(event) => setEnabled(event.target.checked)}
-          />
-          Cho phép tạo nhiệm vụ
-        </label>
-      </div>
-
-      {error && <p role="alert" className="mt-3 text-sm text-red-600">{error}</p>}
-      {success && <p className="mt-3 text-sm text-green-700">{success}</p>}
-
-      <button
-        type="button"
-        disabled={busy || !valid}
-        onClick={save}
-        className="mt-4 rounded-xl bg-blue-600 px-5 py-3 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
-      >
-        {busy ? 'Đang lưu...' : 'Lưu giá nhiệm vụ'}
-      </button>
-    </section>
-  )
+// NOSCAM_EXCHANGE_TOGGLE_ONLY_V1
+// Các nền tảng bổ sung chỉ được bật khi backend trả về cấu hình hỗ trợ.
+// NOSCAM_EXCHANGE_TOGGLE_V2
+const platformNames = {
+  instagram: 'Instagram',
+  tiktok: 'TikTok',
+  facebook: 'Facebook',
+  youtube: 'YouTube',
+  threads: 'Threads',
+  twitter: 'X (Twitter)',
+  telegram: 'Telegram',
+  zalo: 'Zalo',
+  pinterest: 'Pinterest',
+  linkedin: 'LinkedIn',
+  reddit: 'Reddit',
 }
 
+const taskNames = {
+  follow: 'Follow',
+  like: 'Like',
+  comment: 'Comment',
+  view: 'View',
+  share: 'Share',
+  subscribe: 'Subscribe',
+  repost: 'Repost',
+  join: 'Join',
+  reaction: 'Reaction',
+  save: 'Save',
+  upvote: 'Upvote',
+}
+
+// NOSCAM_EXCHANGE_RESPONSIVE_V2
 function AdminExchangePricePanel() {
-  const { confirm } = useNoScamUI()
-  const [prices, setPrices] = useState([])
-  const dirtyRef = useRef(new Set())
-
-  const onDirtyChange = useCallback((platform, task, dirty) => {
-    const key = `${platform}:${task}`
-
-    if (dirty) {
-      dirtyRef.current.add(key)
-    } else {
-      dirtyRef.current.delete(key)
-    }
-  }, [])
-
-  const confirmDiscard = useCallback(async () => {
-    if (dirtyRef.current.size === 0) return true
-
-    return await confirm(
-      'Bạn có thay đổi giá chưa lưu. Bạn có muốn bỏ các thay đổi này?'
-    )
-  }, [confirm])
-
+  const { confirm, notify } = useNoScamUI()
+  const [platforms, setPlatforms] = useState([])
   const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState('')
   const [error, setError] = useState('')
-
 
   const load = useCallback(async () => {
     setLoading(true)
     setError('')
-
     try {
-      const response = await adminExchangeService.prices()
-      setPrices(Array.isArray(response?.data) ? response.data : [])
+      const response = await adminExchangeService.toggles()
+      if (!Array.isArray(response?.data)) {
+        throw new Error('Dữ liệu cấu hình không hợp lệ.')
+      }
+      setPlatforms(response.data)
     } catch (err) {
-      setError(err?.message || 'Không thể tải giá Exchange.')
+      setError(err?.message || 'Không thể tải cấu hình.')
     } finally {
       setLoading(false)
     }
-  }, [])
-
-  const updateSavedPrice = useCallback(async (price) => {
-    setPrices((current) => {
-      const remaining = current.filter(
-        (item) =>
-          item.platform !== price.platform ||
-          item.task_type !== price.task_type
-      )
-      return [...remaining, price]
-    })
-    return true
   }, [])
 
   useEffect(() => {
     load()
   }, [load])
 
-  useEffect(() => {
-    const handleBeforeUnload = (event) => {
-      if (dirtyRef.current.size > 0) {
-        event.preventDefault()
-        event.returnValue = ''
+  const change = async (platform, task, current) => {
+    if (saving) return
+
+    const next = !current
+    const name = platformNames[platform] || platform
+    const actionName = task === '__platform__'
+      ? name
+      : `${taskNames[task] || task} - ${name}`
+
+    if (!(await confirm(
+      `${next ? 'Bật' : 'Tắt'} ${actionName}?`
+    ))) return
+
+    setSaving(`${platform}:${task}`)
+    setError('')
+
+    try {
+      const response = await adminExchangeService.updateToggle({
+        platform,
+        task_type: task,
+        is_enabled: next,
+      })
+
+      if (
+        response?.data?.platform !== platform ||
+        response?.data?.task_type !== task ||
+        response?.data?.is_enabled !== next
+      ) {
+        throw new Error('Máy chủ chưa xác nhận trạng thái.')
       }
-    }
 
-    window.addEventListener('beforeunload', handleBeforeUnload)
-
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload)
-    }
-  }, [])
-
-  const reloadPrices = async () => {
-    if (await confirmDiscard()) {
       await load()
+      notify('Đã lưu trạng thái.', 'success')
+    } catch (err) {
+      setError(err?.message || 'Không thể lưu trạng thái.')
+      notify(err?.message || 'Không thể lưu trạng thái.', 'error')
+    } finally {
+      setSaving('')
     }
   }
 
-
   return (
-    <div className="min-h-screen bg-slate-50">
-
-
-      <main className="mx-auto max-w-7xl px-5 py-10 lg:px-8">
-        <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
+    <div className="min-h-screen bg-white">
+      <main className="mx-auto max-w-7xl px-3 py-5 sm:px-5 sm:py-7 lg:px-6">
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="text-3xl font-black text-slate-950">
-              Quản lý Kiếm xu
+            <h1 className="text-2xl font-black tracking-tight text-slate-950 sm:text-[28px]">
+              Quản lý tương tác chéo
             </h1>
-            <p className="mt-2 text-sm text-slate-600">
-              Thiết lập giá, thưởng và phí nền tảng. 1 xu = 1 VND.
+            <p className="mt-1 text-xs text-slate-500 sm:text-sm">
+              Bật/tắt nền tảng và từng loại tương tác.
             </p>
           </div>
-
           <button
             type="button"
-            onClick={reloadPrices}
-            disabled={loading}
-            className="rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-bold text-slate-700 disabled:opacity-50"
+            onClick={load}
+            disabled={loading || Boolean(saving)}
+            className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 shadow-sm transition-all duration-200 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 active:scale-[0.98] disabled:opacity-50 sm:text-sm"
           >
             Tải lại
           </button>
@@ -353,44 +136,140 @@ function AdminExchangePricePanel() {
         )}
 
         {loading ? (
-          <p className="text-sm text-slate-500">Đang tải dữ liệu...</p>
-        ) : !error ? (
-          <div className="space-y-10">
+          <p>Đang tải cấu hình...</p>
+        ) : (
+          <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
             {platforms.map((platform) => (
-              <section key={platform.id}>
-                <h2 className="mb-4 text-xl font-black text-slate-900">
-                  {platform.name}
-                </h2>
+              <section
+                key={platform.platform}
+                className="group rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-lg hover:shadow-slate-200/50 sm:p-5"
+              >
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
+                  <div>
+                    <div className="flex min-w-0 items-center gap-3"><ExchangePlatformIcon platform={platform.platform || platform.name} /><div className="min-w-0"><h2 className="text-base font-extrabold tracking-tight text-slate-900 sm:text-lg">
+                      {platformNames[platform.platform] || platform.platform}
+                    </h2></div></div>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {platform.is_enabled ? 'Nền tảng đang bật' : 'Nền tảng đang tắt'}
+                    </p>
+                  </div>
+                  <label className="flex items-center gap-2 rounded-full bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700 transition-colors group-hover:bg-blue-50 sm:text-sm">
+                    <span>Bật nền tảng</span>
+                    <input
+                      type="checkbox"
+                      role="switch"
+                      checked={platform.is_enabled}
+                      disabled={Boolean(saving)}
+                      onChange={() => change(
+                        platform.platform,
+                        '__platform__',
+                        platform.is_enabled
+                      )}
+                      className="h-4 w-4 cursor-pointer accent-blue-600 transition-transform hover:scale-110 disabled:cursor-not-allowed disabled:opacity-50"
+                    />
+                  </label>
+                </div>
 
-                <div className="grid gap-5 lg:grid-cols-3">
-                  {taskTypes.map((task) => {
-                    const saved = prices.find(
-                      (item) =>
-                        item.platform === platform.id &&
-                        item.task_type === task.id
-                    )
-
-                    return (
-                      <PriceCard
-                        key={`${platform.id}-${task.id}`}
-                        platform={platform}
-                        task={task}
-                        saved={saved}
-                        onSaved={updateSavedPrice}
-                        onDirtyChange={onDirtyChange}
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-2 xl:grid-cols-3">
+                  {platform.services.map((task) => (
+                    <div
+                      key={task.task_type}
+                      className="flex min-w-0 items-center justify-between gap-2 rounded-xl border border-slate-100 bg-slate-50/70 p-3 transition-all duration-200 hover:border-blue-200 hover:bg-blue-50/70"
+                    >
+                      <div>
+                        <h3 className="font-bold text-slate-900">
+                          {taskNames[task.task_type] || task.task_type}
+                        </h3>
+                        <p className="mt-1 text-xs text-slate-500">
+                          {!task.backend_supported
+                            ? 'Chưa hỗ trợ tạo nhiệm vụ'
+                            : !platform.is_enabled
+                              ? 'Nền tảng đang tắt'
+                              : task.is_enabled
+                                ? 'Đang bật'
+                                : 'Đang tắt'}
+                        </p>
+                      </div>
+                      <input
+                        type="checkbox"
+                        role="switch"
+                        aria-label={`${task.task_type} ${platform.platform}`}
+                        checked={task.is_enabled}
+                        disabled={Boolean(saving)}
+                        onChange={() => change(
+                          platform.platform,
+                          task.task_type,
+                          task.is_enabled
+                        )}
+                        className="h-4 w-4 cursor-pointer accent-blue-600 transition-transform hover:scale-110 disabled:cursor-not-allowed disabled:opacity-50"
                       />
-                    )
-                  })}
+                    </div>
+                  ))}
                 </div>
               </section>
             ))}
           </div>
-        ) : null}
+        )}
       </main>
     </div>
   )
 }
 
+
+
+// NOSCAM_ALL_PLATFORM_ICONS_V4
+const exchangePlatformIcons = {
+  instagram: ['instagram', 'E4405F', 'FFF0F5', 'IG'],
+  tiktok: ['tiktok', '000000', 'F1F5F9', 'TT'],
+  facebook: ['facebook', '0866FF', 'EFF6FF', 'f'],
+  youtube: ['youtube', 'FF0033', 'FFF1F2', 'YT'],
+  threads: ['threads', '000000', 'F1F5F9', '@'],
+  twitter: ['x', '000000', 'F1F5F9', 'X'],
+  x: ['x', '000000', 'F1F5F9', 'X'],
+  telegram: ['telegram', '26A5E4', 'EFF9FF', 'TG'],
+  zalo: ['zalo', '0068FF', 'EFF6FF', 'Z'],
+  pinterest: ['pinterest', 'BD081C', 'FFF1F2', 'P'],
+  linkedin: ['linkedin', '0A66C2', 'EFF6FF', 'in'],
+  reddit: ['reddit', 'FF4500', 'FFF7ED', 'r'],
+}
+
+function ExchangePlatformIcon({ platform }) {
+  const key = String(platform || '').trim().toLowerCase()
+  const config = exchangePlatformIcons[key]
+  const [failed, setFailed] = useState(false)
+
+  const slug = config?.[0]
+  const color = config?.[1] || '475569'
+  const background = config?.[2] || 'F1F5F9'
+  const fallback = config?.[3] || key.slice(0, 2).toUpperCase() || '?'
+
+  return (
+    <span
+      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-100"
+      style={{ backgroundColor: `#${background}` }}
+      title={platform}
+    >
+      {slug && !failed ? (
+        <img
+          src={`https://cdn.simpleicons.org/${slug}/${color}`}
+          alt=""
+          width="26"
+          height="26"
+          loading="lazy"
+          onError={() => setFailed(true)}
+          className="h-[26px] w-[26px] object-contain"
+        />
+      ) : (
+        <span
+          className="text-sm font-black"
+          style={{ color: `#${color}` }}
+        >
+          {fallback}
+        </span>
+      )}
+    </span>
+  )
+}
 
 export default function AdminExchangePage() {
   const [tab, setTab] = useState('campaigns')
@@ -398,7 +277,7 @@ export default function AdminExchangePage() {
   const tabs = [
     { id: 'campaigns', label: 'Chiến dịch' },
     { id: 'disputes', label: 'Khiếu nại' },
-    { id: 'prices', label: 'Bảng giá' }
+    { id: 'prices', label: 'Quản lý tương tác' }
   ]
 
   return (

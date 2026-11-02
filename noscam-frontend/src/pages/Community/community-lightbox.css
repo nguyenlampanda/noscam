@@ -1,0 +1,41 @@
+
+/* Lightbox ảnh Cộng đồng - giao diện tương tự trang Cảnh báo */
+
+.noscam-community-photo-lightbox {
+  padding: 16px;
+}
+
+.noscam-community-photo-lightbox > div,
+.noscam-community-photo-lightbox > section {
+  max-width: 850px;
+  width: 100%;
+  max-height: 90dvh;
+  margin-left: auto;
+  margin-right: auto;
+  border-radius: 16px;
+  background: #fff;
+  overflow: hidden;
+  box-shadow: 0 25px 70px rgba(15, 23, 42, 0.3);
+}
+
+.noscam-community-photo-lightbox img {
+  max-width: 100%;
+  max-height: 65dvh;
+  object-fit: contain;
+}
+
+@media (max-width: 640px) {
+  .noscam-community-photo-lightbox {
+    padding: 12px;
+  }
+
+  .noscam-community-photo-lightbox > div,
+  .noscam-community-photo-lightbox > section {
+    max-height: 88dvh;
+    border-radius: 14px;
+  }
+
+  .noscam-community-photo-lightbox img {
+    max-height: 60dvh;
+  }
+}

@@ -40,7 +40,12 @@ class GuestDigitalOrderController extends Controller
 
         $requirements = $service->requirements ?? [];
         $rules = [];
-        $allowedKeys = [];
+        $allowedKeys = ['zalo_phone'];
+        $rules['request_data.zalo_phone'] = [
+            'required',
+            'string',
+            'regex:/^0[0-9]{9}$/',
+        ];
 
         foreach ($requirements as $field) {
             if (

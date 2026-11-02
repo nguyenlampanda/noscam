@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import communityService from '../../services/communityService'
 import { getCustomerToken } from '../../services/customerService'
+import './community-lightbox.css'
 
 const categories = [
   { value: 'discussion', label: 'Thảo luận' },
@@ -527,17 +528,18 @@ function CommunityPage() {
   return (
     <main className="noscam-community min-h-screen bg-slate-50 px-4 py-10">
       <div className="noscam-community-layout mx-auto max-w-5xl">
-        <p className="text-sm font-semibold uppercase tracking-wide text-blue-600">
+        <div className="noscam-community-hero rounded-[26px] bg-gradient-to-br from-slate-950 via-[#10265c] to-blue-700 px-6 py-9 text-white shadow-2xl shadow-blue-950/15 sm:px-10"><p className="text-sm font-semibold uppercase tracking-widest text-blue-200">
           NoScam Community
         </p>
 
-        <h1 className="mt-2 text-3xl font-bold text-slate-950">
+        <h1 className="mt-3 text-3xl font-black tracking-tight text-white sm:text-5xl">
           Cộng đồng MMO NoScam
         </h1>
 
-        <p className="mt-3 text-slate-600">
+        <p className="mt-4 max-w-2xl text-sm leading-7 text-blue-100 sm:text-base">
           Tìm việc, tuyển cộng tác viên, cung cấp dịch vụ và kết nối đối tác an toàn.
         </p>
+        </div>
 
         {notice && (
           <div role="status" className="mt-6 rounded-xl bg-blue-50 p-4 text-sm text-blue-800">
@@ -554,6 +556,48 @@ function CommunityPage() {
 
         <div className="noscam-community-grid mt-8 grid gap-6 lg:grid-cols-[1fr_260px]">
           <div className="space-y-6">
+            {/* NOSCAM_COMMUNITY_FILTER_UI_V2 */}
+            <section
+              aria-label="Tìm kiếm cộng đồng"
+              className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4"
+            >
+              <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 transition-all focus-within:border-blue-500 focus-within:bg-white focus-within:ring-4 focus-within:ring-blue-50">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                  className="shrink-0 text-slate-400"
+                >
+                  <circle cx="11" cy="11" r="8" />
+                  <path d="m21 21-4.35-4.35" />
+                </svg>
+                <input
+                  type="search"
+                  aria-label="Tìm kiếm bài viết cộng đồng"
+                  value={mmoSearch}
+                  onChange={event => setMmoSearch(event.target.value)}
+                  placeholder="Tìm kiếm bài viết, công việc, kỹ năng, dịch vụ..."
+                  className="h-12 min-w-0 flex-1 bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
+                />
+                {mmoSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setMmoSearch('')}
+                    className="shrink-0 rounded-lg px-2 py-1 text-xs font-semibold text-slate-500 hover:bg-slate-200 hover:text-slate-900"
+                  >
+                    Xóa
+                  </button>
+                )}
+              </div>
+            </section>
+
             <section className="noscam-community-composer rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
               <div className="flex items-center gap-3">
                 <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-blue-100 font-bold text-blue-700">
@@ -587,102 +631,7 @@ function CommunityPage() {
                 </div>
               )}
 
-              <section className="mb-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                <h2 className="mb-3 text-lg font-bold text-slate-900">
-                  Khám phá việc làm và dịch vụ MMO
-                </h2>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <input
-                    type="search"
-                    value={mmoSearch}
-                    onChange={event => setMmoSearch(event.target.value)}
-                    placeholder="Tìm job, kỹ năng, dịch vụ..."
-                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 transition-colors focus:border-blue-600"
-                  style={{
-                      outline: 'none',
-                      boxShadow: 'none',
-                      WebkitAppearance: 'none',
-                    }}
-                  />
-                  <select
-                    value={mmoFilter}
-                    onChange={event => setMmoFilter(event.target.value)}
-                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-blue-500"
-                  >
-                    <option value="all">Tất cả bài viết</option>
-                    {categories.map(category => (
-                      <option key={category.value} value={category.value}>
-                        {category.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <p className="mt-3 text-xs text-slate-500">
-                  Hiển thị {filteredPosts.length} / {posts.length} bài đã tải
-                </p>
-              </section>
-
-
-              <div className="mb-5 flex flex-wrap gap-2">
-                {[
-                  { value: 'all', label: 'Tất cả' },
-                  { value: 'job_offer', label: 'Tuyển dụng' },
-                  { value: 'job_seeking', label: 'Tìm việc' },
-                  { value: 'service_offer', label: 'Dịch vụ MMO' },
-                  { value: 'partnership', label: 'Hợp tác' },
-                ].map(option => (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() => setMmoFilter(option.value)}
-                    aria-pressed={mmoFilter === option.value}
-                    className={`rounded-full border px-4 py-2 text-sm font-semibold transition ${
-                      mmoFilter === option.value
-                        ? 'border-blue-600 bg-blue-600 text-white'
-                        : 'border-slate-200 bg-white text-slate-600 hover:border-blue-300 hover:text-blue-600'
-                    }`}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-
-
-              <div className="mb-5 grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:grid-cols-2">
-                <div>
-                  <label className="mb-2 block text-sm font-semibold text-slate-700">
-                    Hình thức làm việc
-                  </label>
-                  <select
-                    value={mmoWorkMode}
-                    onChange={e => setMmoWorkMode(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-blue-600 focus:ring-0"
-                  >
-                    <option value="all">Tất cả hình thức</option>
-                    <option value="remote">Online / Remote</option>
-                    <option value="onsite">Trực tiếp</option>
-                    <option value="hybrid">Hybrid</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="mb-2 block text-sm font-semibold text-slate-700">
-                    Tỉnh / thành phố
-                  </label>
-                  <input
-                    value={mmoCity}
-                    onChange={e => setMmoCity(e.target.value)}
-                    placeholder="Ví dụ: Hồ Chí Minh"
-                    maxLength={100}
-                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-blue-600 focus:ring-0"
-                    style={{ outline: 'none', boxShadow: 'none' }}
-                  />
-                </div>
-                <p className="text-xs text-slate-500 sm:col-span-2">
-                  Tìm kiếm toàn bộ bài đã được duyệt. Các bài cũ chưa có thông tin
-                  địa điểm riêng có thể không xuất hiện khi lọc theo địa điểm.
-                </p>
-              </div>
-
+              {/* NOSCAM_POST_CSS_V4 */}
               {filteredPosts.map(post => (
                 <article key={post.id} className="noscam-community-post rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
                   <div className="text-sm text-slate-500">
@@ -691,7 +640,7 @@ function CommunityPage() {
                     {categories.find(category => category.value === post.category)?.label || 'Thảo luận'}
                   </div>
 
-                  {post.title && <h3 className="mt-3 text-xl font-bold">{post.title}</h3>}
+                  {post.title && <h3 className="mt-4 break-words text-xl font-bold leading-snug tracking-tight text-slate-950 sm:text-2xl">{post.title}</h3>}
                   {['job_offer', 'job_seeking', 'service_offer', 'partnership'].includes(post.category) &&
                   (post.work_mode || post.city || post.salary || post.deadline) && (
                     <div className="my-3 flex flex-wrap gap-2">
@@ -722,15 +671,15 @@ function CommunityPage() {
                     </div>
                   )}
                 {post.content && (
-                    <p className="mt-3 whitespace-pre-wrap break-words text-slate-700">{post.content}</p>
+                    <p className="mt-4 whitespace-pre-wrap break-words text-[15px] leading-7 text-slate-700 sm:text-base">{post.content}</p>
                   )}
-                  <PhotoGrid images={post.images} />
+                  <div className="mt-5 overflow-hidden rounded-2xl border border-slate-100 bg-slate-50"><PhotoGrid images={post.images} /></div>
 
-                  <div className="mt-5 flex gap-3 border-t pt-4">
+                  <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-slate-200 pt-4">
                     <button
                       type="button"
                       onClick={() => likePost(post.id)}
-                      className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${
+                      className={`inline-flex min-h-11 items-center justify-center rounded-xl border border-transparent px-5 py-2.5 text-sm font-semibold transition-colors ${
                           likedPosts[post.id]
                             ? 'bg-blue-100 text-blue-700'
                             : 'bg-slate-100 text-slate-600 hover:bg-blue-50'
@@ -742,7 +691,7 @@ function CommunityPage() {
                     <button
                       type="button"
                       onClick={() => toggleComments(post.id)}
-                      className="rounded-lg bg-slate-100 px-4 py-2 text-sm"
+                      className="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 px-5 py-2.5 text-sm font-semibold text-slate-700 transition-colors hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
                     >
                       Bình luận · {post.comments_count || 0}
                     </button>
@@ -818,7 +767,7 @@ function CommunityPage() {
               role="dialog"
               aria-modal="true"
               aria-labelledby="community-composer-title"
-              className="noscam-community-modal max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl"
+              className="noscam-community-modal max-h-[68vh] w-full max-w-xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl"
             >
               <div className="mb-5 flex items-center justify-between gap-4">
                 <h2
@@ -1109,7 +1058,7 @@ function CommunityPage() {
 
         {viewer && (
           <div role="dialog" aria-modal="true" aria-label="Xem ảnh bài viết"
-            className="fixed inset-0 z-[130] flex items-center justify-center bg-slate-950/95 p-4"
+            className="noscam-community-photo-lightbox fixed inset-0 z-[130] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm"
             onClick={() => setViewer(null)}>
             <button type="button" aria-label="Đóng ảnh" onClick={() => setViewer(null)}
               className="absolute right-5 top-5 text-3xl text-white">✕</button>
@@ -1119,7 +1068,7 @@ function CommunityPage() {
             }} className="absolute left-3 rounded-full bg-white/20 px-3 py-2 text-white">❮</button>
             <img src={viewer.images[viewer.index]} alt={`Ảnh ${viewer.index + 1}`}
               onClick={event => event.stopPropagation()}
-              className="max-h-[85vh] max-w-[80vw] object-contain" />
+              className="block max-h-[65dvh] max-w-full object-contain" />
             <button type="button" aria-label="Ảnh tiếp" onClick={event => {
               event.stopPropagation()
               setViewer(prev => ({ ...prev, index: (prev.index + 1) % prev.images.length }))
@@ -1209,34 +1158,81 @@ function CommunityPage() {
         </div>
       )}
 
-              <div className="mx-auto mt-6 flex w-full max-w-[890px] flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:px-5 lg:mr-auto lg:ml-[max(0px,calc((100vw-1194px)/2))]">
-                <span className="text-sm text-slate-600">
-                  {loading ? 'Đang tải bài viết...' : (
-                    <>
-                      Trang {mmoMeta.current_page} / {mmoMeta.last_page}
-                      {' '}· Tổng {mmoMeta.total} bài
-                    </>
-                  )}
-                </span>
-                <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+              
+              {/* NOSCAM_PAGINATION_EXCHANGE_STYLE_V1 */}
+              <nav
+                aria-label="Phân trang cộng đồng"
+                className="mx-auto mt-6 flex w-full max-w-[890px] flex-col items-center gap-3"
+              >
+                <p className="text-center text-sm text-slate-500">
+                  {loading
+                    ? 'Đang tải bài viết...'
+                    : `Trang ${mmoMeta.current_page}/${mmoMeta.last_page} · ${mmoMeta.total} bài viết`}
+                </p>
+
+                <div className="flex max-w-full flex-wrap items-center justify-center gap-2">
                   <button
                     type="button"
                     disabled={loading || mmoPage <= 1}
-                    onClick={() => setMmoPage(page => Math.max(1, page - 1))}
-                    className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold disabled:opacity-40"
+                    onClick={() => setMmoPage(p => Math.max(1, p - 1))}
+                    className="min-h-10 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-40"
                   >
-                    Trang trước
+                    ‹ Trước
                   </button>
+
+                  {Array.from(
+                    { length: Math.max(1, mmoMeta.last_page) },
+                    (_, i) => i + 1
+                  )
+                    .filter(n =>
+                      n === 1 ||
+                      n === mmoMeta.last_page ||
+                      Math.abs(n - mmoPage) <= 1
+                    )
+                    .reduce((result, n, i, pages) => {
+                      if (i > 0 && n - pages[i - 1] > 1) {
+                        result.push('dots-' + n)
+                      }
+                      result.push(n)
+                      return result
+                    }, [])
+                    .map(n =>
+                      typeof n === 'string' ? (
+                        <span key={n} className="px-1 text-slate-400">
+                          ...
+                        </span>
+                      ) : (
+                        <button
+                          key={n}
+                          type="button"
+                          aria-label={'Trang ' + n}
+                          aria-current={mmoPage === n ? 'page' : undefined}
+                          disabled={loading}
+                          onClick={() => setMmoPage(n)}
+                          className={
+                            'flex min-h-10 min-w-10 items-center justify-center rounded-xl border px-3 text-sm font-bold transition disabled:opacity-40 ' +
+                            (mmoPage === n
+                              ? 'border-blue-600 bg-blue-600 text-white'
+                              : 'border-slate-200 bg-white text-slate-700 hover:bg-blue-50')
+                          }
+                        >
+                          {n}
+                        </button>
+                      )
+                    )}
+
                   <button
                     type="button"
                     disabled={loading || mmoPage >= mmoMeta.last_page}
-                    onClick={() => setMmoPage(page => page + 1)}
-                    className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
+                    onClick={() => setMmoPage(p =>
+                      Math.min(mmoMeta.last_page, p + 1)
+                    )}
+                    className="min-h-10 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-40"
                   >
-                    Trang sau
+                    Tiếp ›
                   </button>
                 </div>
-              </div>
+              </nav>
 
     </main>
   )

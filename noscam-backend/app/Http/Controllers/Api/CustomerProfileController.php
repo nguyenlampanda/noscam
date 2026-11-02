@@ -21,6 +21,7 @@ class CustomerProfileController extends Controller
                 'username' => $user->username,
                 'name' => $user->name,
                 'email' => $user->email,
+                'phone' => $user->phone,
             ],
         ]);
     }
@@ -35,6 +36,12 @@ class CustomerProfileController extends Controller
                 'nullable',
                 'string',
                 'max:100',
+            ],
+
+            'phone' => [
+                'nullable',
+                'string',
+                'regex:/^0[35789][0-9]{8}$/',
             ],
 
             'email' => [
@@ -60,6 +67,11 @@ class CustomerProfileController extends Controller
                 )
                 : null;
 
+        $user->phone =
+            filled($data['phone'] ?? null)
+                ? trim($data['phone'])
+                : null;
+
         $user->save();
 
         return response()->json([
@@ -71,6 +83,7 @@ class CustomerProfileController extends Controller
                 'username' => $user->username,
                 'name' => $user->name,
                 'email' => $user->email,
+                'phone' => $user->phone,
             ],
         ]);
     }

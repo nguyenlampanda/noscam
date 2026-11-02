@@ -65,6 +65,41 @@ export default function WalletPage() {
     setTransactions,
   ] = useState([])
 
+  // NOSCAM_WALLET_HISTORY_PAGINATION_V2
+  const [historyPage, setHistoryPage] = useState(1)
+  const historyPageSize = 10
+
+  const sortedHistory = useMemo(() => {
+    return [...transactions].sort((a, b) => {
+      const aTime = Date.parse(a.created_at || '') || 0
+      const bTime = Date.parse(b.created_at || '') || 0
+
+      if (aTime !== bTime) return bTime - aTime
+
+      return Number(b.id || 0) - Number(a.id || 0)
+    })
+  }, [transactions])
+
+  const historyTotalPages = Math.max(
+    1,
+    Math.ceil(sortedHistory.length / historyPageSize)
+  )
+
+  const safeHistoryPage = Math.min(
+    historyPage,
+    historyTotalPages
+  )
+
+  const visibleHistory = useMemo(() => {
+    const start = (safeHistoryPage - 1) * historyPageSize
+
+    return sortedHistory.slice(
+      start,
+      start + historyPageSize
+    )
+  }, [sortedHistory, safeHistoryPage])
+
+
   const [amount, setAmount] =
     useState('')
 
@@ -177,7 +212,7 @@ export default function WalletPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-50 px-5 py-10">
+    <main className="min-h-screen bg-gradient-to-b from-blue-50/40 via-slate-50 to-white px-3 py-6 sm:px-5 sm:py-10">
       <div className="mx-auto max-w-6xl">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
@@ -198,13 +233,14 @@ export default function WalletPage() {
           </Link>
         </div>
 
+
         {error && (
           <div className="mt-5 rounded-2xl bg-red-50 p-4 font-semibold text-red-600">
             {error}
           </div>
         )}
 
-        <div className="mt-7 grid gap-4 md:grid-cols-4">
+        <div className="mt-7 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
           {[
             [
               'Số dư',
@@ -307,9 +343,51 @@ export default function WalletPage() {
                   <div className="text-xs font-bold text-slate-400">
                     NGÂN HÀNG
                   </div>
+                  <div className="mt-3 flex min-w-0 items-center gap-3 sm:gap-4">
+                    {/* NOSCAM_PRIORITY_INLINE_V7 */}
+                    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#211A18] shadow-lg shadow-slate-900/15 sm:h-16 sm:w-16">
+                      <svg
+                        viewBox="0 0 64 64"
+                        className="h-11 w-11 sm:h-12 sm:w-12"
+                        role="img"
+                        aria-label="Biểu tượng Priority"
+                      >
+                        <defs>
+                          <linearGradient
+                            id="wallet-priority-gold-v7"
+                            x1="0%"
+                            y1="0%"
+                            x2="100%"
+                            y2="100%"
+                          >
+                            <stop offset="0%" stopColor="#F0D4AA" />
+                            <stop offset="55%" stopColor="#D5B18A" />
+                            <stop offset="100%" stopColor="#AE835F" />
+                          </linearGradient>
+                        </defs>
+                        <path
+                          d="M5 32 23 14 41 32 23 50Z"
+                          fill="url(#wallet-priority-gold-v7)"
+                        />
+                        <path
+                          d="M23 32 41 14 59 32 41 50Z"
+                          fill="url(#wallet-priority-gold-v7)"
+                        />
+                        <path
+                          d="M23 32 32 23 41 32 32 41Z"
+                          fill="#211A18"
+                        />
+                      </svg>
+                    </div>
 
-                  <div className="mt-1 font-black">
-                    Techcombank
+                    <div className="min-w-0">
+                      <div className="text-base font-black text-slate-950 sm:text-lg">
+                        Techcombank
+                      </div>
+                      <div className="mt-1 text-[10px] font-black tracking-[0.18em] text-[#A47B50] sm:text-xs">
+                        PRIORITY MEMBER
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -432,57 +510,135 @@ export default function WalletPage() {
           </div>
         </div>
 
-        <div className="mt-7 rounded-3xl border border-slate-200 bg-white p-6">
-          <h2 className="text-xl font-black">
-            Lịch sử giao dịch
-          </h2>
 
-          <div className="mt-4 divide-y divide-slate-100">
-            {transactions.length ===
-            0 ? (
-              <div className="py-10 text-center text-sm text-slate-400">
+        {/* NOSCAM_WALLET_HISTORY_CSS_V4 */}
+        <section className="mt-7 overflow-hidden rounded-3xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-900/5 sm:p-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-blue-600">
+                NOSCAM WALLET
+              </p>
+              <h2 className="mt-1 text-xl font-black text-slate-950 sm:text-2xl">
+                Lịch sử giao dịch
+              </h2>
+              <p className="mt-1 text-xs text-slate-500 sm:text-sm">
+                Các khoản cộng và trừ tiền trong ví.
+              </p>
+            </div>
+
+            <span className="rounded-full bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700">
+              {sortedHistory.length} giao dịch
+            </span>
+          </div>
+
+          <div className="mt-5 space-y-3">
+            {sortedHistory.length === 0 ? (
+              <div className="rounded-2xl bg-slate-50 px-4 py-12 text-center text-sm text-slate-400">
                 Chưa có giao dịch.
               </div>
             ) : (
-              transactions.map(
-                (item) => (
-                  <div
-                    key={item.id}
-                    className="flex items-center justify-between gap-4 py-4"
+              visibleHistory.map((item, index) => {
+                const incoming = item.direction === 'credit'
+
+                return (
+                  <motion.div
+                    key={`${safeHistoryPage}-${item.id}`}
+                    initial={{ opacity: 0, y: 14 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{
+                      duration: 0.28,
+                      delay: Math.min(index * 0.04, 0.28),
+                    }}
+                    whileHover={{ y: -2 }}
+                    className="flex min-w-0 flex-col gap-3 rounded-2xl border border-slate-100 bg-slate-50/60 p-3 transition-colors duration-200 hover:border-blue-200 hover:bg-blue-50/40 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:p-4"
                   >
-                    <div>
-                      <div className="font-bold">
-                        {item.description ||
-                          item.code}
+                    <div className="flex min-w-0 items-start gap-3">
+                      <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-lg font-black ${
+                        incoming
+                          ? 'bg-emerald-50 text-emerald-600'
+                          : 'bg-rose-50 text-rose-600'
+                      }`}>
+                        {incoming ? '+' : '−'}
                       </div>
 
-                      <div className="mt-1 text-xs text-slate-400">
-                        {item.code}
+                      <div className="min-w-0">
+                        <div className="break-words text-sm font-bold leading-6 text-slate-900 sm:text-base">
+                          {item.description || item.code}
+                        </div>
+
+                        <div className="mt-1 break-all text-xs text-slate-400">
+                          {item.code}
+                        </div>
+
+                        {item.created_at && (
+                          <div className="mt-1 text-xs text-slate-400">
+                            {new Date(item.created_at).toLocaleString('vi-VN')}
+                          </div>
+                        )}
                       </div>
                     </div>
 
-                    <div
-                      className={`font-black ${
-                        item.direction ===
-                        'credit'
-                          ? 'text-emerald-600'
-                          : 'text-red-600'
-                      }`}
-                    >
-                      {item.direction ===
-                      'credit'
-                        ? '+'
-                        : '-'}
-                      {money(
-                        item.amount,
-                      )}
+                    <div className={`shrink-0 self-end whitespace-nowrap text-base font-black sm:self-auto sm:text-lg ${
+                      incoming
+                        ? 'text-emerald-600'
+                        : 'text-rose-600'
+                    }`}>
+                      {incoming ? '+' : '−'}
+                      {money(item.amount)}
                     </div>
-                  </div>
-                ),
-              )
+                  </motion.div>
+                )
+              })
             )}
           </div>
-        </div>
+
+          {sortedHistory.length > 0 && (
+            <div className="mt-6 flex flex-col gap-4 border-t border-slate-100 pt-5 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-center text-xs font-semibold text-slate-500 sm:text-left">
+                Hiển thị{' '}
+                {(safeHistoryPage - 1) * historyPageSize + 1}
+                {' – '}
+                {Math.min(
+                  safeHistoryPage * historyPageSize,
+                  sortedHistory.length
+                )}
+                {' / '}
+                {sortedHistory.length} giao dịch
+              </p>
+
+              <div className="flex items-center justify-center gap-2">
+                <button
+                  type="button"
+                  disabled={safeHistoryPage <= 1}
+                  onClick={() =>
+                    setHistoryPage((page) => Math.max(1, page - 1))
+                  }
+                  className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-300 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:translate-y-0"
+                >
+                  Trước
+                </button>
+
+                <span className="min-w-[85px] rounded-xl bg-slate-100 px-3 py-2.5 text-center text-sm font-black text-slate-800">
+                  {safeHistoryPage} / {historyTotalPages}
+                </span>
+
+                <button
+                  type="button"
+                  disabled={safeHistoryPage >= historyTotalPages}
+                  onClick={() =>
+                    setHistoryPage((page) =>
+                      Math.min(historyTotalPages, page + 1)
+                    )
+                  }
+                  className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:translate-y-0"
+                >
+                  Sau
+                </button>
+              </div>
+            </div>
+          )}
+        </section>
+
       </div>
     </main>
   )

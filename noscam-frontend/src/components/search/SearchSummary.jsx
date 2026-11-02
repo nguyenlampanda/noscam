@@ -72,11 +72,11 @@ function SearchSummary({
         />
 
         <SummaryItem
-          label="Mức cảnh báo"
+          label="Trạng thái báo cáo"
           value={
-            result.riskLabel ||
-            result.status ||
-            '—'
+            Number(result.reports ?? 0) > 0
+              ? 'Có báo cáo đã duyệt'
+              : 'Chưa ghi nhận báo cáo'
           }
           right
         />

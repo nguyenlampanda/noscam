@@ -413,7 +413,7 @@ function AdminReportDetailPage() {
                         {entity.risk_score !==
                           undefined && (
                           <div className="mt-3 text-xs text-slate-500">
-                            Risk Score:{' '}
+                            Điểm rủi ro:{' '}
                             <strong className="text-slate-800">
                               {
                                 entity.risk_score
@@ -485,7 +485,7 @@ function AdminReportDetailPage() {
                     ? 'Báo cáo chưa đóng góp vào dữ liệu cảnh báo cho đến khi được duyệt.'
                     : report.status ===
                         'approved'
-                      ? 'Báo cáo đang đóng góp vào entity, quan hệ và Risk Score của hệ thống.'
+                      ? 'Báo cáo đang đóng góp vào entity, quan hệ và Điểm rủi ro của hệ thống.'
                       : 'Báo cáo hiện không đóng góp vào dữ liệu cảnh báo công khai.'}
                 </p>
 
@@ -593,7 +593,7 @@ function ConfirmationDialog({
 
   return (
     <motion.div
-      className="fixed inset-0 z-[100] grid place-items-center bg-slate-950/75 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-[100] grid place-items-center bg-slate-950/65 p-4 backdrop-blur-[5px]"
       initial={{
         opacity: 0,
       }}
@@ -628,7 +628,7 @@ function ConfirmationDialog({
           opacity: 0,
           scale: 0.96,
         }}
-        className="w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-2xl"
+        className="w-full max-w-[480px] max-h-[90vh] overflow-y-auto rounded-[26px] border border-slate-200 bg-white shadow-[0_28px_90px_rgba(15,23,42,0.25)]"
       >
         <div
           className={`h-1.5 ${
@@ -655,9 +655,9 @@ function ConfirmationDialog({
             {approving
               ? report.status ===
                 'rejected'
-                ? 'Duyệt lại báo cáo?'
-                : 'Duyệt báo cáo?'
-              : 'Từ chối báo cáo?'}
+                ? 'Xác nhận duyệt lại báo cáo'
+                : 'Xác nhận duyệt báo cáo'
+              : 'Xác nhận từ chối báo cáo'}
           </h2>
 
           <p className="mt-2 text-sm leading-6 text-slate-500">
@@ -668,8 +668,8 @@ function ConfirmationDialog({
 
           <div className="mt-5 rounded-2xl bg-slate-50 p-4 text-sm leading-6 text-slate-600">
             {approving
-              ? 'Nếu xác nhận, dữ liệu của báo cáo có thể được đưa vào entity, quan hệ liên quan và Risk Score sẽ được tính lại.'
-              : 'Nếu xác nhận, báo cáo sẽ không đóng góp vào dữ liệu cảnh báo công khai và Risk Score sẽ được tính lại.'}
+              ? 'Nếu xác nhận, dữ liệu của báo cáo có thể được đưa vào entity, quan hệ liên quan và Điểm rủi ro sẽ được tính lại.'
+              : 'Nếu xác nhận, báo cáo sẽ không đóng góp vào dữ liệu cảnh báo công khai và Điểm rủi ro sẽ được tính lại.'}
           </div>
 
           <div className="mt-6 flex gap-3">
@@ -677,7 +677,7 @@ function ConfirmationDialog({
               type="button"
               disabled={processing}
               onClick={onCancel}
-              className="flex-1 rounded-xl border border-slate-200 px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              className="flex-1 min-h-12 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
             >
               Hủy
             </button>
@@ -686,7 +686,7 @@ function ConfirmationDialog({
               type="button"
               disabled={processing}
               onClick={onConfirm}
-              className={`flex-1 rounded-xl px-4 py-3 text-sm font-bold text-slate-950 disabled:opacity-60 ${
+              className={`flex-1 min-h-12 rounded-xl px-4 py-3 text-sm font-bold text-slate-950 disabled:opacity-60 ${
                 approving
                   ? 'bg-blue-600 hover:bg-blue-700'
                   : 'bg-red-600 hover:bg-red-700'

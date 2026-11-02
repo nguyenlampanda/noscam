@@ -28,6 +28,7 @@ class ExchangeCampaign extends Model
         'rules_accepted_at',
         'idempotency_key',
         'request_hash',
+        'is_free_reciprocal',
     ];
 
     protected function casts(): array
@@ -40,6 +41,7 @@ class ExchangeCampaign extends Model
             'budget_held' => 'decimal:4',
             'budget_settled' => 'decimal:4',
             'budget_refunded' => 'decimal:4',
+            'is_free_reciprocal' => 'boolean',
             'rules_accepted' => 'boolean',
             'rules_accepted_at' => 'datetime',
         ];

@@ -210,6 +210,12 @@ class ExchangeCampaignController extends Controller
         Request $request,
         ExchangeCampaignService $service
     ): JsonResponse {
+        // Exchange is free-only: reject legacy paid requests before any wallet operation.
+        if (!$request->boolean('is_free_reciprocal')) {
+            throw ValidationException::withMessages([
+                'is_free_reciprocal' => 'Exchange chỉ hỗ trợ chiến dịch miễn phí.',
+            ]);
+        }
         $data = $request->validate([
             'platform' => [
                 'required',
@@ -234,6 +240,14 @@ class ExchangeCampaignController extends Controller
             'rules_accepted' => [
                 'required',
                 'accepted',
+            ],
+            'is_free_reciprocal' => ['sometimes', 'boolean'],
+            'social_account_id' => [
+                Rule::requiredIf(
+                    fn () => $request->boolean('is_free_reciprocal')
+                ),
+                'integer',
+                'min:1',
             ],
             'max_budget' => [
                 'sometimes',
@@ -266,6 +280,10 @@ class ExchangeCampaignController extends Controller
                 $idempotencyKey,
                 isset($data['max_budget'])
                     ? (int) $data['max_budget']
+                    : null,
+                $request->boolean('is_free_reciprocal'),
+                isset($data['social_account_id'])
+                    ? (int) $data['social_account_id']
                     : null
             );
         } catch (HttpResponseException $exception) {
@@ -277,7 +295,9 @@ class ExchangeCampaignController extends Controller
         }
 
         return response()->json([
-            'message' => 'Đã tạo chiến dịch và giữ ngân sách.',
+            'message' => $request->boolean('is_free_reciprocal')
+                ? 'Đã tạo chiến dịch tương tác miễn phí.'
+                : 'Đã tạo chiến dịch trả xu.',
             'data' => [
                 'id' => $campaign->id,
                 'platform' => $campaign->platform,

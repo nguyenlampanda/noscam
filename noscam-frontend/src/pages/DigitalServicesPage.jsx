@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { getCustomerToken } from '../services/customerService'
 import apiClient from '../services/apiClient'
+import DigitalPlatformIcon from '../components/ui/DigitalPlatformIcon'
+import DigitalServiceDetailPage from './DigitalServiceDetailPage'
 
 const categories = [
   { value: '', label: 'Tất cả danh mục' },
@@ -118,7 +121,12 @@ function FilterDropdown({ id, value, onChange, options }) {
             : 'border-slate-200 hover:border-blue-300 hover:bg-blue-50/40'
         }`}
       >
-        <span className="truncate">{selected?.label}</span>
+        <span className="flex min-w-0 items-center gap-2">
+          {id === 'digital-platform' && (
+            <DigitalPlatformIcon platform={selected?.value} size={20} />
+          )}
+          <span className="truncate">{selected?.label}</span>
+        </span>
 
         <svg
           viewBox="0 0 24 24"
@@ -166,7 +174,12 @@ function FilterDropdown({ id, value, onChange, options }) {
                     : 'text-slate-700 hover:bg-blue-50 hover:text-blue-700 focus:bg-blue-50 focus:text-blue-700 focus:outline-none'
                 }`}
               >
-                <span>{item.label}</span>
+                <span className="flex items-center gap-2">
+                  {id === 'digital-platform' && (
+                    <DigitalPlatformIcon platform={item.value} size={20} />
+                  )}
+                  <span>{item.label}</span>
+                </span>
                 {active && (
                   <svg
                     viewBox="0 0 24 24"
@@ -189,6 +202,69 @@ function FilterDropdown({ id, value, onChange, options }) {
 }
 
 export default function DigitalServicesPage() {
+  // NOSCAM_DIGITAL_AUTH_GATE_V2
+  const loggedIn = Boolean(getCustomerToken())
+  const [selectedServiceId, setSelectedServiceId] = useState(null)
+  const modalRef = useRef(null)
+  const closeButtonRef = useRef(null)
+  const triggerRef = useRef(null)
+
+  useEffect(() => {
+    if (selectedServiceId === null) return undefined
+
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+
+    function handleKeyDown(event) {
+      if (event.key === 'Escape') {
+        setSelectedServiceId(null)
+      }
+
+      if (event.key === 'Tab' && modalRef.current) {
+        const focusable = Array.from(
+          modalRef.current.querySelectorAll(
+            'button:not([disabled]), a[href], input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+          )
+        ).filter(element => element.getClientRects().length > 0)
+
+        if (!focusable.length) {
+          event.preventDefault()
+          modalRef.current.focus()
+          return
+        }
+
+        const first = focusable[0]
+        const last = focusable[focusable.length - 1]
+
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault()
+          last.focus()
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault()
+          first.focus()
+        }
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    closeButtonRef.current?.focus()
+
+    return () => {
+      document.body.style.overflow = previousOverflow
+      document.removeEventListener('keydown', handleKeyDown)
+      triggerRef.current?.focus()
+    }
+  }, [selectedServiceId])
+
+  function openServiceModal(id, event) {
+    if (!loggedIn) return
+    triggerRef.current = event.currentTarget
+    setSelectedServiceId(id)
+  }
+
+  // NOSCAM_PAGINATION_V2
+  const PAGE_SIZE = 10
+  const [currentPage, setCurrentPage] = useState(1)
   const [items, setItems] = useState([])
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('')
@@ -238,24 +314,46 @@ export default function DigitalServicesPage() {
     }
   }, [search, category, platform])
 
+  const totalPages = Math.max(1, Math.ceil(items.length / PAGE_SIZE))
+  const safePage = Math.min(currentPage, totalPages)
+  const visibleItems = items.slice(
+    (safePage - 1) * PAGE_SIZE,
+    safePage * PAGE_SIZE
+  )
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [search, category, platform])
+
   return (
     <div className="min-h-screen bg-slate-50">
 
       <main className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
-        <div className="rounded-3xl bg-gradient-to-br from-blue-700 via-blue-600 to-sky-500 p-8 text-white shadow-xl shadow-blue-100 sm:p-12">
-          <p className="text-sm font-bold uppercase tracking-widest text-blue-100">
+        <div className="noscam-digital-hero relative isolate overflow-hidden rounded-[28px] bg-gradient-to-br from-slate-950 via-[#10265c] to-blue-700 px-5 py-8 text-white shadow-2xl shadow-blue-950/20 sm:px-10 sm:py-12">
+          <div aria-hidden="true" className="pointer-events-none absolute -right-24 -top-32 h-80 w-80 rounded-full bg-blue-400/20 blur-3xl" />
+          <div aria-hidden="true" className="pointer-events-none absolute -bottom-32 left-1/3 h-72 w-72 rounded-full bg-cyan-400/10 blur-3xl" />
+          <div className="relative z-10">
+          <p className="inline-flex items-center rounded-full border border-blue-300/25 bg-white/10 px-4 py-2 text-xs font-bold uppercase tracking-widest text-blue-100">
             NOSCAM.VN
           </p>
-          <h1 className="mt-3 text-3xl font-extrabold sm:text-4xl">
+          <h1 className="mt-5 text-3xl font-black tracking-tight sm:text-5xl">
             Dịch vụ số
           </h1>
-          <p className="mt-4 max-w-2xl text-sm leading-7 text-blue-50 sm:text-base">
+          <p className="mt-4 max-w-2xl text-sm leading-7 text-blue-100/90 sm:text-base sm:leading-8">
             Khám phá các dịch vụ hỗ trợ tài khoản, truyền thông,
             báo chí và những giải pháp số khác.
           </p>
+          </div>
         </div>
 
-        <section className="mt-8 rounded-3xl border border-blue-100 bg-white p-5 shadow-sm sm:p-6">
+        <div className="relative mt-8">
+          <div
+            inert={!loggedIn}
+            className={!loggedIn
+              ? 'pointer-events-none select-none opacity-40 blur-[2.5px] transition-all duration-300'
+              : 'transition-all duration-300'}
+          >
+        <section className="mt-8 rounded-3xl border border-blue-100 bg-white p-5 shadow-[0_14px_45px_-30px_rgba(15,23,42,0.4)] transition-shadow duration-300 hover:shadow-lg sm:p-6">
           <h2 className="text-lg font-extrabold text-slate-900">
             Tìm dịch vụ phù hợp
           </h2>
@@ -324,7 +422,7 @@ export default function DigitalServicesPage() {
             </p>
           ) : (
             <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-              {items.map(item => (
+              {visibleItems.map(item => (
                 <article
                   key={item.id}
                   className="flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-1 hover:border-blue-200 hover:shadow-lg"
@@ -332,11 +430,12 @@ export default function DigitalServicesPage() {
                   <div className="h-1 bg-blue-600" />
                   <div className="flex flex-1 flex-col p-6">
                     <div className="flex flex-wrap gap-2">
+                      <span className="inline-flex items-center gap-2 rounded-lg bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+  <DigitalPlatformIcon platform={item.platform} size={16} />
+  {platforms.find(p => p.value === item.platform)?.label ?? item.platform}
+</span>
                       <span className="rounded-lg bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">
                         {categories.find(c => c.value === item.category)?.label ?? item.category}
-                      </span>
-                      <span className="rounded-lg bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-                        {platforms.find(p => p.value === item.platform)?.label ?? item.platform}
                       </span>
                     </div>
 
@@ -356,19 +455,181 @@ export default function DigitalServicesPage() {
                           : money(item.price_vnd)}
                       </p>
 
-                      <Link
-                        to={`/digital-services/${item.id}`}
-                        className="mt-5 block rounded-xl bg-blue-600 px-5 py-3 text-center text-sm font-bold text-white transition hover:bg-blue-700"
+                      <button
+                        type="button"
+                        onClick={event => openServiceModal(item.id, event)}
+                        className="mt-5 block w-full rounded-xl bg-blue-600 px-5 py-3 text-center text-sm font-bold text-white transition hover:bg-blue-700"
                       >
                         Xem chi tiết
-                      </Link>
+                      </button>
                     </div>
                   </div>
                 </article>
               ))}
             </div>
           )}
+
+        {!loading && items.length > 0 && !error && (
+          <nav
+            aria-label="Phân trang dịch vụ"
+            className="mt-7 flex flex-col items-center gap-3"
+          >
+            <p className="text-sm font-medium text-slate-500">
+              Trang {safePage}/{totalPages} · {items.length} dịch vụ
+            </p>
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <button
+                type="button"
+                disabled={safePage <= 1}
+                onClick={() => setCurrentPage(safePage - 1)}
+                className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 disabled:opacity-40"
+              >
+                ‹ Trước
+              </button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1)
+                .filter(n => n === 1 || n === totalPages || Math.abs(n - safePage) <= 1)
+                .reduce((result, n, i, pages) => {
+                  if (i && n - pages[i - 1] > 1) result.push('dots-' + n)
+                  result.push(n)
+                  return result
+                }, [])
+                .map(n => typeof n === 'string' ? (
+                  <span key={n} className="px-1 text-slate-400">...</span>
+                ) : (
+                  <button
+                    key={n}
+                    type="button"
+                    aria-current={safePage === n ? 'page' : undefined}
+                    onClick={() => setCurrentPage(n)}
+                    className={'min-w-10 rounded-xl border px-3 py-2 text-sm font-bold ' +
+                      (safePage === n
+                        ? 'border-blue-600 bg-blue-600 text-white'
+                        : 'border-slate-200 bg-white text-slate-700 hover:text-blue-600')}
+                  >
+                    {n}
+                  </button>
+                ))}
+              <button
+                type="button"
+                disabled={safePage >= totalPages}
+                onClick={() => setCurrentPage(safePage + 1)}
+                className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 disabled:opacity-40"
+              >
+                Tiếp ›
+              </button>
+            </div>
+          </nav>
+        )}
         </section>
+      
+      
+          </div>
+
+          {!loggedIn && (
+            <div className="absolute inset-x-0 top-8 z-10 flex justify-center px-3 sm:top-16">
+              <div
+                role="dialog"
+                aria-labelledby="digital-login-title"
+                aria-describedby="digital-login-description"
+                className="w-full max-w-md rounded-[26px] border border-blue-100 bg-white p-6 text-center shadow-[0_25px_70px_-20px_rgba(15,23,42,0.3)] sm:p-8"
+              >
+                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="h-7 w-7"
+                    aria-hidden="true"
+                  >
+                    <rect x="4" y="10" width="16" height="11" rx="2" />
+                    <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+                  </svg>
+                </div>
+
+                <h2
+                  id="digital-login-title"
+                  className="mt-5 text-xl font-black text-slate-950"
+                >
+                  Đăng nhập để sử dụng Dịch vụ số
+                </h2>
+
+                <p
+                  id="digital-login-description"
+                  className="mt-3 text-sm leading-6 text-slate-500"
+                >
+                  Vui lòng đăng nhập hoặc đăng ký tài khoản NoScam.vn
+                  để tìm kiếm, xem chi tiết và đặt dịch vụ.
+                </p>
+
+                <div className="mt-6 grid grid-cols-2 gap-3">
+                  <Link
+                    to="/login"
+                    className="flex min-h-12 items-center justify-center rounded-xl bg-blue-600 px-3 text-sm font-bold text-white transition hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-lg"
+                  >
+                    Đăng nhập
+                  </Link>
+
+                  <Link
+                    to="/register"
+                    className="flex min-h-12 items-center justify-center rounded-xl border border-blue-100 bg-blue-50 px-3 text-sm font-bold text-blue-700 transition hover:-translate-y-0.5 hover:bg-blue-100"
+                  >
+                    Đăng ký
+                  </Link>
+                </div>
+
+                <p className="mt-4 text-xs text-slate-400">
+                  Đăng nhập để mở khóa toàn bộ chức năng dịch vụ số.
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+{selectedServiceId !== null && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/65 p-2 backdrop-blur-sm sm:p-5"
+          onMouseDown={event => {
+            if (event.target === event.currentTarget) {
+              setSelectedServiceId(null)
+            }
+          }}
+        >
+          <div
+            ref={modalRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Chi tiết dịch vụ số"
+            tabIndex={-1}
+            className="flex max-h-[94dvh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl sm:rounded-3xl"
+          >
+            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white px-5 py-4 sm:px-7">
+              <h2 className="text-lg font-extrabold text-slate-900">
+                Chi tiết dịch vụ
+              </h2>
+              <button
+                ref={closeButtonRef}
+                type="button"
+                aria-label="Đóng chi tiết dịch vụ"
+                onClick={() => setSelectedServiceId(null)}
+                className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-xl font-bold text-slate-700 transition hover:bg-red-50 hover:text-red-600"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+              <DigitalServiceDetailPage
+                key={selectedServiceId}
+                serviceId={selectedServiceId}
+                onClose={() => setSelectedServiceId(null)}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
       </main>
     </div>
   )

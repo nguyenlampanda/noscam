@@ -374,7 +374,7 @@ export default function MyDigitalOrdersPage() {
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
                     <p className="text-sm font-bold text-blue-600">
-                      Đơn #{order.id}
+                      Đơn NSD-{String(order.id).padStart(6, '0')}
                     </p>
                     <h2 className="mt-1 text-lg font-bold text-slate-900">
                       {order.service?.name || 'Dịch vụ số'}
@@ -407,28 +407,73 @@ export default function MyDigitalOrdersPage() {
           </div>
         )}
 
-        {!loading && lastPage > 1 && (
-          <div className="mt-6 flex items-center justify-center gap-4">
-            <button
-              type="button"
-              disabled={page <= 1}
-              onClick={() => setPage((p) => p - 1)}
-              className="rounded-xl border bg-white px-4 py-2 disabled:opacity-40"
-            >
-              Trang trước
-            </button>
-            <span className="text-sm text-slate-600">
-              {page} / {lastPage}
-            </span>
-            <button
-              type="button"
-              disabled={page >= lastPage}
-              onClick={() => setPage((p) => p + 1)}
-              className="rounded-xl border bg-white px-4 py-2 disabled:opacity-40"
-            >
-              Trang sau
-            </button>
-          </div>
+        {!loading && orders.length > 0 && (
+          <nav
+            aria-label="Phân trang đơn dịch vụ số"
+            className="mt-7 flex flex-col items-center gap-3"
+          >
+            <p className="text-sm font-medium text-slate-500">
+              Trang {page}/{lastPage}
+            </p>
+
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <button
+                type="button"
+                disabled={page <= 1}
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-blue-50 disabled:opacity-40"
+              >
+                ‹ Trước
+              </button>
+
+              {Array.from(
+                { length: lastPage },
+                (_, index) => index + 1
+              )
+                .filter(n =>
+                  n === 1 ||
+                  n === lastPage ||
+                  Math.abs(n - page) <= 1
+                )
+                .reduce((result, n, index, pages) => {
+                  if (index && n - pages[index - 1] > 1) {
+                    result.push(`dots-${n}`)
+                  }
+                  result.push(n)
+                  return result
+                }, [])
+                .map(n =>
+                  typeof n === 'string' ? (
+                    <span key={n} className="px-1 text-slate-400">
+                      ...
+                    </span>
+                  ) : (
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() => setPage(n)}
+                      aria-current={page === n ? 'page' : undefined}
+                      className={
+                        page === n
+                          ? 'min-w-10 rounded-xl bg-blue-600 px-3 py-2 text-sm font-bold text-white'
+                          : 'min-w-10 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:bg-blue-50'
+                      }
+                    >
+                      {n}
+                    </button>
+                  )
+                )}
+
+              <button
+                type="button"
+                disabled={page >= lastPage}
+                onClick={() => setPage(p => Math.min(lastPage, p + 1))}
+                className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-blue-50 disabled:opacity-40"
+              >
+                Tiếp ›
+              </button>
+            </div>
+          </nav>
         )}
 
         {dialogOpen && (

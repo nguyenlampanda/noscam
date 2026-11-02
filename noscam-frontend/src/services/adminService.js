@@ -112,13 +112,15 @@ export const adminService = {
     }
   },
 
-  async getDashboard() {
+  async getDashboard(params = {}) {
+    const query = new URLSearchParams()
+    if (params.from) query.set('from', params.from)
+    if (params.to) query.set('to', params.to)
     return adminRequest(
-      () =>
-        apiClient.get(
-          '/admin/dashboard',
-          authOptions(),
-        ),
+      () => apiClient.get(
+        `/admin/dashboard${query.toString() ? '?' + query.toString() : ''}`,
+        authOptions(),
+      ),
     )
   },
 
@@ -573,6 +575,14 @@ export const adminService = {
     )
   },
 
+  async cancelSocialOrderWithoutRefund(id, reason) {
+    return adminRequest(() => apiClient.post(
+      `/admin/social/orders/${id}/cancel-no-refund`,
+      { reason, confirmation: 'CANCEL_NO_REFUND' },
+      authOptions(),
+    ))
+  },
+
   async cancelSocialOrder(id) {
     return adminRequest(
       () =>
@@ -690,6 +700,27 @@ export const adminService = {
           `/admin/social/customers/${id}`,
           authOptions(),
         ),
+    )
+  },
+
+  /* NOSCAM_ADMIN_USERS_V1 */
+  async updateSocialCustomerProfile(id, payload) {
+    return adminRequest(() =>
+      apiClient.put(
+        `/admin/social/customers/${id}/profile`,
+        payload,
+        authOptions(),
+      ),
+    )
+  },
+
+  async revokeSocialCustomerSessions(id) {
+    return adminRequest(() =>
+      apiClient.post(
+        `/admin/social/customers/${id}/revoke-sessions`,
+        {},
+        authOptions(),
+      ),
     )
   },
 

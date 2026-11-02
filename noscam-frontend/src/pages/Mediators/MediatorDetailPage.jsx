@@ -1,102 +1,92 @@
-import AvatarLightbox from '../../components/AvatarLightbox'
-import {
-  useEffect,
-  useState,
-} from 'react'
-import { motion } from 'motion/react'
-import {
-  Link,
-  useParams,
-} from 'react-router-dom'
+import AvatarLightbox from "../../components/AvatarLightbox";
+import { useEffect, useState } from "react";
+import { motion } from "motion/react";
+import { Link, useParams } from "react-router-dom";
 
-import Container from '../../components/layout/Container'
-import mediatorService from '../../services/mediatorService'
+import Container from "../../components/layout/Container";
+import mediatorService from "../../services/mediatorService";
 
 const labels = {
-  phone: 'Số điện thoại',
-  bank_account:
-    'Tài khoản ngân hàng',
-  facebook: 'Facebook',
-  instagram: 'Instagram',
-  tiktok: 'TikTok',
-  zalo: 'Zalo',
-  telegram: 'Telegram',
-  other: 'Thông tin khác',
-}
+  phone: "Số điện thoại",
+  bank_account: "Tài khoản ngân hàng",
+  facebook: "Facebook",
+  instagram: "Instagram",
+  tiktok: "TikTok",
+  zalo: "Zalo",
+  telegram: "Telegram",
+  other: "Thông tin khác",
+};
 
 function money(value) {
-  return `${Number(
-    value || 0,
-  ).toLocaleString('vi-VN')}đ`
+  return `${Number(value || 0).toLocaleString("vi-VN")}đ`;
 }
-
 
 const platformInfo = {
-  facebook: { name: 'Facebook', icon: 'f', color: 'bg-blue-600' },
-  instagram: { name: 'Instagram', icon: '◎', color: 'bg-pink-600' },
-  tiktok: { name: 'TikTok', icon: '♪', color: 'bg-slate-950' },
-  telegram: { name: 'Telegram', icon: '➤', color: 'bg-sky-500' },
-  zalo: { name: 'Zalo', icon: 'Z', color: 'bg-blue-500' },
-  phone: { name: 'Số điện thoại', icon: '☎', color: 'bg-emerald-600' },
-  bank_account: { name: 'Tài khoản ngân hàng', icon: '▣', color: 'bg-slate-600' },
-  other: { name: 'Thông tin khác', icon: '↗', color: 'bg-slate-500' },
-}
+  facebook: { name: "Facebook", icon: "f", color: "bg-blue-600" },
+  instagram: { name: "Instagram", icon: "◎", color: "bg-pink-600" },
+  tiktok: { name: "TikTok", icon: "♪", color: "bg-slate-950" },
+  telegram: { name: "Telegram", icon: "➤", color: "bg-sky-500" },
+  zalo: { name: "Zalo", icon: "Z", color: "bg-blue-500" },
+  phone: { name: "Số điện thoại", icon: "☎", color: "bg-emerald-600" },
+  bank_account: {
+    name: "Tài khoản ngân hàng",
+    icon: "▣",
+    color: "bg-slate-600",
+  },
+  other: { name: "Thông tin khác", icon: "↗", color: "bg-slate-500" },
+};
 
 function safeExternalUrl(value, type) {
-  const raw = String(value || '').trim()
-  if (!raw) return null
+  const raw = String(value || "").trim();
+  if (!raw) return null;
 
-  if (type === 'phone') {
-    const number = raw.replace(/[^\d+]/g, '')
-    return /^\+?\d{9,15}$/.test(number) ? `tel:${number}` : null
+  if (type === "phone") {
+    const number = raw.replace(/[^\d+]/g, "");
+    return /^\+?\d{9,15}$/.test(number) ? `tel:${number}` : null;
   }
 
-  if (type === 'zalo' && /^\+?[\d\s().-]{9,20}$/.test(raw)) {
-    const number = raw.replace(/\D/g, '')
+  if (type === "zalo" && /^\+?[\d\s().-]{9,20}$/.test(raw)) {
+    const number = raw.replace(/\D/g, "");
     return number.length >= 9 && number.length <= 15
       ? `https://zalo.me/${number}`
-      : null
+      : null;
   }
 
-  let candidate = raw
+  let candidate = raw;
 
   if (!/^[a-z][a-z0-9+.-]*:/i.test(candidate)) {
     if (/^(www\.|[a-z0-9-]+\.[a-z]{2,})/i.test(candidate)) {
-      candidate = `https://${candidate}`
+      candidate = `https://${candidate}`;
     } else {
-      return null
+      return null;
     }
   }
 
   try {
-    const url = new URL(candidate)
-    return ['https:', 'http:'].includes(url.protocol)
-      ? url.href
-      : null
+    const url = new URL(candidate);
+    return ["https:", "http:"].includes(url.protocol) ? url.href : null;
   } catch {
-    return null
+    return null;
   }
 }
 
 function isImageUrl(url) {
-  if (!url || url.startsWith('tel:')) return false
+  if (!url || url.startsWith("tel:")) return false;
   try {
-    return /\.(png|jpe?g|webp|gif|avif)$/i.test(
-      new URL(url).pathname
-    )
+    return /\.(png|jpe?g|webp|gif|avif)$/i.test(new URL(url).pathname);
   } catch {
-    return false
+    return false;
   }
 }
 
 function MediatorIdentifier({ item }) {
-  const type = String(item.type || 'other').toLowerCase()
-  const platform = platformInfo[type] || platformInfo.other
-  const value = String(item.value || '').trim()
-  const href = safeExternalUrl(value, type)
-  const image = isImageUrl(href)
-  const isPhone = type === 'phone'
-  const isZalo = type === 'zalo'
+  const type = String(item.type || "other").toLowerCase();
+  const platform = platformInfo[type] || platformInfo.other;
+  const value = String(item.value || "").trim();
+  const href = safeExternalUrl(value, type);
+  const image = isImageUrl(href);
+  const isPhone = type === "phone";
+  const isZalo = type === "zalo";
 
   return (
     <div className="group min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 transition-all duration-200 hover:border-blue-200 hover:shadow-md sm:p-5">
@@ -116,8 +106,8 @@ function MediatorIdentifier({ item }) {
           {href ? (
             <a
               href={href}
-              target={isPhone ? undefined : '_blank'}
-              rel={isPhone ? undefined : 'noopener noreferrer'}
+              target={isPhone ? undefined : "_blank"}
+              rel={isPhone ? undefined : "noopener noreferrer"}
               className="mt-2 block break-all text-sm font-bold leading-6 text-blue-600 underline decoration-blue-200 underline-offset-4 transition hover:text-blue-800 hover:decoration-blue-600"
               title={value}
             >
@@ -125,7 +115,7 @@ function MediatorIdentifier({ item }) {
             </a>
           ) : (
             <p className="mt-2 break-all text-sm font-bold leading-6 text-slate-900">
-              {value || 'Chưa cập nhật'}
+              {value || "Chưa cập nhật"}
             </p>
           )}
 
@@ -157,97 +147,77 @@ function MediatorIdentifier({ item }) {
         <div className="mt-4 flex justify-end">
           <a
             href={href}
-            target={isPhone ? undefined : '_blank'}
-            rel={isPhone ? undefined : 'noopener noreferrer'}
+            target={isPhone ? undefined : "_blank"}
+            rel={isPhone ? undefined : "noopener noreferrer"}
             className="inline-flex items-center gap-2 rounded-xl bg-blue-50 px-4 py-2 text-xs font-bold text-blue-700 transition hover:bg-blue-600 hover:text-white"
           >
             {isPhone
-              ? 'Gọi điện'
+              ? "Gọi điện"
               : isZalo
-                ? 'Mở Zalo'
+                ? "Mở Zalo"
                 : image
-                  ? 'Xem hình ảnh'
-                  : 'Truy cập liên kết'}
+                  ? "Xem hình ảnh"
+                  : "Truy cập liên kết"}
             <span aria-hidden="true">↗</span>
           </a>
         </div>
       )}
     </div>
-  )
+  );
 }
 
 function MediatorDetailPage() {
-  const { code } = useParams()
+  const { code } = useParams();
 
-  const [data, setData] =
-    useState(null)
+  const [data, setData] = useState(null);
 
-  const [loading, setLoading] =
-    useState(true)
+  const [loading, setLoading] = useState(true);
 
-  const [error, setError] =
-    useState('')
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    let active = true
+    let active = true;
 
     async function load() {
       try {
-        const response =
-          await mediatorService
-            .show(code)
+        const response = await mediatorService.show(code);
 
         if (active) {
-          setData(
-            response?.data ||
-            null,
-          )
+          setData(response?.data || null);
         }
       } catch (err) {
         if (active) {
-          setError(
-            err?.message ||
-            'Không tìm thấy hồ sơ.',
-          )
+          setError(err?.message || "Không tìm thấy hồ sơ.");
         }
       } finally {
         if (active) {
-          setLoading(false)
+          setLoading(false);
         }
       }
     }
 
-    load()
+    load();
 
     return () => {
-      active = false
-    }
-  }, [code])
+      active = false;
+    };
+  }, [code]);
 
   if (loading) {
     return (
-      <div className="py-24 text-center text-slate-400">
-        Đang tải hồ sơ...
-      </div>
-    )
+      <div className="py-24 text-center text-slate-400">Đang tải hồ sơ...</div>
+    );
   }
 
   if (!data) {
-    return (
-      <div className="py-24 text-center text-red-600">
-        {error}
-      </div>
-    )
+    return <div className="py-24 text-center text-red-600">{error}</div>;
   }
 
   return (
     <section className="bg-slate-50 py-10 sm:py-16">
       <Container>
         <div className="mx-auto max-w-5xl">
-          <Link
-            to="/mediators"
-            className="text-sm font-bold text-blue-600"
-          >
+          <Link to="/mediators" className="text-sm font-bold text-blue-600">
             ← Danh sách trung gian
           </Link>
 
@@ -272,21 +242,21 @@ function MediatorDetailPage() {
                   </span>
 
                   {data.avatar_url && (
-                    <AvatarLightbox src={data.avatar_url} alt="Ảnh đại diện trung gian" className="mt-5 h-24 w-24 rounded-full border-4 border-white object-cover shadow-md" />
+                    <AvatarLightbox
+                      src={data.avatar_url}
+                      alt="Ảnh đại diện trung gian"
+                      className="mt-5 h-24 w-24 rounded-full border-4 border-white object-cover shadow-md"
+                    />
                   )}
                   <h1 className="mt-5 text-3xl font-black tracking-tight text-slate-950">
                     {data.name}
                   </h1>
 
-                  <p className="mt-2 font-black text-blue-600">
-                    {data.code}
-                  </p>
+                  <p className="mt-2 font-black text-blue-600">{data.code}</p>
 
                   {data.description && (
                     <p className="mt-5 max-w-2xl text-sm leading-7 text-slate-600">
-                      {
-                        data.description
-                      }
+                      {data.description}
                     </p>
                   )}
                 </div>
@@ -297,10 +267,7 @@ function MediatorDetailPage() {
                   </p>
 
                   <p className="mt-2 text-3xl font-black text-emerald-600">
-                    {money(
-                      data
-                        .deposit_balance,
-                    )}
+                    {money(data.deposit_balance)}
                   </p>
                 </div>
               </div>
@@ -311,76 +278,67 @@ function MediatorDetailPage() {
                 </h2>
 
                 <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                  {data.identifiers?.map(item => (
-                    <MediatorIdentifier
-                      key={item.id}
-                      item={item}
-                    />
+                  {data.identifiers?.map((item) => (
+                    <MediatorIdentifier key={item.id} item={item} />
                   ))}
                 </div>
               </div>
 
-              {data.deposit_history
-                ?.length > 0 && (
+              {data.deposit_history?.length > 0 && (
                 <div className="mt-9 border-t border-slate-100 pt-7">
                   <h2 className="text-lg font-black text-slate-950">
                     Lịch sử tiền cọc
                   </h2>
 
                   <div className="mt-4 space-y-2">
-                    {data
-                      .deposit_history
-                      .map((log) => (
-                        <div
-                          key={log.id}
-                          className="flex flex-col gap-2 rounded-xl bg-slate-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
-                        >
-                          <div>
-                            <p className="text-sm font-bold text-slate-700">
-                              {log.note ||
-                                'Điều chỉnh tiền cọc'}
-                            </p>
+                    {data.deposit_history.map((log) => (
+                      <div
+                        key={log.id}
+                        className="flex flex-col gap-2 rounded-xl bg-slate-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+                      >
+                        <div>
+                          <p className="text-sm font-bold text-slate-700">
+                            {log.note || "Điều chỉnh tiền cọc"}
+                          </p>
 
-                            <p className="mt-1 text-xs text-slate-400">
-                              {
-                                log.recorded_at
-                              }
-                            </p>
-                          </div>
-
-                          <strong
-                            className={
-                              Number(
-                                log.amount,
-                              ) >= 0
-                                ? 'text-emerald-600'
-                                : 'text-red-600'
-                            }
-                          >
-                            {Number(
-                              log.amount,
-                            ) > 0
-                              ? '+'
-                              : ''}
-                            {money(
-                              log.amount,
-                            )}
-                          </strong>
+                          <p className="mt-1 text-xs text-slate-400">
+                            {log.recorded_at}
+                          </p>
                         </div>
-                      ))}
+
+                        <strong
+                          className={
+                            Number(log.amount) >= 0
+                              ? "text-emerald-600"
+                              : "text-red-600"
+                          }
+                        >
+                          {Number(log.amount) > 0 ? "+" : ""}
+                          {money(log.amount)}
+                        </strong>
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}
 
               <div className="mt-9 rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm leading-6 text-amber-900">
-                Số tiền cọc và hồ sơ trên là dữ liệu NoScam đang ghi nhận tại thời điểm hiển thị. Đây không phải bảo đảm tuyệt đối rằng mọi giao dịch đều không có rủi ro. Hãy đối chiếu chính xác SĐT, STK và tài khoản trước khi chuyển tiền.
+                <strong>NoScam.vn đảm bảo an toàn giao dịch</strong> dựa trên
+                thông tin hồ sơ và số tiền đặt cọc được hệ thống ghi nhận. Người
+                dùng được khuyến nghị chỉ thực hiện giao dịch với giá trị{" "}
+                <strong>thấp hơn số tiền đặt cọc của trung gian</strong> nhằm
+                hạn chế rủi ro và tăng khả năng được bảo vệ khi phát sinh tranh
+                chấp. Trước khi chuyển tiền, vui lòng kiểm tra chính xác số điện
+                thoại, số tài khoản ngân hàng và thông tin người nhận. Mọi
+                trường hợp phát sinh sẽ được NoScam.vn hỗ trợ xử lý theo chính
+                sách bảo đảm giao dịch hiện hành.
               </div>
             </div>
           </motion.div>
         </div>
       </Container>
     </section>
-  )
+  );
 }
 
-export default MediatorDetailPage
+export default MediatorDetailPage;

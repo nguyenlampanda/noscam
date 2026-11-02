@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom'
 import {
   useEffect,
   useRef,
@@ -14,6 +15,22 @@ function EvidenceGallery({
 }) {
   const [expanded, setExpanded] =
     useState(false)
+
+  // NOSCAM_EVIDENCE_LIGHTBOX_V1
+  const [activeImageIndex, setActiveImageIndex] = useState(null)
+
+  const images = evidences.filter(
+    item => item.mime_type?.startsWith('image/')
+  )
+
+  const closeImage = () => setActiveImageIndex(null)
+
+  const openImage = (evidence) => {
+    const index = images.findIndex(
+      item => item.id === evidence.id
+    )
+    if (index >= 0) setActiveImageIndex(index)
+  }
 
   if (!evidences.length) {
     return (
@@ -73,16 +90,26 @@ function EvidenceGallery({
             <EvidenceItem
               key={evidence.id}
               evidence={evidence}
+              onOpenImage={openImage}
             />
           ),
         )}
       </div>
+
+      {activeImageIndex !== null && (
+        <EvidenceLightbox
+          images={images}
+          initialIndex={activeImageIndex}
+          onClose={closeImage}
+        />
+      )}
     </div>
   )
 }
 
 function EvidenceItem({
   evidence,
+  onOpenImage,
 }) {
   const containerRef =
     useRef(null)
@@ -218,13 +245,8 @@ function EvidenceItem({
       return
     }
 
-    if (isImage && url) {
-      window.open(
-        url,
-        '_blank',
-        'noopener,noreferrer',
-      )
-
+    if (isImage) {
+      onOpenImage(evidence)
       return
     }
 
@@ -345,6 +367,173 @@ function EvidenceItem({
         </button>
       )}
     </div>
+  )
+}
+
+
+function EvidenceLightbox({
+  images,
+  initialIndex,
+  onClose,
+}) {
+  const [index, setIndex] = useState(initialIndex)
+  const [url, setUrl] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
+  const closeRef = useRef(onClose)
+
+  useEffect(() => {
+    closeRef.current = onClose
+  }, [onClose])
+
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        closeRef.current()
+      }
+
+      if (event.key === 'ArrowLeft') {
+        setIndex(current =>
+          Math.max(0, current - 1)
+        )
+      }
+
+      if (event.key === 'ArrowRight') {
+        setIndex(current =>
+          Math.min(images.length - 1, current + 1)
+        )
+      }
+    }
+
+    window.addEventListener('keydown', onKeyDown)
+
+    return () => {
+      document.body.style.overflow = previousOverflow
+      window.removeEventListener('keydown', onKeyDown)
+    }
+  }, [images.length])
+
+  useEffect(() => {
+    const evidence = images[index]
+    if (!evidence) return
+
+    let active = true
+    let objectUrl = ''
+
+    async function load() {
+      setLoading(true)
+      setError(false)
+      setUrl('')
+
+      try {
+        const blob = await adminService.getEvidence(evidence.id)
+
+        if (!active) return
+
+        objectUrl = URL.createObjectURL(blob)
+        setUrl(objectUrl)
+      } catch {
+        if (active) setError(true)
+      } finally {
+        if (active) setLoading(false)
+      }
+    }
+
+    load()
+
+    return () => {
+      active = false
+      if (objectUrl) URL.revokeObjectURL(objectUrl)
+    }
+  }, [images, index])
+
+  const evidence = images[index]
+
+  if (!evidence) return null
+
+  // NOSCAM_LIGHTBOX_PORTAL_V2
+
+  // NOSCAM_COMPACT_LIGHTBOX_V3
+  return createPortal(
+    <div
+      role="presentation"
+      className="fixed inset-0 z-[99999] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-[3px]"
+      onMouseDown={event => {
+        if (event.target === event.currentTarget) onClose()
+      }}
+    >
+      <section
+        role="dialog"
+        aria-modal="true"
+        aria-label="Xem ảnh bằng chứng"
+        className="flex max-h-[85dvh] w-full max-w-[650px] flex-col overflow-hidden rounded-[22px] border border-slate-200 bg-white shadow-[0_25px_90px_rgba(0,0,0,0.3)]"
+      >
+        <header className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
+          <div className="min-w-0">
+            <h3 className="text-base font-extrabold text-slate-900">
+              Ảnh bằng chứng
+            </h3>
+            <p className="mt-1 truncate text-xs text-slate-500">
+              {evidence.original_name || `Ảnh #${evidence.id}`}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Đóng ảnh"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-100 text-2xl text-slate-600 transition hover:bg-slate-200"
+          >
+            ×
+          </button>
+        </header>
+
+        <div className="relative flex min-h-0 flex-1 items-center justify-center bg-slate-50 px-12 py-4 sm:px-16">
+          {loading ? (
+            <p className="text-sm text-slate-500">Đang tải ảnh...</p>
+          ) : error ? (
+            <p className="text-sm text-red-600">Không tải được ảnh.</p>
+          ) : (
+            <img
+              src={url}
+              alt={evidence.original_name || 'Ảnh bằng chứng'}
+              className="block max-h-[60dvh] max-w-full object-contain"
+              draggable={false}
+            />
+          )}
+
+          {images.length > 1 && (
+            <>
+              <button
+                type="button"
+                disabled={index === 0}
+                onClick={() => setIndex(i => Math.max(0, i - 1))}
+                aria-label="Ảnh trước"
+                className="absolute left-2 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-slate-200 bg-white text-2xl text-slate-700 shadow-sm hover:bg-slate-100 disabled:opacity-30 sm:left-3"
+              >
+                ‹
+              </button>
+              <button
+                type="button"
+                disabled={index === images.length - 1}
+                onClick={() => setIndex(i => Math.min(images.length - 1, i + 1))}
+                aria-label="Ảnh tiếp theo"
+                className="absolute right-2 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-slate-200 bg-white text-2xl text-slate-700 shadow-sm hover:bg-slate-100 disabled:opacity-30 sm:right-3"
+              >
+                ›
+              </button>
+            </>
+          )}
+        </div>
+
+        <footer className="shrink-0 border-t border-slate-100 px-5 py-3 text-center text-sm font-semibold text-slate-500">
+          {index + 1} / {images.length}
+        </footer>
+      </section>
+    </div>,
+    document.body
   )
 }
 

@@ -228,6 +228,42 @@ class SearchController extends Controller
                         $entity
                     ),
 
+                // NOSCAM_SEARCH_PUBLIC_IMAGES_V1
+                // Chỉ sử dụng bản sao bằng chứng đã công khai.
+                'public_images' => \Illuminate\Support\Facades\DB::table(
+                    'public_evidence_images as p'
+                )
+                    ->join(
+                        'evidences as ev',
+                        'ev.id',
+                        '=',
+                        'p.evidence_id'
+                    )
+                    ->join(
+                        'reports as r',
+                        'r.id',
+                        '=',
+                        'ev.report_id'
+                    )
+                    ->join(
+                        'entity_report as er',
+                        'er.report_id',
+                        '=',
+                        'r.id'
+                    )
+                    ->where('er.entity_id', $entity->id)
+                    ->where('r.status', 'approved')
+                    ->where('p.is_public', true)
+                    ->orderByDesc('p.published_at')
+                    ->limit(3)
+                    ->pluck('p.id')
+                    ->map(
+                        fn ($id) =>
+                            url('/api/alerts/public-images/' . $id)
+                    )
+                    ->values()
+                    ->all(),
+
                 'related_information' =>
                     $relatedInformation,
 
@@ -303,7 +339,7 @@ class SearchController extends Controller
                         $search['type'],
                     ];
 
-            return (clone $base)
+            $typedMatch = (clone $base)
                 ->whereIn(
                     'type',
                     $types
@@ -318,6 +354,21 @@ class SearchController extends Controller
                 ->orderByDesc(
                     'risk_score'
                 )
+                ->first();
+
+            if ($typedMatch !== null) {
+                return $typedMatch;
+            }
+
+            // Fallback cho dữ liệu đã duyệt nhưng
+            // được lưu ở loại khác loại tự nhận diện.
+            return (clone $base)
+                ->where(
+                    'normalized_value',
+                    $search['normalized']
+                )
+                ->orderByDesc('report_count')
+                ->orderByDesc('risk_score')
                 ->first();
         }
 

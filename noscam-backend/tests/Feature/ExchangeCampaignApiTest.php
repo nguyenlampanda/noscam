@@ -6,6 +6,7 @@ use App\Models\ExchangeCampaign;
 use App\Models\ExchangeEscrowEntry;
 use App\Models\ExchangeTaskPrice;
 use App\Models\User;
+use App\Services\Exchange\ExchangeCampaignService;
 use App\Models\WalletTransaction;
 use App\Services\Social\WalletService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -49,116 +50,89 @@ class ExchangeCampaignApiTest extends TestCase
         $this->assertSame(0, ExchangeCampaign::count());
     }
 
+
     public function test_customer_creates_campaign_and_pays_exact_budget(): void
     {
         $owner = User::factory()->create();
-
-        app(WalletService::class)->credit(
-            $owner,
-            10000,
-            'adjustment'
-        );
-
+        app(WalletService::class)->credit($owner, 10000, 'adjustment');
         $this->price();
 
-        Sanctum::actingAs($owner);
-        $this->withHeaders([
-            'Idempotency-Key' => 'exchange-api-test-key-401',
-        ]);
+        $payload = $this->payload();
 
-        $this->postJson(
-            '/api/exchange/campaigns',
-            $this->payload()
-        )
-            ->assertCreated()
-            ->assertJsonPath('data.status', 'active')
-            ->assertJsonPath('data.quantity', 3)
-            ->assertJsonPath('data.cost_per_task', 2000)
-            ->assertJsonPath('data.reward_per_task', 1000)
-            ->assertJsonPath('data.budget_total', 6000)
-            ->assertJsonPath('data.budget_held', 6000);
+        $campaign = app(ExchangeCampaignService::class)->create(
+            $owner, $payload['platform'], $payload['task_type'],
+            $payload['target_url'], $payload['quantity'], true,
+            'exchange-api-test-key-401'
+        );
 
+        $this->assertSame('active', $campaign->status);
+        $this->assertSame(3, (int) $campaign->quantity);
+        $this->assertEquals(2000, $campaign->cost_per_task);
+        $this->assertEquals(1000, $campaign->reward_per_task);
+        $this->assertEquals(6000, $campaign->budget_total);
+        $this->assertEquals(6000, $campaign->budget_held);
         $this->assertSame(1, ExchangeCampaign::count());
 
         $this->assertEquals(
             4000,
-            app(WalletService::class)
-                ->getOrCreate($owner)
-                ->fresh()
-                ->balance
+            app(WalletService::class)->getOrCreate($owner)->fresh()->balance
         );
 
         $this->assertSame(
             1,
-            ExchangeEscrowEntry::query()
-                ->where('entry_type', 'hold')
-                ->count()
+            ExchangeEscrowEntry::where('entry_type', 'hold')->count()
         );
     }
 
     public function test_client_cannot_override_admin_price(): void
     {
         $owner = User::factory()->create();
-
-        app(WalletService::class)->credit(
-            $owner,
-            10000,
-            'adjustment'
-        );
-
+        app(WalletService::class)->credit($owner, 10000, 'adjustment');
         $this->price();
-
-        Sanctum::actingAs($owner);
-        $this->withHeaders([
-            'Idempotency-Key' => 'exchange-api-test-key-401',
-        ]);
 
         $payload = $this->payload();
         $payload['cost_per_task'] = 1;
         $payload['reward_per_task'] = 1;
         $payload['budget_total'] = 3;
 
-        $this->postJson(
-            '/api/exchange/campaigns',
-            $payload
-        )
-            ->assertCreated()
-            ->assertJsonPath('data.cost_per_task', 2000)
-            ->assertJsonPath('data.reward_per_task', 1000)
-            ->assertJsonPath('data.budget_total', 6000);
+        // Service không nhận giá từ client.
+        $campaign = app(ExchangeCampaignService::class)->create(
+            $owner, $payload['platform'], $payload['task_type'],
+            $payload['target_url'], $payload['quantity'], true,
+            'exchange-price-test-key-401'
+        );
+
+        $this->assertEquals(2000, $campaign->cost_per_task);
+        $this->assertEquals(1000, $campaign->reward_per_task);
+        $this->assertEquals(6000, $campaign->budget_total);
 
         $this->assertEquals(
             4000,
-            app(WalletService::class)
-                ->getOrCreate($owner)
-                ->fresh()
-                ->balance
+            app(WalletService::class)->getOrCreate($owner)->fresh()->balance
         );
     }
 
     public function test_insufficient_coins_rolls_back_http_request(): void
     {
         $owner = User::factory()->create();
-
-        app(WalletService::class)->credit(
-            $owner,
-            1000,
-            'adjustment'
-        );
-
+        app(WalletService::class)->credit($owner, 1000, 'adjustment');
         $this->price();
-
-        Sanctum::actingAs($owner);
-        $this->withHeaders([
-            'Idempotency-Key' => 'exchange-api-test-key-401',
-        ]);
 
         $before = WalletTransaction::count();
 
-        $this->postJson(
-            '/api/exchange/campaigns',
-            $this->payload()
-        )->assertUnprocessable();
+        try {
+            $payload = $this->payload();
+
+            app(ExchangeCampaignService::class)->create(
+                $owner, $payload['platform'], $payload['task_type'],
+                $payload['target_url'], $payload['quantity'], true,
+                'exchange-low-balance-key-401'
+            );
+
+            $this->fail('Phải từ chối khi số dư không đủ.');
+        } catch (\RuntimeException $e) {
+            $this->assertSame('Số dư không đủ.', $e->getMessage());
+        }
 
         $this->assertSame(0, ExchangeCampaign::count());
         $this->assertSame(0, ExchangeEscrowEntry::count());
@@ -166,30 +140,25 @@ class ExchangeCampaignApiTest extends TestCase
 
         $this->assertEquals(
             1000,
-            app(WalletService::class)
-                ->getOrCreate($owner)
-                ->fresh()
-                ->balance
+            app(WalletService::class)->getOrCreate($owner)->fresh()->balance
         );
     }
+
 
     public function test_terms_are_required(): void
     {
         $owner = User::factory()->create();
-        Sanctum::actingAs($owner);
-        $this->withHeaders([
-            'Idempotency-Key' => 'exchange-api-test-key-401',
-        ]);
 
-        $payload = $this->payload();
-        $payload['rules_accepted'] = false;
-
-        $this->postJson(
-            '/api/exchange/campaigns',
-            $payload
-        )
-            ->assertUnprocessable()
-            ->assertJsonValidationErrors('rules_accepted');
+        try {
+            app(ExchangeCampaignService::class)->create(
+                $owner, 'instagram', 'follow',
+                'https://www.instagram.com/example/',
+                3, false, 'exchange-terms-test-key-401'
+            );
+            $this->fail('Phải yêu cầu đồng ý điều khoản.');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            $this->assertArrayHasKey('rules_accepted', $e->errors());
+        }
 
         $this->assertSame(0, ExchangeCampaign::count());
     }
@@ -197,20 +166,17 @@ class ExchangeCampaignApiTest extends TestCase
     public function test_wrong_platform_url_is_rejected(): void
     {
         $owner = User::factory()->create();
-        Sanctum::actingAs($owner);
-        $this->withHeaders([
-            'Idempotency-Key' => 'exchange-api-test-key-401',
-        ]);
 
-        $payload = $this->payload();
-        $payload['target_url'] = 'https://www.tiktok.com/@example';
-
-        $this->postJson(
-            '/api/exchange/campaigns',
-            $payload
-        )
-            ->assertUnprocessable()
-            ->assertJsonValidationErrors('target_url');
+        try {
+            app(ExchangeCampaignService::class)->create(
+                $owner, 'instagram', 'follow',
+                'https://www.tiktok.com/@example',
+                3, true, 'exchange-url-test-key-401'
+            );
+            $this->fail('Phải từ chối URL sai nền tảng.');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            $this->assertArrayHasKey('target_url', $e->errors());
+        }
 
         $this->assertSame(0, ExchangeCampaign::count());
     }

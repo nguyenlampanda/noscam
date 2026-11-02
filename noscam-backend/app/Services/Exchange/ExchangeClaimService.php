@@ -262,6 +262,12 @@ class ExchangeClaimService
                 );
             }
 
+            if ((bool) $campaign->is_free_reciprocal) {
+                throw new RuntimeException(
+                    'Chiến dịch miễn phí phải hoàn tất xác nhận hai chiều.'
+                );
+            }
+
             // EscrowService sử dụng cùng transaction, tự khóa lại
             // bản ghi và kiểm tra idempotency trước khi trả xu.
             app(ExchangeEscrowService::class)
@@ -373,6 +379,14 @@ class ExchangeClaimService
             if ($campaign->status !== 'active') {
                 throw new RuntimeException(
                     'Chiến dịch không hoạt động.'
+                );
+            }
+
+            // Chiến dịch miễn phí dùng quy trình hai chiều riêng.
+            // Chưa mở nhận nhiệm vụ cho đến khi API xác nhận hoàn tất.
+            if ((bool) $campaign->is_free_reciprocal) {
+                throw new RuntimeException(
+                    'Đang hoàn thiện quy trình tương tác hai chiều.'
                 );
             }
 

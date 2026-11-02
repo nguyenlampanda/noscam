@@ -18,7 +18,7 @@ class ExchangeSocialAccountController extends Controller
             'data' => ExchangeSocialAccount::query()
                 ->where('user_id', $request->user()->id)
                 ->orderBy('platform')
-                ->orderByDesc('is_default')
+                ->orderBy('priority')
                 ->orderBy('id')
                 ->get(),
         ]);
@@ -183,6 +183,237 @@ class ExchangeSocialAccountController extends Controller
         });
 
         return response()->json(['data' => $account], 201);
+    }
+
+
+    public function update(Request $request, int $id): JsonResponse
+    {
+        $existingAccount = ExchangeSocialAccount::query()
+            ->where('user_id', $request->user()->id)
+            ->where('is_active', true)
+            ->findOrFail($id);
+
+        $data = $request->validate([
+            'account' => ['required', 'string', 'max:2048'],
+        ]);
+
+        $platform = $existingAccount->platform;
+        $input = trim($data['account']);
+
+        if ($platform === 'instagram' || $platform === 'tiktok') {
+            $value = $input;
+
+            if (preg_match('~^https?://~i', $input)) {
+                $parts = parse_url($input);
+                $host = strtolower($parts['host'] ?? '');
+
+                $allowed = $platform === 'instagram'
+                    ? ['instagram.com', 'www.instagram.com']
+                    : ['tiktok.com', 'www.tiktok.com'];
+
+                if (!in_array($host, $allowed, true)) {
+                    throw ValidationException::withMessages([
+                        'account' => 'Liên kết không đúng nền tảng.',
+                    ]);
+                }
+
+                $segments = explode(
+                    '/',
+                    trim($parts['path'] ?? '', '/')
+                );
+
+                $value = $segments[0] ?? '';
+
+                if ($platform === 'tiktok') {
+                    $value = ltrim($value, '@');
+                }
+            }
+
+            $username = ltrim($value, '@');
+
+            $pattern = $platform === 'instagram'
+                ? '/^[A-Za-z0-9._]{1,30}$/'
+                : '/^[A-Za-z0-9._]{2,24}$/';
+
+            if (!preg_match($pattern, $username)) {
+                throw ValidationException::withMessages([
+                    'account' => 'Username không hợp lệ.',
+                ]);
+            }
+
+            $normalized = strtolower($username);
+
+            $url = $platform === 'instagram'
+                ? "https://www.instagram.com/{$normalized}/"
+                : "https://www.tiktok.com/@{$normalized}";
+        } else {
+            $parts = parse_url($input);
+            $host = strtolower($parts['host'] ?? '');
+
+            if (!in_array($host, [
+                'facebook.com',
+                'www.facebook.com',
+                'm.facebook.com',
+                'web.facebook.com',
+                'fb.com',
+                'www.fb.com',
+            ], true)) {
+                throw ValidationException::withMessages([
+                    'account' => 'Vui lòng nhập liên kết Facebook hợp lệ.',
+                ]);
+            }
+
+            $path = trim($parts['path'] ?? '', '/');
+
+            if ($path === '' || str_contains($path, '..')) {
+                throw ValidationException::withMessages([
+                    'account' => 'Liên kết Facebook không hợp lệ.',
+                ]);
+            }
+
+            $username = $path;
+            $normalized = strtolower($path);
+
+            if (strtolower(basename($path)) === 'profile.php') {
+                $query = [];
+                parse_str($parts['query'] ?? '', $query);
+
+                if (!preg_match('/^[0-9]+$/', $query['id'] ?? '')) {
+                    throw ValidationException::withMessages([
+                        'account' => 'Facebook profile thiếu ID hợp lệ.',
+                    ]);
+                }
+
+                $username = 'profile.php?id='.$query['id'];
+                $normalized = $username;
+            }
+
+            $url = 'https://www.facebook.com/'.$username;
+
+            if (strlen($normalized) > 191) {
+                throw ValidationException::withMessages([
+                    'account' => 'Liên kết Facebook quá dài.',
+                ]);
+            }
+        }
+
+
+        $account = DB::transaction(function () use (
+            $request, $id, $platform, $username, $normalized, $url
+        ) {
+            // Khóa theo người dùng để tránh hai lần chỉnh sửa đồng thời.
+            $request->user()->newQuery()
+                ->whereKey($request->user()->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $account = ExchangeSocialAccount::query()
+                ->where('user_id', $request->user()->id)
+                ->where('is_active', true)
+                ->lockForUpdate()
+                ->findOrFail($id);
+
+            if ($account->platform !== $platform) {
+                throw ValidationException::withMessages([
+                    'account' => 'Nền tảng tài khoản đã thay đổi.',
+                ]);
+            }
+
+            $duplicate = ExchangeSocialAccount::query()
+                ->where('platform', $platform)
+                ->where('normalized_username', $normalized)
+                ->where('id', '!=', $id)
+                ->exists();
+
+            if ($duplicate) {
+                throw ValidationException::withMessages([
+                    'account' => 'Tài khoản mạng xã hội này đã được đăng ký.',
+                ]);
+            }
+
+            $account->update([
+                'username' => $username,
+                'normalized_username' => $normalized,
+                'profile_url' => $url,
+            ]);
+
+            return $account;
+        }, 3);
+
+        return response()->json([
+            'message' => 'Cập nhật tài khoản thành công.',
+            'data' => $account,
+        ]);
+    }
+
+    public function updateRoles(Request $request, int $id): JsonResponse
+    {
+        $data = $request->validate([
+            'can_receive' => ['required', 'boolean'],
+            'can_perform' => ['required', 'boolean'],
+            'priority' => ['sometimes', 'integer', 'min:1', 'max:100'],
+            'move_direction' => ['sometimes', 'in:up,down'],
+        ]);
+
+        $account = DB::transaction(function () use ($request, $id, $data) {
+            DB::table('users')
+                ->where('id', $request->user()->id)
+                ->lockForUpdate()
+                ->first();
+
+            $account = ExchangeSocialAccount::query()
+                ->where('user_id', $request->user()->id)
+                ->where('is_active', true)
+                ->lockForUpdate()
+                ->findOrFail($id);
+
+            if (isset($data['move_direction'])) {
+                $siblings = ExchangeSocialAccount::query()
+                    ->where('user_id', $request->user()->id)
+                    ->where('platform', $account->platform)
+                    ->where('is_active', true)
+                    ->orderBy('priority')
+                    ->orderBy('id')
+                    ->lockForUpdate()
+                    ->get();
+
+                $position = $siblings->search(
+                    fn ($item) => (int) $item->id === (int) $account->id
+                );
+
+                if ($position === false) {
+                    abort(404);
+                }
+
+                $target = $data['move_direction'] === 'up'
+                    ? $position - 1
+                    : $position + 1;
+
+                if ($target >= 0 && $target < $siblings->count()) {
+                    $ordered = $siblings->all();
+
+                    [$ordered[$position], $ordered[$target]] = [
+                        $ordered[$target], $ordered[$position]
+                    ];
+
+                    foreach ($ordered as $index => $item) {
+                        $item->update(['priority' => $index + 1]);
+                    }
+                }
+
+                return $account->refresh();
+            }
+
+            $account->update([
+                'can_receive' => (bool) $data['can_receive'],
+                'can_perform' => (bool) $data['can_perform'],
+                'priority' => $data['priority'] ?? $account->priority,
+            ]);
+
+            return $account->refresh();
+        }, 3);
+
+        return response()->json(['data' => $account]);
     }
 
     public function setDefault(Request $request, int $id): JsonResponse

@@ -17,6 +17,9 @@ class ExchangeSocialAccount extends Model
         'profile_url',
         'is_default',
         'is_active',
+        'can_receive',
+        'can_perform',
+        'priority',
     ];
 
     protected function casts(): array
@@ -24,6 +27,9 @@ class ExchangeSocialAccount extends Model
         return [
             'is_default' => 'boolean',
             'is_active' => 'boolean',
+            'can_receive' => 'boolean',
+            'can_perform' => 'boolean',
+            'priority' => 'integer',
         ];
     }
 

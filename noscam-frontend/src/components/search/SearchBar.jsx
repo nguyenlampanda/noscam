@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   motion,
   AnimatePresence,
@@ -13,6 +13,14 @@ function SearchBar({
 }) {
   const [query, setQuery] =
     useState(initialValue)
+
+  // NOSCAM_SEARCH_HISTORY_SYNC_V2
+  useEffect(() => {
+    setQuery(initialValue || '')
+    setError('')
+    setIsScanning(false)
+  }, [initialValue])
+
 
   const [error, setError] =
     useState('')

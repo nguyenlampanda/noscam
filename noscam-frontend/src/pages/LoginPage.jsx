@@ -1,3 +1,4 @@
+import { showAuthSuccess } from '../components/layout/AuthSuccessPopup'
 import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { motion } from 'motion/react'
@@ -29,6 +30,7 @@ export default function LoginPage() {
         password,
       )
 
+      showAuthSuccess('login')
       navigate(safeReturnTo, { replace: true })
     } catch (err) {
       setError(

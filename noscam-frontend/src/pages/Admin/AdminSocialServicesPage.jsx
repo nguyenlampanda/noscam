@@ -1,3 +1,4 @@
+import SocialFilterSelect from '../../components/ui/SocialFilterSelect'
 
 
 function getProviderDescriptionForSale(item) {
@@ -308,21 +309,36 @@ function MapModal({ item, onClose, onDone }) {
   const sourceName = item.provider_service_name || ''
   const source = sourceName.toLowerCase()
 
+  // Tự nhận diện từ tên dịch vụ gốc của API.
   const detectedPlatform =
+    /\bthreads?\b/i.test(source) ? 'threads' :
+    /\byou\s*tube\b/i.test(source) ? 'youtube' :
+    /\btelegram\b/i.test(source) ? 'telegram' :
+    /\btwitter\b|\bx\s*\(twitter\)/i.test(source) ? 'twitter' :
+    /\bdiscord\b/i.test(source) ? 'discord' :
+    /\bspotify\b/i.test(source) ? 'spotify' :
+    /\bsoundcloud\b/i.test(source) ? 'soundcloud' :
+    /\bpinterest\b/i.test(source) ? 'pinterest' :
+    /\blinkedin\b/i.test(source) ? 'linkedin' :
+    /\btwitch\b/i.test(source) ? 'twitch' :
+    /\breddit\b/i.test(source) ? 'reddit' :
+    /\bsnapchat\b/i.test(source) ? 'snapchat' :
+    /\bwhatsapp\b/i.test(source) ? 'whatsapp' :
+    /\bzalo\b/i.test(source) ? 'zalo' :
     /instagram|\big\b/i.test(source) ? 'instagram' :
     /tiktok|tik tok/i.test(source) ? 'tiktok' :
     /facebook|\bfb\b/i.test(source) ? 'facebook' :
     'other'
 
   const detectedCategory =
-    /follow|follower/i.test(source) ? 'follow' :
-    /comment/i.test(source) ? 'comment' :
-    /share/i.test(source) ? 'share' :
-    /view|watch/i.test(source) ? 'view' :
-    /reaction|react/i.test(source) ? 'reaction' :
-    /like/i.test(source) ? 'like' :
-    /member/i.test(source) ? 'member' :
-    /save|favorite|favourite/i.test(source) ? 'save' :
+    /\bfollow(?:ers?|ing)?\b/i.test(source) ? 'follow' :
+    /\bcomments?\b/i.test(source) ? 'comment' :
+    /\bshares?\b/i.test(source) ? 'share' :
+    /\bviews?\b|\bwatch\b/i.test(source) ? 'view' :
+    /\breactions?\b|\breact\b/i.test(source) ? 'reaction' :
+    /\blikes?\b/i.test(source) ? 'like' :
+    /\bmembers?\b/i.test(source) ? 'member' :
+    /\bsaves?\b|\bfavou?rites?\b/i.test(source) ? 'save' :
     'other'
 
   const [platform, setPlatform] = useState(detectedPlatform)
@@ -330,6 +346,7 @@ function MapModal({ item, onClose, onDone }) {
   const [name, setName] = useState(sourceName)
   const [description, setDescription] = useState(() => getProviderDescriptionForSale(item))
   const [price, setPrice] = useState('')
+  const [priceFocused, setPriceFocused] = useState(false)
 
   const [noscamManualLimitMin, setNoscamManualLimitMin] = useState(
     String(item.min_quantity ?? '')
@@ -338,21 +355,38 @@ function MapModal({ item, onClose, onDone }) {
     String(item.max_quantity ?? '')
   )
   const [busy, setBusy] = useState(false)
+  const [saved, setSaved] = useState(null)
+  const [confirming, setConfirming] = useState(false)
   const [error, setError] = useState('')
 
-  const cost1000 = Number(
+  // Gia von API duoc hieu la VND / 1 luot.
+  const cost1 = Number(
     item.cost_price_vnd ?? item.cost_price_per_1000 ?? 0
   )
-  const cost1 = cost1000 / 1000
+  const cost1000 = cost1 * 1000
+
+  // Hiển thị giá vốn mỗi lượt từ chuỗi giá vốn / 1000.
+  // Dịch dấu thập phân, không làm tròn.
+  const formatCostPerTurn = () =>
+    new Intl.NumberFormat('vi-VN', {
+      maximumFractionDigits: 6,
+    }).format(cost1) + 'đ'
+
+
   const sell1 = Number(price)
   const profit1 = sell1 - cost1
 
   const format = (value) =>
     new Intl.NumberFormat('vi-VN', {
-      maximumFractionDigits: 7,
+      maximumFractionDigits: 0,
     }).format(Number(value || 0))
 
-  async function submit() {
+  const formatPercent = (value) =>
+    new Intl.NumberFormat('vi-VN', {
+      maximumFractionDigits: 2,
+    }).format(Number(value || 0))
+
+  function submit() {
     setError('')
 
     if (item.social_service_id || item.service?.id) {
@@ -376,7 +410,7 @@ function MapModal({ item, onClose, onDone }) {
       sell1 <= cost1
     ) {
       setError(
-        `Giá bán phải cao hơn giá vốn ${format(cost1)}đ/lượt.`
+        `Giá bán phải cao hơn giá vốn ${formatCostPerTurn()}/lượt.`
       )
       return
     }
@@ -396,6 +430,27 @@ function MapModal({ item, onClose, onDone }) {
       return
     }
 
+    setConfirming(true)
+  }
+
+  async function confirmSubmit() {
+    if (busy) return
+
+    const min = Number(noscamManualLimitMin)
+    const max = Number(noscamManualLimitMax)
+
+    if (
+      !Number.isSafeInteger(min) ||
+      !Number.isSafeInteger(max) ||
+      min < 1 ||
+      max < min
+    ) {
+      setConfirming(false)
+      setError('Min / Max không hợp lệ. Vui lòng kiểm tra lại.')
+      return
+    }
+
+    setConfirming(false)
     setBusy(true)
 
     try {
@@ -411,8 +466,23 @@ function MapModal({ item, onClose, onDone }) {
         is_active: true,
       })
 
-      await onDone()
-      onClose()
+      setSaved({
+        name: name.trim(),
+        provider: item.provider?.name || item.provider?.code || item.provider_code || 'Nhà cung cấp',
+        platform,
+        category,
+        cost1,
+        cost1000,
+        sell1,
+        min,
+        max,
+        profit1,
+      })
+      try {
+        await onDone()
+      } catch (refreshError) {
+        console.error('Đã lưu dịch vụ nhưng không tải lại được danh sách:', refreshError)
+      }
     } catch (err) {
       setError(
         err?.data?.message ||
@@ -426,6 +496,272 @@ function MapModal({ item, onClose, onDone }) {
 
   const fieldClass =
     'w-full rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-blue-400'
+
+  if (confirming) {
+    const row = (label, value) => (
+      <div className="flex justify-between gap-4 border-b border-slate-100 py-2 text-sm">
+        <span className="text-slate-500">{label}</span>
+        <strong className="text-right text-slate-900">{value}</strong>
+      </div>
+    )
+
+    return (
+      <motion.div
+        className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+      >
+        <motion.div
+          className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl"
+          initial={{ opacity: 0, y: 15 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <h2 className="text-xl font-black">
+            Xác nhận đưa lên bán
+          </h2>
+          <p className="mt-2 text-sm text-slate-500">
+            Kiểm tra thông tin trước khi đăng bán dịch vụ.
+          </p>
+
+          <div className="mt-4 space-y-3">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                Thông tin dịch vụ
+              </p>
+              <p className="mt-2 text-base font-black leading-6 text-slate-900">
+                {name.trim()}
+              </p>
+              <p className="mt-2 text-xs font-medium text-slate-500">
+                {item.provider?.name || item.provider_code || 'Nhà cung cấp'}
+                {' · '}{platform}{' · '}{category}
+              </p>
+              <p className="mt-2 text-xs text-slate-500">
+                Giới hạn: {format(Number(noscamManualLimitMin))}
+                {' – '}
+                {format(Number(noscamManualLimitMax))} lượt
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4">
+                <p className="text-xs font-bold text-blue-600">
+                  Giá vốn / lượt
+                </p>
+                <p className="mt-2 text-xl font-black text-blue-800">
+                  {formatCostPerTurn()}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-violet-100 bg-violet-50 p-4">
+                <p className="text-xs font-bold text-violet-600">
+                  Giá bán / lượt
+                </p>
+                <p className="mt-2 text-xl font-black text-violet-800">
+                  {vnd(sell1)}
+                </p>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+              <p className="text-xs font-bold text-emerald-700">
+                Lợi nhuận dự kiến / 1.000 lượt
+              </p>
+              <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                <p className="text-2xl font-black text-emerald-700">
+                  {vnd(profit1 * 1000)}
+                </p>
+                <span className="rounded-full bg-white px-3 py-1 text-sm font-black text-emerald-700">
+                  {sell1 > 0
+                    ? `${formatPercent((profit1 / sell1) * 100)}%`
+                    : '0%'}
+                </span>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-white p-4">
+              <div className="space-y-3 text-sm">
+                <div className="flex justify-between gap-3">
+                  <span className="text-slate-500">Doanh thu / 1.000 lượt</span>
+                  <strong className="text-slate-900">{vnd(sell1 * 1000)}</strong>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <span className="text-slate-500">Giá vốn / 1.000 lượt</span>
+                  <strong className="text-slate-900">{vnd(cost1000)}</strong>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-6 grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() => setConfirming(false)}
+              className="rounded-xl border border-slate-200 px-4 py-3 font-bold"
+            >
+              Hủy
+            </button>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={confirmSubmit}
+              className="rounded-xl bg-blue-600 px-4 py-3 font-bold text-white disabled:opacity-50"
+            >
+              Xác nhận đưa lên bán
+            </button>
+          </div>
+        </motion.div>
+      </motion.div>
+    )
+  }
+
+  if (saved) {
+    const platformLabel = {
+      facebook: 'Facebook',
+      instagram: 'Instagram',
+      tiktok: 'TikTok',
+      threads: 'Threads',
+      youtube: 'YouTube',
+      telegram: 'Telegram',
+      twitter: 'X (Twitter)',
+      discord: 'Discord',
+      spotify: 'Spotify',
+      soundcloud: 'SoundCloud',
+      pinterest: 'Pinterest',
+      linkedin: 'LinkedIn',
+      twitch: 'Twitch',
+      reddit: 'Reddit',
+      snapchat: 'Snapchat',
+      whatsapp: 'WhatsApp',
+      zalo: 'Zalo',
+    }[saved.platform] || saved.platform
+
+    const categoryLabel = {
+      like: 'Like',
+      follow: 'Follow',
+      comment: 'Comment',
+      share: 'Share',
+      view: 'View',
+      reaction: 'Reaction',
+      member: 'Member',
+      save: 'Save',
+    }[saved.category] || saved.category
+
+    const detail = (label, value) => (
+      <div className="flex justify-between gap-4 border-b border-slate-100 py-2 text-sm">
+        <span className="text-slate-500">{label}</span>
+        <strong className="text-right text-slate-900">{value}</strong>
+      </div>
+    )
+
+    return (
+      <motion.div
+        className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+      >
+        <motion.div
+          className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl"
+          initial={{ opacity: 0, y: 15 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <div className="mb-4 text-center">
+            <div className="text-4xl text-emerald-600">✓</div>
+            <h2 className="mt-2 text-xl font-black text-emerald-700">
+              Đưa lên bán thành công!
+            </h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Dịch vụ đã được lưu vào NoScam.vn
+            </p>
+          </div>
+
+          <div className="space-y-3">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                Dịch vụ đã đăng bán
+              </p>
+              <p className="mt-2 text-base font-black leading-6 text-slate-900">
+                {saved.name}
+              </p>
+              <p className="mt-2 text-xs font-medium text-slate-500">
+                {saved.provider} · {platformLabel} · {categoryLabel}
+              </p>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-700">
+                  Đang bán
+                </span>
+                <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-600">
+                  Min / Max: {format(saved.min)} – {format(saved.max)}
+                </span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4">
+                <p className="text-xs font-bold text-blue-600">
+                  Giá vốn / lượt
+                </p>
+                <p className="mt-2 text-xl font-black text-blue-800">
+                  {formatCostPerTurn()}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-violet-100 bg-violet-50 p-4">
+                <p className="text-xs font-bold text-violet-600">
+                  Giá bán / lượt
+                </p>
+                <p className="mt-2 text-xl font-black text-violet-800">
+                  {vnd(saved.sell1)}
+                </p>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+              <p className="text-xs font-bold text-emerald-700">
+                Lợi nhuận dự kiến / 1.000 lượt
+              </p>
+              <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                <p className="text-2xl font-black text-emerald-700">
+                  {vnd(saved.profit1 * 1000)}
+                </p>
+                <span className="rounded-full bg-white px-3 py-1 text-sm font-black text-emerald-700">
+                  {saved.sell1 > 0
+                    ? `${formatPercent((saved.profit1 / saved.sell1) * 100)}%`
+                    : '0%'}
+                </span>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-white p-4">
+              <div className="space-y-3 text-sm">
+                <div className="flex justify-between gap-3">
+                  <span className="text-slate-500">
+                    Doanh thu / 1.000 lượt
+                  </span>
+                  <strong className="text-slate-900">
+                    {vnd(saved.sell1 * 1000)}
+                  </strong>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <span className="text-slate-500">
+                    Giá vốn / 1.000 lượt
+                  </span>
+                  <strong className="text-slate-900">
+                    {vnd(saved.cost1000)}
+                  </strong>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="mt-5 w-full rounded-xl bg-blue-600 px-5 py-3.5 font-bold text-white"
+          >
+            Hoàn tất
+          </button>
+        </motion.div>
+      </motion.div>
+    )
+  }
 
   return (
     <motion.div
@@ -475,21 +811,35 @@ function MapModal({ item, onClose, onDone }) {
         <div className="mt-5 grid gap-4 sm:grid-cols-2">
           <label className="grid gap-2">
             <span className="text-sm font-bold">Nền tảng</span>
-            <NoScamSelect
+            <SocialFilterSelect
               value={platform}
               onChange={(e) => setPlatform(e.target.value)}
               className={fieldClass}
             >
-              <option value="other">Chưa xác định</option>
+              <option value="other">Chưa xác định / Website / Khác</option>
               <option value="facebook">Facebook</option>
               <option value="instagram">Instagram</option>
               <option value="tiktok">TikTok</option>
-            </NoScamSelect>
+              <option value="threads">Threads</option>
+              <option value="youtube">YouTube</option>
+              <option value="telegram">Telegram</option>
+              <option value="twitter">X (Twitter)</option>
+              <option value="discord">Discord</option>
+              <option value="spotify">Spotify</option>
+              <option value="soundcloud">SoundCloud</option>
+              <option value="pinterest">Pinterest</option>
+              <option value="linkedin">LinkedIn</option>
+              <option value="twitch">Twitch</option>
+              <option value="reddit">Reddit</option>
+              <option value="snapchat">Snapchat</option>
+              <option value="whatsapp">WhatsApp</option>
+              <option value="zalo">Zalo</option>
+            </SocialFilterSelect>
           </label>
 
           <label className="grid gap-2">
             <span className="text-sm font-bold">Loại dịch vụ</span>
-            <NoScamSelect
+            <SocialFilterSelect
               value={category}
               onChange={(e) => setCategory(e.target.value)}
               className={fieldClass}
@@ -503,7 +853,7 @@ function MapModal({ item, onClose, onDone }) {
               <option value="reaction">Reaction</option>
               <option value="member">Member</option>
               <option value="save">Save</option>
-            </NoScamSelect>
+            </SocialFilterSelect>
           </label>
         </div>
 
@@ -529,7 +879,10 @@ function MapModal({ item, onClose, onDone }) {
               Giá vốn / 1 lượt
             </div>
             <div className="mt-1 text-xl font-black text-blue-800">
-              {format(cost1)}đ
+              {formatCostPerTurn()}
+            </div>
+            <div className="mt-1 text-xs font-semibold text-blue-600">
+              {vnd(cost1000)} / 1.000 lượt
             </div>
           </div>
 
@@ -538,32 +891,35 @@ function MapModal({ item, onClose, onDone }) {
               Min / Max từ API
             </div>
             <div className="mt-1 font-bold">
-              {format(item.min_quantity || 1)}
+              {format(item.min_quantity ?? 1)}
               {' – '}
-              {format(item.max_quantity || 1000000)}
+              {format(item.max_quantity ?? 1000000)}
             </div>
           </div>
         </div>
 
-        <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="mt-5 grid gap-3 sm:grid-cols-2">
           <label className="grid gap-2">
-            <span className="text-sm font-bold">Min bán cho khách</span>
+            <span className="text-sm font-bold">
+              Min bán cho khách
+            </span>
             <input
               type="number"
               min="1"
-              step="1"
               value={noscamManualLimitMin}
               onChange={(e) => setNoscamManualLimitMin(e.target.value)}
               placeholder="Nhập Min"
               className={fieldClass}
             />
           </label>
+
           <label className="grid gap-2">
-            <span className="text-sm font-bold">Max bán cho khách</span>
+            <span className="text-sm font-bold">
+              Max bán cho khách
+            </span>
             <input
               type="number"
               min="1"
-              step="1"
               value={noscamManualLimitMax}
               onChange={(e) => setNoscamManualLimitMax(e.target.value)}
               placeholder="Nhập Max"
@@ -571,6 +927,7 @@ function MapModal({ item, onClose, onDone }) {
             />
           </label>
         </div>
+
         <p className="mt-2 text-xs text-amber-700">
           Nếu API không cung cấp Min/Max, hãy xác minh với
           nhà cung cấp trước khi nhập giới hạn bán.
@@ -581,12 +938,22 @@ function MapModal({ item, onClose, onDone }) {
             Giá bán / 1 lượt (VND)
           </span>
           <input
-            type="number"
-            min="0"
-            step="any"
-            value={price}
-            onChange={(e) => setPrice(e.target.value)}
-            placeholder="Ví dụ: 0.5 hoặc 2"
+            type="text"
+            inputMode="numeric"
+            value={
+              priceFocused || price === ''
+                ? price
+                : `${new Intl.NumberFormat('vi-VN', {
+                    maximumFractionDigits: 0,
+                  }).format(Number(price))}đ`
+            }
+            onFocus={() => setPriceFocused(true)}
+            onBlur={() => setPriceFocused(false)}
+            onChange={(e) => {
+              const raw = e.target.value.replace(/[^0-9]/g, '')
+              setPrice(raw)
+            }}
+            placeholder="Ví dụ: 300đ"
             className={fieldClass}
           />
         </label>
@@ -599,11 +966,41 @@ function MapModal({ item, onClose, onDone }) {
           }`}>
             Lãi dự kiến: {format(profit1)}đ/lượt
             {' · '}
-            {cost1 > 0
-              ? `${format((profit1 / cost1) * 100)}%`
+            {sell1 > 0
+              ? `Biên lợi nhuận: ${formatPercent((profit1 / sell1) * 100)}%`
               : 'Chưa có tỷ lệ'}
           </div>
         )}
+        {price !== '' && Number.isFinite(sell1) && (
+          <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm">
+            <div className="mb-3 font-black text-slate-800">
+              Dự kiến cho 1.000 lượt
+            </div>
+            <div className="space-y-2">
+              <div className="flex justify-between gap-3">
+                <span>Doanh thu (1.000 lượt)</span>
+                <strong>{vnd(sell1 * 1000)}</strong>
+              </div>
+              <div className="flex justify-between gap-3">
+                <span>Giá vốn (1.000 lượt)</span>
+                <strong>{vnd(cost1000)}</strong>
+              </div>
+              <div className="flex justify-between gap-3 text-emerald-700">
+                <span className="font-bold">Lãi dự kiến</span>
+                <strong>{vnd(profit1 * 1000)}</strong>
+              </div>
+              <div className="flex justify-between gap-3">
+                <span>Biên lợi nhuận</span>
+                <strong>
+                  {sell1 > 0
+                    ? `${formatPercent((profit1 / sell1) * 100)}%`
+                    : 'Chưa có tỷ lệ'}
+                </strong>
+              </div>
+            </div>
+          </div>
+        )}
+
 
         <label className="mt-5 grid gap-2">
           <span className="text-sm font-bold">
@@ -641,10 +1038,11 @@ function MapModal({ item, onClose, onDone }) {
 
 function PriceModal({ item, onClose, onDone }) {
   const service = item.service || {}
-  const cost1000 = Number(
+  // Gia von API duoc hieu la VND / 1 luot.
+  const cost1 = Number(
     item.cost_price_vnd ?? item.cost_price_per_1000 ?? 0
   )
-  const cost1 = cost1000 / 1000
+  const cost1000 = cost1 * 1000
 
   const [name, setName] = useState(service.name || '')
   const [platform, setPlatform] = useState(service.platform || 'other')
@@ -794,21 +1192,35 @@ function PriceModal({ item, onClose, onDone }) {
 
           <label className="space-y-1">
             <span className="text-sm font-bold">Nền tảng</span>
-            <NoScamSelect
+            <SocialFilterSelect
               className={field}
               value={platform}
               onChange={(e) => setPlatform(e.target.value)}
             >
+              <option value="other">Chưa xác định / Website / Khác</option>
               <option value="facebook">Facebook</option>
               <option value="instagram">Instagram</option>
               <option value="tiktok">TikTok</option>
-              <option value="other">Khác</option>
-            </NoScamSelect>
+              <option value="threads">Threads</option>
+              <option value="youtube">YouTube</option>
+              <option value="telegram">Telegram</option>
+              <option value="twitter">X (Twitter)</option>
+              <option value="discord">Discord</option>
+              <option value="spotify">Spotify</option>
+              <option value="soundcloud">SoundCloud</option>
+              <option value="pinterest">Pinterest</option>
+              <option value="linkedin">LinkedIn</option>
+              <option value="twitch">Twitch</option>
+              <option value="reddit">Reddit</option>
+              <option value="snapchat">Snapchat</option>
+              <option value="whatsapp">WhatsApp</option>
+              <option value="zalo">Zalo</option>
+            </SocialFilterSelect>
           </label>
 
           <label className="space-y-1">
             <span className="text-sm font-bold">Loại dịch vụ</span>
-            <NoScamSelect
+            <SocialFilterSelect
               className={field}
               value={category}
               onChange={(e) => setCategory(e.target.value)}
@@ -828,7 +1240,7 @@ function PriceModal({ item, onClose, onDone }) {
               <option value="member">Member</option>
               <option value="save">Save</option>
               <option value="other">Khác</option>
-            </NoScamSelect>
+            </SocialFilterSelect>
           </label>
 
           <label className="space-y-1">
@@ -850,14 +1262,14 @@ function PriceModal({ item, onClose, onDone }) {
 
           <label className="space-y-1">
             <span className="text-sm font-bold">Trạng thái</span>
-            <NoScamSelect
+            <SocialFilterSelect
               className={field}
               value={active ? '1' : '0'}
               onChange={(e) => setActive(e.target.value === '1')}
             >
               <option value="1">Đang bán</option>
               <option value="0">Tạm ngừng bán</option>
-            </NoScamSelect>
+            </SocialFilterSelect>
           </label>
 
           <label className="space-y-1">
@@ -1136,7 +1548,7 @@ export default function AdminSocialServicesPage() {
 
         <SocialAdminNav />
 
-        <div className="mt-6 grid gap-3 md:grid-cols-3">
+        <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <input
             value={search}
             onChange={(e) => {
@@ -1146,10 +1558,10 @@ export default function AdminSocialServicesPage() {
               setPage(1)
             }}
             placeholder="Tìm tên hoặc ID dịch vụ..."
-            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-blue-400"
+            className="h-12 w-full min-w-0 rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
           />
 
-          <NoScamSelect
+          <SocialFilterSelect
             value={providerId}
             onChange={(e) => {
               setProviderId(
@@ -1157,7 +1569,7 @@ export default function AdminSocialServicesPage() {
               )
               setPage(1)
             }}
-            className="rounded-2xl border border-slate-200 bg-white px-4 py-3"
+            className="h-12 w-full min-w-0 rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
           >
             <option value="">
               Tất cả nhà cung cấp
@@ -1173,9 +1585,9 @@ export default function AdminSocialServicesPage() {
                 </option>
               ),
             )}
-          </NoScamSelect>
+          </SocialFilterSelect>
 
-          <NoScamSelect
+          <SocialFilterSelect
             value={mapped}
             onChange={(e) => {
               setMapped(
@@ -1183,7 +1595,7 @@ export default function AdminSocialServicesPage() {
               )
               setPage(1)
             }}
-            className="rounded-2xl border border-slate-200 bg-white px-4 py-3"
+            className="h-12 w-full min-w-0 rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
           >
             <option value="">
               Tất cả trạng thái
@@ -1194,21 +1606,21 @@ export default function AdminSocialServicesPage() {
             <option value="true">
               Đã map
             </option>
-          </NoScamSelect>
+          </SocialFilterSelect>
 
-          <NoScamSelect
+          <SocialFilterSelect
             value={availability}
             onChange={(e) => {
               setAvailability(e.target.value)
               setPage(1)
             }}
-            className="rounded-2xl border border-slate-200 bg-white px-4 py-3"
+            className="h-12 w-full min-w-0 rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
           >
             <option value="">Tất cả trạng thái API</option>
             <option value="available">Đang cung cấp</option>
             <option value="unavailable">Ngưng cung cấp</option>
             <option value="unknown">Chưa xác minh</option>
-          </NoScamSelect>
+          </SocialFilterSelect>
         </div>
 
         <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
@@ -1302,13 +1714,11 @@ export default function AdminSocialServicesPage() {
 
                       <td className="px-2 py-4 align-middle break-words">
                         <div className="font-black text-slate-900">
-                          {money(
-                            item.cost_price_per_1000,
-                          )}{' '}
-                          <span className="text-xs text-slate-400">
-                            {item.cost_currency ||
-                              item.provider?.currency}
-                          </span>
+                          {vnd(
+                            item.cost_price_vnd ??
+                              (Number(item.cost_price_per_1000 || 0) *
+                               Number(item.exchange_rate_to_vnd || 1))
+                          )}
                         </div>
 
                         {Number(

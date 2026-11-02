@@ -3,6 +3,7 @@
 namespace App\Services\Social;
 
 use App\Models\SocialOrder;
+use App\Services\Social\ProviderOrderRejectedException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -79,7 +80,7 @@ class SocialOrderProviderService
                 !in_array(
                     $order->provider->driver,
                     [
-                        'nganhangsub',
+                        'subs24h',
                         'hacklike17',
                         'vietnamfb',
                     ],
@@ -178,6 +179,33 @@ class SocialOrderProviderService
                     3
                 );
             } catch (Throwable $e) {
+                // NOSCAM_PROVIDER_REJECTION_V2
+                if ($e instanceof ProviderOrderRejectedException) {
+                    DB::transaction(function () use ($order, $e) {
+                        $locked = SocialOrder::query()
+                            ->lockForUpdate()
+                            ->findOrFail($order->id);
+
+                        if (
+                            $locked->status !== 'pending' ||
+                            $locked->provider_order_id
+                        ) {
+                            throw new RuntimeException(
+                                'Trạng thái đơn đã thay đổi, cần đối soát.'
+                            );
+                        }
+
+                        $locked->provider_error = mb_substr(
+                            $e->getMessage(), 0, 2000
+                        );
+
+                        $locked->status = 'cancelled';
+                        $locked->save();
+
+                        $this->orders->refund($locked);
+                    }, 3);
+                }
+
                 $failed =
                     SocialOrder::query()
                         ->find(

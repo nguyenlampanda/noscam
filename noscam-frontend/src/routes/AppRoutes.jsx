@@ -74,6 +74,11 @@ const AdminMediatorsPage = lazy(() =>
   ),
 )
 
+// NOSCAM_HEADER_MANAGER_V1
+const AdminHeaderPage = lazy(() =>
+  import('../pages/Admin/AdminHeaderPage')
+)
+
 const AdminDashboardPage = lazy(() =>
   import(
     '../pages/Admin/AdminDashboardPage'
@@ -176,6 +181,11 @@ const ProfilePage = lazy(() =>
   import('../pages/ProfilePage')
 )
 
+
+const AdminDigitalTabsPage = lazy(() =>
+  import('../pages/Admin/AdminDigitalTabsPage')
+)
+
 const AdminDigitalServicesPage = lazy(() =>
   import('../pages/Admin/AdminDigitalServicesPage')
 )
@@ -212,6 +222,11 @@ function AppRoutes() {
         >
           <Route
             path="/"
+            element={<SocialServicesPage />}
+          />
+
+          <Route
+            path="/home"
             element={<HomePage />}
           />
 
@@ -318,6 +333,15 @@ function AppRoutes() {
         />
 
         <Route
+          path="/admin/header"
+          element={
+            <ProtectedAdminRoute>
+              <AdminHeaderPage />
+            </ProtectedAdminRoute>
+          }
+        />
+
+        <Route
           path="/admin"
           element={
             <ProtectedAdminRoute>
@@ -390,6 +414,15 @@ function AppRoutes() {
         />
 
         <Route
+          path="/admin/users"
+          element={
+            <ProtectedAdminRoute>
+              <AdminSocialCustomersPage />
+            </ProtectedAdminRoute>
+          }
+        />
+
+        <Route
           path="/admin/social/topups"
           element={
             <ProtectedAdminRoute>
@@ -437,7 +470,7 @@ function AppRoutes() {
           path="/admin/digital/services"
           element={
             <ProtectedAdminRoute>
-              <AdminDigitalServicesPage />
+              <AdminDigitalTabsPage />
             </ProtectedAdminRoute>
           }
         />

@@ -1,3 +1,5 @@
+import WalletDepositSuccessPopup from './components/layout/WalletDepositSuccessPopup'
+import AuthSuccessPopup from './components/layout/AuthSuccessPopup'
 import './styles/noscam-final-ui.css'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
@@ -11,6 +13,8 @@ createRoot(document.getElementById('root')).render(
   <StrictMode>
     <BrowserRouter>
       <NoScamUIProvider>
+        <AuthSuccessPopup />
+        <WalletDepositSuccessPopup />
         <App />
       </NoScamUIProvider>
     </BrowserRouter>

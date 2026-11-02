@@ -20,10 +20,7 @@ const items = [
     to: '/admin/social/providers',
     label: 'Nhà cung cấp',
   },
-  {
-    to: '/admin/social/customers',
-    label: 'Khách hàng',
-  },
+  
 ]
 
 export default function SocialAdminNav() {

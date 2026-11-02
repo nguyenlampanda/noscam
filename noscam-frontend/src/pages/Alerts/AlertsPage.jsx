@@ -83,7 +83,7 @@ const sortOptions = [
   },
   {
     value: 'risk',
-    label: 'Risk Score cao',
+    label: 'Điểm rủi ro cao',
   },
   {
     value: 'reports',
@@ -262,7 +262,7 @@ function AlertsPage() {
 
   return (
     <>
-      <section className="relative overflow-hidden border-b border-slate-200 bg-slate-50 py-12 sm:py-20">
+      <section className="noscam-page-hero relative overflow-hidden border-b border-blue-100 bg-gradient-to-br from-blue-50 via-white to-cyan-50 py-12 sm:py-20">
         <motion.div
           aria-hidden="true"
           className="absolute -left-24 top-0 h-72 w-72 rounded-full bg-blue-100/70 blur-3xl"
@@ -474,7 +474,7 @@ function AlertsPage() {
             <div className="mt-5 border-t border-slate-200 pt-5 sm:flex sm:items-end sm:justify-between sm:gap-6">
               <div>
                 <p className="mb-3 text-xs font-bold uppercase tracking-[0.12em] text-slate-400">
-                  Mức Risk Score
+                  Mức Điểm rủi ro
                 </p>
 
                 <div className="flex flex-wrap gap-2">
@@ -718,55 +718,83 @@ function AlertsPage() {
                     )}
                   </div>
 
-                  {pagination &&
-                    pagination.lastPage >
-                      1 && (
-                      <div className="mt-8 flex items-center justify-center gap-3">
-                        <motion.button
+                  
+                  {/* NOSCAM_PAGINATION_UI_V3 */}
+                  {pagination && pagination.lastPage > 1 && (
+                    <nav
+                      aria-label="Phân trang cảnh báo"
+                      className="mt-8 flex flex-col items-center gap-3"
+                    >
+                      <p className="text-sm font-medium text-slate-500">
+                        Trang {page} / {pagination.lastPage}
+                        {' · Tổng '}{pagination.total ?? 0} cảnh báo
+                      </p>
+                      <div className="flex max-w-full flex-wrap items-center justify-center gap-2">
+                        <button
                           type="button"
-                          whileTap={{
-                            scale: 0.96,
-                          }}
-                          disabled={
-                            page <= 1
-                          }
-                          onClick={() =>
-                            changePage(
-                              page - 1,
-                            )
-                          }
-                          className="h-11 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:border-blue-200 hover:text-blue-600 disabled:cursor-not-allowed disabled:opacity-40"
+                          disabled={page <= 1}
+                          onClick={() => changePage(page - 1)}
+                          className="min-h-10 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 transition hover:border-blue-300 hover:text-blue-600 disabled:cursor-not-allowed disabled:opacity-40"
                         >
-                          ← Trước
-                        </motion.button>
+                          ‹ Trước
+                        </button>
 
-                        <span className="min-w-20 text-center text-sm font-semibold text-slate-500">
-                          {page} /{' '}
-                          {
-                            pagination.lastPage
-                          }
-                        </span>
+                {Array.from(
+                  { length: Math.max(1, pagination.lastPage) },
+                  (_, index) => index + 1
+                )
+                  .filter(n =>
+                    n === 1 ||
+                    n === pagination.lastPage ||
+                    Math.abs(n - page) <= 1
+                  )
+                  .reduce((result, n, index, pages) => {
+                    if (index > 0 && n - pages[index - 1] > 1) {
+                      result.push('ellipsis-' + n)
+                    }
+                    result.push(n)
+                    return result
+                  }, [])
+                  .map(n =>
+                    typeof n === 'string' ? (
+                      <span
+                        key={n}
+                        className="px-1 text-slate-400"
+                      >
+                        ...
+                      </span>
+                    ) : (
+                      <button
+                        key={n}
+                        type="button"
+                        aria-label={'Trang ' + n}
+                        aria-current={page === n ? 'page' : undefined}
+                        disabled={false}
+                        onClick={() => changePage(n)}
+                        className={
+                          'flex min-h-10 min-w-10 items-center justify-center rounded-xl border px-3 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-40 ' +
+                          (page === n
+                            ? 'border-blue-600 bg-blue-600 text-white shadow-md shadow-blue-100'
+                            : 'border-slate-200 bg-white text-slate-700 hover:border-blue-300 hover:text-blue-600')
+                        }
+                      >
+                        {n}
+                      </button>
+                    )
+                  )}
 
-                        <motion.button
+                        <button
                           type="button"
-                          whileTap={{
-                            scale: 0.96,
-                          }}
-                          disabled={
-                            page >=
-                            pagination.lastPage
-                          }
-                          onClick={() =>
-                            changePage(
-                              page + 1,
-                            )
-                          }
-                          className="h-11 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:border-blue-200 hover:text-blue-600 disabled:cursor-not-allowed disabled:opacity-40"
+                          disabled={page >= pagination.lastPage}
+                          onClick={() => changePage(page + 1)}
+                          className="min-h-10 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 transition hover:border-blue-300 hover:text-blue-600 disabled:cursor-not-allowed disabled:opacity-40"
                         >
-                          Sau →
-                        </motion.button>
+                          Tiếp ›
+                        </button>
                       </div>
-                    )}
+                    </nav>
+                  )}
+
 
                   <motion.div
                     initial={{
@@ -805,7 +833,7 @@ function AlertsPage() {
                         </p>
 
                         <p className="mt-2 max-w-4xl text-xs leading-5 text-slate-500 sm:text-sm sm:leading-6">
-                          Risk Score và
+                          Điểm rủi ro và
                           danh sách cảnh
                           báo được xây dựng
                           từ dữ liệu hệ

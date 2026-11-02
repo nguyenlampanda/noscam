@@ -1,31 +1,7 @@
 import { motion } from 'motion/react'
 import { useNavigate } from 'react-router-dom'
 
-const riskStyles = {
-  high: {
-    dot: 'bg-red-500',
-    badge:
-      'border-red-200 bg-red-50 text-red-700',
-  },
-
-  medium: {
-    dot: 'bg-amber-500',
-    badge:
-      'border-amber-200 bg-amber-50 text-amber-700',
-  },
-
-  low: {
-    dot: 'bg-blue-500',
-    badge:
-      'border-blue-200 bg-blue-50 text-blue-700',
-  },
-
-  safe: {
-    dot: 'bg-emerald-500',
-    badge:
-      'border-emerald-200 bg-emerald-50 text-emerald-700',
-  },
-}
+// NOSCAM_SEARCH_NO_RISK_V1
 
 function RelatedInformation({
   items = [],
@@ -132,11 +108,7 @@ function RelatedInformation({
             <div className="space-y-3">
               {items.map(
                 (item, index) => {
-                  const style =
-                    riskStyles[
-                      item.riskLevel
-                    ] ||
-                    riskStyles.low
+                  
 
                   return (
                     <motion.button
@@ -171,11 +143,11 @@ function RelatedInformation({
                       onClick={() =>
                         handleSearch(item)
                       }
-                      className="group relative flex w-full gap-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-4 text-left transition-colors hover:border-blue-200 hover:bg-blue-50/40 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                      className="group relative flex w-full cursor-pointer gap-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-4 text-left shadow-sm transition-all duration-200 hover:border-blue-400 hover:bg-blue-50 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                     >
                       <div className="relative z-10 mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-blue-200 bg-white shadow-sm">
                         <motion.div
-                          className={`h-2.5 w-2.5 rounded-full ${style.dot}`}
+                          className={`h-2.5 w-2.5 rounded-full bg-blue-500`}
                           animate={{
                             scale: [
                               1,
@@ -207,12 +179,7 @@ function RelatedInformation({
                             </p>
                           </div>
 
-                          <span
-                            className={`shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${style.badge}`}
-                          >
-                            Risk{' '}
-                            {item.riskScore}
-                          </span>
+                          
                         </div>
 
                         <div className="mt-3 flex flex-wrap gap-2">
@@ -228,9 +195,9 @@ function RelatedInformation({
                         </div>
 
                         <div className="mt-3 flex items-center justify-between gap-3">
-                          <p className="text-xs text-slate-400">
-                            {item.riskLabel}
-                          </p>
+                          <p className="text-xs font-medium text-blue-700">
+                              Có thông tin trong báo cáo đã duyệt
+                            </p>
 
                           <motion.span
                             aria-hidden="true"

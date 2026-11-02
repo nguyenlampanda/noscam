@@ -98,7 +98,7 @@ class VietnamFbProvider implements SocialProviderInterface
             isset($json['success']) &&
             (int) $json['success'] === 0
         ) {
-            throw new RuntimeException(
+            throw new \App\Services\Social\ProviderOrderRejectedException(
                 (string) (
                     $json['message']
                     ?? 'VietnamFB API báo lỗi.'

@@ -24,6 +24,22 @@ class SocialServiceClassifier
     public function platform(
         string $text
     ): string {
+        // NOSCAM_SOCIAL_PLATFORM_EXPANSION_V4: API service-name hints.
+        if (preg_match('~\bthreads?\b~i', $text)) return 'threads';
+        if (preg_match('~\byou\s*tube\b|\byoutube\b~i', $text)) return 'youtube';
+        if (preg_match('~\btelegram\b~i', $text)) return 'telegram';
+        if (preg_match('~\btwitter\b|\bx\s*\(twitter\)~i', $text)) return 'twitter';
+        if (preg_match('~\bdiscord\b~i', $text)) return 'discord';
+        if (preg_match('~\bspotify\b~i', $text)) return 'spotify';
+        if (preg_match('~\bsoundcloud\b~i', $text)) return 'soundcloud';
+        if (preg_match('~\bpinterest\b~i', $text)) return 'pinterest';
+        if (preg_match('~\blinkedin\b~i', $text)) return 'linkedin';
+        if (preg_match('~\btwitch\b~i', $text)) return 'twitch';
+        if (preg_match('~\breddit\b~i', $text)) return 'reddit';
+        if (preg_match('~\bsnapchat\b~i', $text)) return 'snapchat';
+        if (preg_match('~\bwhatsapp\b~i', $text)) return 'whatsapp';
+        if (preg_match('~\bzalo\b~i', $text)) return 'zalo';
+
         if (
             str_contains(
                 $text,

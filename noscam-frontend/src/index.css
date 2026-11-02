@@ -185,3 +185,97 @@ button .animate-spin {
     animation: none;
   }
 }
+
+
+/* NOSCAM_UNIFIED_UI_2026 */
+@media (hover: hover) {
+  .noscam-nav-link:hover {
+    color: #1d4ed8;
+    background-color: #eff6ff;
+    transform: translateY(-2px);
+    box-shadow: 0 5px 16px rgba(37, 99, 235, .08);
+  }
+
+  .noscam-community-feed article,
+  .noscam-community-composer {
+    transition: transform .22s ease, box-shadow .22s ease, border-color .22s ease;
+  }
+
+  .noscam-community-feed article:hover,
+  .noscam-community-composer:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 14px 32px rgba(15, 23, 42, .08);
+    border-color: #bfdbfe;
+  }
+}
+
+.noscam-nav-link:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .noscam-nav-link,
+  .noscam-community-feed article,
+  .noscam-community-composer {
+    transition: none !important;
+    transform: none !important;
+  }
+}
+
+
+/* NOSCAM_HEADER_LAYOUT_FIX */
+.noscam-nav-link {
+  white-space: nowrap;
+  transform-origin: center;
+}
+
+@media (hover: hover) {
+  .noscam-nav-link:hover {
+    transform: translateY(-1px);
+    background: transparent;
+    box-shadow: none;
+    color: #2563eb;
+  }
+}
+
+
+/* NOSCAM_DECORATIVE_GRID_POINTER_FIX_V1 */
+/* Lớp nền trang trí không được chặn thao tác chuột */
+.noscam-grid {
+  pointer-events: none !important;
+}
+
+
+/* NOSCAM_SEARCH_HISTORY_HOVER_V2 */
+
+a[href^="/search?q="] {
+  cursor: pointer !important;
+  pointer-events: auto !important;
+  position: relative;
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease;
+}
+
+a[href^="/search?q="]:hover {
+  background-color: #eff6ff !important;
+  border-color: #60a5fa !important;
+  color: #1d4ed8 !important;
+  box-shadow: 0 5px 16px rgba(37, 99, 235, .14);
+  transform: translateY(-2px);
+}
+
+a[href^="/search?q="]:focus-visible {
+  outline: 3px solid #93c5fd;
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  a[href^="/search?q="] {
+    transition: none;
+  }
+}

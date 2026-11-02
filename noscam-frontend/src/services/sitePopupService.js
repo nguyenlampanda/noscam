@@ -25,6 +25,13 @@ export const sitePopupService = {
   publicList: page =>
     apiClient.get(`/site-popups?page=${encodeURIComponent(page)}`),
 
+  // NOSCAM_POPUP_IMAGE_UPLOAD_V1
+  uploadImage: file => {
+    const data = new FormData()
+    data.append('image', file)
+    return apiClient.post('/admin/site-popups/upload-image', data, auth())
+  },
+
   list: () =>
     apiClient.get('/admin/site-popups', auth()),
 

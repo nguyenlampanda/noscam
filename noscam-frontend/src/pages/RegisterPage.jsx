@@ -1,3 +1,4 @@
+import { showAuthSuccess } from '../components/layout/AuthSuccessPopup'
 import { useState } from 'react'
 import {
   Link,
@@ -46,6 +47,7 @@ export default function RegisterPage() {
         form,
       )
 
+      showAuthSuccess('register')
       navigate(safeReturnTo, { replace: true })
     } catch (err) {
       setError(

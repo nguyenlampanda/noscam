@@ -10,6 +10,7 @@ export default function ProfilePage() {
     username: '',
     name: '',
     email: '',
+    phone: '',
   })
 
   const [passwordForm, setPasswordForm] =
@@ -52,6 +53,8 @@ export default function ProfilePage() {
             user.name || '',
           email:
             user.email || '',
+          phone:
+            user.phone || '',
         })
       })
       .catch((err) => {
@@ -110,6 +113,9 @@ export default function ProfilePage() {
           email:
             form.email.trim() ||
             null,
+          phone:
+            form.phone.trim() ||
+            null,
         })
 
       const user =
@@ -121,6 +127,8 @@ export default function ProfilePage() {
           user.name || '',
         email:
           user.email || '',
+        phone:
+          user.phone || '',
       }))
 
       setSuccess(
@@ -191,7 +199,7 @@ export default function ProfilePage() {
 
           <p className="mt-2 text-sm text-slate-500">
             Username dùng để đăng nhập.
-            Email có thể bổ sung sau.
+            Email và số điện thoại có thể bổ sung sau.
           </p>
         </div>
 
@@ -270,6 +278,34 @@ export default function ProfilePage() {
               placeholder="Email (không bắt buộc)"
               className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-blue-500"
             />
+
+            <label
+              htmlFor="profile-sms-zalo"
+              className="mt-5 block text-sm font-bold"
+            >
+              Số điện thoại (SMS/Zalo)
+            </label>
+
+            <input
+              id="profile-sms-zalo"
+              type="tel"
+              inputMode="tel"
+              autoComplete="tel"
+              value={form.phone}
+              onChange={(e) =>
+                update('phone', e.target.value)
+              }
+              placeholder="0912345678 (không bắt buộc)"
+              maxLength={10}
+              pattern="0[35789][0-9]{8}"
+              title="Nhập số di động Việt Nam gồm 10 chữ số"
+              className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-blue-500"
+            />
+
+            <p className="mt-2 text-xs text-slate-400">
+              Dùng để liên hệ qua SMS hoặc Zalo.
+              Có thể để trống.
+            </p>
 
             <button
               disabled={saving}

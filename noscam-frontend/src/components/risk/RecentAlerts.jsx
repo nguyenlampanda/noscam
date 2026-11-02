@@ -350,7 +350,7 @@ function RecentAlerts() {
                       </p>
 
                       <p className="mt-1 text-xs text-slate-400">
-                        Risk Score
+                        Điểm rủi ro
                       </p>
                     </div>
 

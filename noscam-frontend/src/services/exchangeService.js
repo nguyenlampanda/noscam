@@ -17,6 +17,48 @@ function authOptions(extraHeaders = {}) {
 }
 
 const exchangeService = {
+
+  // NOSCAM_RECIPROCAL_PENDING_V1
+  reciprocalCampaignUsers(campaignId, page = 1, filters = {}) {
+    const params = new URLSearchParams({
+      page: String(page),
+      per_page: '20',
+      status: filters.status || 'awaiting_return',
+    })
+    if (filters.search) params.set('search', filters.search)
+
+    return apiClient.get(
+      `/exchange/reciprocal/campaigns/${encodeURIComponent(campaignId)}/users?${params.toString()}`,
+      authOptions(),
+    )
+  },
+
+  reciprocal() {
+    return apiClient.get('/exchange/reciprocal', authOptions())
+  },
+
+  tickReciprocal(campaignId, performAccountIds, returnAllocations) {
+    return apiClient.post(
+      `/exchange/reciprocal/${encodeURIComponent(campaignId)}/tick`,
+      { perform_account_ids: performAccountIds, return_allocations: returnAllocations },
+      authOptions(),
+    )
+  },
+
+  confirmReciprocal(claimId, decision = 'approve', returnAccountId = null) {
+    return apiClient.post(
+      `/exchange/reciprocal/claims/${encodeURIComponent(claimId)}/return`,
+      {
+        decision,
+        ...(returnAccountId !== null
+          ? { return_account_id: Number(returnAccountId) }
+          : {}),
+      },
+      authOptions(),
+    )
+  },
+
+
   prices() {
     return apiClient.get('/exchange/prices', authOptions())
   },
@@ -28,6 +70,22 @@ const exchangeService = {
   createAccount(data) {
     return apiClient.post(
       '/exchange/accounts',
+      data,
+      authOptions(),
+    )
+  },
+
+  updateAccount(id, data) {
+    return apiClient.patch(
+      `/exchange/accounts/${encodeURIComponent(id)}`,
+      data,
+      authOptions(),
+    )
+  },
+
+  updateAccountRoles(id, data) {
+    return apiClient.patch(
+      `/exchange/accounts/${encodeURIComponent(id)}/roles`,
       data,
       authOptions(),
     )

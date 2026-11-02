@@ -69,11 +69,33 @@ function validatePrice(data) {
 }
 
 export const adminExchangeService = {
-  async campaigns({ status = '', platform = '', page = 1 } = {}) {
+  // NOSCAM_EXCHANGE_TOGGLE_V2
+  async toggles() {
+    return apiClient.get('/admin/exchange/toggles', authOptions())
+  },
+
+  async updateToggle(data) {
+    if (
+      !data ||
+      typeof data.platform !== 'string' ||
+      typeof data.task_type !== 'string' ||
+      typeof data.is_enabled !== 'boolean'
+    ) {
+      throw new Error('Dữ liệu bật/tắt không hợp lệ.')
+    }
+    return apiClient.put(
+      '/admin/exchange/toggles',
+      data,
+      authOptions()
+    )
+  },
+
+  async campaigns({ status = '', platform = '', taskType = '', page = 1 } = {}) {
     const params = new URLSearchParams()
 
     if (status) params.set('status', status)
     if (platform) params.set('platform', platform)
+    if (taskType) params.set('task_type', taskType)
     params.set('page', String(page))
     params.set('per_page', '15')
 

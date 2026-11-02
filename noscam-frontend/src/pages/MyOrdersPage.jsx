@@ -179,6 +179,10 @@ function progressOf(order) {
 }
 
 export default function MyOrdersPage() {
+  // NOSCAM_ORDER_PLATFORM_COMMENT_V1
+  const [platformFilter, setPlatformFilter] = useState('all')
+  const [commentDialogOrder, setCommentDialogOrder] = useState(null)
+
 const [cancelBusyId, setCancelBusyId] = useState(null)
   const [cancelDialogOrder, setCancelDialogOrder] = useState(null)
   const [cancelNotice, setCancelNotice] = useState(null)
@@ -194,6 +198,10 @@ const [cancelBusyId, setCancelBusyId] = useState(null)
 
   const [status, setStatus] =
     useState('all')
+
+  // NOSCAM_MYORDERS_PAGINATION_V1
+  const PAGE_SIZE = 10
+  const [currentPage, setCurrentPage] = useState(1)
 
   const [search, setSearch] =
     useState('')
@@ -306,6 +314,95 @@ async function handleCancelOrder(item) {
     [orders],
   )
 
+
+  const availablePlatforms = useMemo(() => {
+    const found = new Map()
+
+    orders.forEach((item) => {
+      const value = String(item.service?.platform || '').trim()
+      if (value) {
+        const key = value.toLowerCase()
+        if (!found.has(key)) found.set(key, value)
+      }
+    })
+
+    return [...found.values()].sort((a, b) =>
+      a.localeCompare(b, 'vi')
+    )
+  }, [orders])
+
+  const platformLabel = (value) => {
+    const labels = {
+      facebook: 'Facebook',
+      instagram: 'Instagram',
+      tiktok: 'TikTok',
+      youtube: 'YouTube',
+      telegram: 'Telegram',
+      threads: 'Threads',
+      twitter: 'Twitter / X',
+      x: 'X',
+      zalo: 'Zalo',
+      shopee: 'Shopee',
+    }
+    return labels[String(value).toLowerCase()] || value
+  }
+
+  const getOrderComments = (item) => {
+    // NOSCAM_COMMENT_DEMO_V1 - Chỉ dùng để thử giao diện.
+    if (String(item?.code || '').trim() === 'NS-000002') {
+      return [
+        ...Array.from(
+          { length: 20 },
+          (_, index) =>
+            `Bình luận mẫu số ${index + 1}: Đây là nội dung bình luận để kiểm tra chức năng cuộn trong popup NoScam.vn.`
+        ),
+      ]
+    }
+
+    const paths = [
+      item?.comments,
+      item?.comment_lines,
+      item?.custom_comments,
+      item?.comments_text,
+      item?.comment_text,
+      item?.comment_content,
+      item?.options?.comments,
+      item?.parameters?.comments,
+      item?.provider_data?.comments,
+      item?.provider_response?.comments,
+      item?.provider_response?.data?.comments,
+      item?.provider_response?.payload?.comments,
+      item?.provider_response?.request?.comments,
+      item?.provider_response?.data?.comment,
+    ]
+
+    const parse = (value) => {
+      if (Array.isArray(value)) {
+        return value.flatMap(parse)
+      }
+
+      if (typeof value === 'string') {
+        return value
+          .split(/\\r?\\n/)
+          .map((line) => line.trim())
+          .filter(Boolean)
+      }
+
+      if (value && typeof value === 'object') {
+        return parse(value.text ?? value.content ?? value.comment)
+      }
+
+      return []
+    }
+
+    for (const value of paths) {
+      const lines = parse(value)
+      if (lines.length) return lines
+    }
+
+    return []
+  }
+
   const filteredOrders =
     useMemo(() => {
       const keyword =
@@ -353,6 +450,14 @@ async function handleCancelOrder(item) {
             return false
           }
 
+          if (
+            platformFilter !== 'all' &&
+            String(item.service?.platform || '').toLowerCase() !==
+              platformFilter.toLowerCase()
+          ) {
+            return false
+          }
+
           if (!keyword) {
             return true
           }
@@ -377,6 +482,7 @@ async function handleCancelOrder(item) {
       orders,
       status,
       search,
+      platformFilter,
     ])
 
   const tabs = [
@@ -403,8 +509,101 @@ async function handleCancelOrder(item) {
     },
   ]
 
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredOrders.length / PAGE_SIZE)
+  )
+
+  const safePage = Math.min(currentPage, totalPages)
+
+  const paginatedOrders = filteredOrders.slice(
+    (safePage - 1) * PAGE_SIZE,
+    safePage * PAGE_SIZE
+  )
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [status, search, platformFilter])
+
+  function goToPage(page) {
+    const nextPage = Math.max(1, Math.min(page, totalPages))
+    setCurrentPage(nextPage)
+  }
+
   return (
-    <main className="min-h-screen bg-slate-50 px-5 py-10">
+    <main className="bg-white min-h-screen px-4 pb-24 pt-7 sm:px-6 sm:pb-12 md:py-12">
+      {commentDialogOrder && (
+        <div
+          className="fixed inset-0 z-[1000] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              setCommentDialogOrder(null)
+            }
+          }}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="noscam-comments-title"
+            className="w-full max-w-xl overflow-hidden rounded-3xl bg-white p-6 shadow-2xl sm:p-8"
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2
+                  id="noscam-comments-title"
+                  className="text-xl font-black text-slate-950"
+                >
+                  Nội dung bình luận
+                </h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  Đơn hàng {commentDialogOrder.code}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                aria-label="Đóng"
+                onClick={() => setCommentDialogOrder(null)}
+                className="rounded-xl bg-slate-100 px-3 py-2 font-bold text-slate-600 hover:bg-slate-200"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="mt-5 max-h-[55vh] space-y-2 overflow-y-auto overscroll-contain pr-1">
+              {getOrderComments(commentDialogOrder).length > 0 ? (
+                getOrderComments(commentDialogOrder).map((line, index) => (
+                  <div
+                    key={index}
+                    className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm leading-6 text-slate-700"
+                  >
+                    <span className="mr-2 font-black text-blue-600">
+                      {index + 1}.
+                    </span>
+                    <span className="whitespace-pre-wrap break-words">
+                      {line}
+                    </span>
+                  </div>
+                ))
+              ) : (
+                <p className="rounded-xl bg-amber-50 p-4 text-sm text-amber-800">
+                  Chưa có nội dung bình luận trong dữ liệu đơn hàng
+                  được API trả về.
+                </p>
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setCommentDialogOrder(null)}
+              className="mt-6 min-h-11 w-full rounded-xl bg-blue-600 px-4 py-3 font-bold text-white hover:bg-blue-700"
+            >
+              Đóng
+            </button>
+          </section>
+        </div>
+      )}
+
       <div className="mx-auto max-w-6xl">
         <motion.div
           initial={{
@@ -415,7 +614,7 @@ async function handleCancelOrder(item) {
             opacity: 1,
             y: 0,
           }}
-          className="flex flex-wrap items-end justify-between gap-5"
+          className="flex flex-wrap items-end justify-between gap-5 rounded-[32px] border border-blue-100/80 bg-white/90 p-6 shadow-[0_20px_65px_-35px_rgba(37,99,235,0.35)] backdrop-blur-xl sm:p-9"
         >
           <div>
             <div className="text-sm font-black uppercase tracking-[0.18em] text-blue-600">
@@ -427,7 +626,7 @@ async function handleCancelOrder(item) {
             </h1>
 
             <p className="mt-2 text-sm text-slate-400">
-              Theo dõi tiến độ các đơn tăng tương tác.
+              Theo dõi trạng thái, tiến độ và lịch sử đơn tăng tương tác.
             </p>
           </div>
 
@@ -459,53 +658,122 @@ async function handleCancelOrder(item) {
           </div>
         )}
 
-        <div className="mt-7 grid grid-cols-2 gap-3 md:grid-cols-4">
-          {tabs.map(
-            (item) => {
-              const active =
-                status ===
-                item.value
+        <div className="mt-7 grid grid-cols-4 gap-1.5 sm:gap-3">
+          {tabs.map((item) => {
+            const active = status === item.value
 
-              return (
-                <motion.button
-                  type="button"
-                  key={
-                    item.value
-                  }
-                  whileTap={{
-                    scale: 0.98,
-                  }}
-                  onClick={() =>
-                    setStatus(
-                      item.value,
-                    )
-                  }
-                  className={`rounded-2xl border p-4 text-left transition ${
-                    active
-                      ? 'border-blue-600 bg-blue-600 text-white shadow-md'
-                      : 'border-slate-200 bg-white hover:border-blue-200'
-                  }`}
+            const colors = {
+              all: {
+                selected: 'border-blue-600 bg-blue-600 text-white',
+                normal: 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100',
+              },
+              active: {
+                selected: 'border-violet-600 bg-violet-600 text-white',
+                normal: 'border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100',
+              },
+              completed: {
+                selected: 'border-emerald-600 bg-emerald-600 text-white',
+                normal: 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100',
+              },
+              problem: {
+                selected: 'border-orange-500 bg-orange-500 text-white',
+                normal: 'border-orange-200 bg-orange-50 text-orange-700 hover:bg-orange-100',
+              },
+            }
+
+            const palette = colors[item.value] || colors.all
+
+            return (
+              <motion.button
+                type="button"
+                key={item.value}
+                whileTap={{ scale: 0.96 }}
+                onClick={() => setStatus(item.value)}
+                aria-pressed={active}
+                className={`flex min-w-0 flex-col items-center justify-center
+                  rounded-xl border px-0.5 py-3 text-center
+                  shadow-sm transition-all duration-300
+                  hover:-translate-y-1 hover:shadow-md
+                  sm:min-h-[108px] sm:rounded-2xl sm:px-3 sm:py-4
+                  ${active ? palette.selected : palette.normal}`}
+              >
+                <span
+                  className="block w-full whitespace-nowrap text-center
+                    text-[clamp(7px,1.9vw,11px)] font-extrabold
+                    leading-tight tracking-tight sm:text-xs"
                 >
-                  <div
-                    className={`text-xs font-black uppercase ${
-                      active
-                        ? 'text-blue-100'
-                        : 'text-slate-400'
-                    }`}
-                  >
-                    {item.label}
-                  </div>
+                  {item.label}
+                </span>
 
-                  <div className="mt-1 text-2xl font-black">
-                    {item.count}
-                  </div>
-                </motion.button>
-              )
-            },
-          )}
+                <span className="mt-2 text-xl font-black leading-none sm:text-2xl">
+                  {item.count}
+                </span>
+              </motion.button>
+            )
+          })}
         </div>
 
-        <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-3">
+
+        <div className="mt-5 flex flex-wrap items-center gap-3">
+          <label
+            htmlFor="noscam-order-platform"
+            className="text-sm font-bold text-slate-600"
+          >
+            Nền tảng
+          </label>
+
+          <div
+            role="group"
+            aria-label="Lọc theo nền tảng"
+            className="flex flex-wrap items-center gap-2"
+          >
+            {[
+              { value: 'all', label: 'Tất cả' },
+              ...[
+                'facebook',
+                'instagram',
+                'telegram',
+                'threads',
+                'tiktok',
+                'youtube',
+              ].map((value) => ({
+                value,
+                label: platformLabel(value),
+              })),
+            ].map((item) => {
+              const active = platformFilter === item.value
+
+              return (
+                <button
+                  key={item.value}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => setPlatformFilter(item.value)}
+                  className={`flex min-w-[76px] flex-col items-center gap-1.5 rounded-xl border px-3 py-2.5 transition ${
+                    active
+                      ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm'
+                      : 'border-slate-200 bg-white text-slate-600 hover:border-blue-300 hover:bg-slate-50'
+                  }`}
+                >
+                  {item.value === 'all' ? (
+                    <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-600 text-lg font-black text-white">
+                      ✓
+                    </span>
+                  ) : (
+                    <span className="flex h-9 w-9 items-center justify-center">
+                      <PlatformIcon platform={item.value} size={32} />
+                    </span>
+                  )}
+                  <span className="text-xs font-bold">
+                    {item.label}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        <div className="mt-6 rounded-[24px] border border-slate-200/80 bg-white/95 p-4 shadow-[0_12px_35px_-25px_rgba(15,23,42,0.4)] transition-all duration-300 hover:border-blue-200 hover:shadow-lg focus-within:border-blue-400 focus-within:ring-4 focus-within:ring-blue-50">
           <div className="flex items-center gap-3">
             <span className="pl-2 text-slate-400">
               ⌕
@@ -518,7 +786,7 @@ async function handleCancelOrder(item) {
                   e.target.value,
                 )
               }
-              placeholder="Tìm mã đơn, dịch vụ hoặc target..."
+              placeholder="Tìm mã đơn, tên dịch vụ hoặc liên kết..."
               className="min-w-0 flex-1 bg-transparent py-2 text-sm font-semibold outline-none"
             />
 
@@ -571,7 +839,7 @@ async function handleCancelOrder(item) {
               )}
             </div>
           ) : (
-            filteredOrders.map(
+            paginatedOrders.map(
               (item, index) => {
                 const meta =
                   getStatus(
@@ -593,6 +861,8 @@ async function handleCancelOrder(item) {
                       y: 0,
                     }}
                     transition={{
+                      duration: 0.45,
+                      ease: [0.22, 1, 0.36, 1],
                       delay:
                         Math.min(
                           index *
@@ -600,12 +870,12 @@ async function handleCancelOrder(item) {
                           0.2,
                         ),
                     }}
-                    className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm"
+                    className="overflow-hidden rounded-[28px] border border-slate-200/80 bg-white/95 shadow-[0_12px_35px_-25px_rgba(15,23,42,0.35)] transition-all duration-300 hover:-translate-y-1 hover:border-blue-300 hover:shadow-[0_25px_55px_-28px_rgba(37,99,235,0.35)]"
                   >
                     <div className="p-5 md:p-6">
                       <div className="flex flex-wrap items-start justify-between gap-4">
                         <div className="flex min-w-0 items-start gap-4">
-                          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-slate-50">
+                          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-blue-100 bg-gradient-to-br from-blue-50 to-white shadow-sm transition-transform duration-300 group-hover:scale-110">
                             <PlatformIcon
                               platform={
                                 item.service
@@ -663,7 +933,7 @@ async function handleCancelOrder(item) {
                         </div>
                       </div>
 
-                      <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 rounded-xl border border-slate-100 bg-slate-50/60 px-3 py-2.5 transition-all duration-300 hover:border-blue-200 hover:bg-blue-50/40 md:grid-cols-[minmax(0,1fr)_90px_90px_90px]">
+                      <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 rounded-xl border border-slate-100 bg-slate-50/60 px-3 py-2.5 transition-all duration-300 hover:border-blue-200 hover:bg-blue-50/40 md:grid-cols-[minmax(0,1fr)_90px_90px_90px_90px]">
                           <div className="col-span-2 flex min-w-0 items-center gap-2 md:col-span-1">
                             <span className="shrink-0 text-[10px] font-black uppercase text-slate-400">Target</span>
                             {/^https?:\/\//i.test(String(item.target || '').trim()) ? (
@@ -678,7 +948,19 @@ async function handleCancelOrder(item) {
                             )}
                           </div>
 
+                          
                           <div className="flex items-center justify-between gap-2 md:flex-col md:items-end md:justify-center md:gap-0">
+                            <span className="text-[10px] font-bold uppercase text-slate-400">
+                              Ban đầu
+                            </span>
+                            <span className="text-xs font-black tabular-nums text-blue-600">
+                              {item.start_count == null
+                                ? '—'
+                                : number(item.start_count)}
+                            </span>
+                          </div>
+
+<div className="flex items-center justify-between gap-2 md:flex-col md:items-end md:justify-center md:gap-0">
                             <span className="text-[10px] font-bold uppercase text-slate-400">Số lượng</span>
                             <span className="text-xs font-black tabular-nums">{number(item.quantity)}</span>
                           </div>
@@ -725,13 +1007,28 @@ async function handleCancelOrder(item) {
                         </div>
                       </div>
 
+
+                      {/comment|bình luận/i.test(
+                        String(item.service?.name || '')
+                      ) && (
+                        <div className="mt-4">
+                          <button
+                            type="button"
+                            onClick={() => setCommentDialogOrder(item)}
+                            className="inline-flex min-h-10 items-center rounded-xl border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-bold text-blue-700 transition hover:border-blue-400 hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                          >
+                            Xem nội dung bình luận
+                          </button>
+                        </div>
+                      )}
+
                       {['pending', 'processing', 'in_progress'].includes(item.status) && (
-                        <div className="mt-4 flex justify-end">
+                        <div className="mt-4 flex justify-stretch sm:justify-end">
                           <button
                             type="button"
                             disabled={cancelBusyId !== null}
                             onClick={() => { setCancelNotice(null); setCancelDialogOrder(item) }}
-                            className="rounded-xl border border-red-200 bg-white px-4 py-2 text-xs font-black text-red-600 transition hover:border-red-400 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                            className="min-h-11 w-full rounded-xl border border-red-200 bg-white px-4 py-2.5 text-sm font-black text-red-600 transition hover:border-red-400 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
                           >
                             {cancelBusyId === item.id
                               ? 'Đang gửi yêu cầu...'
@@ -759,6 +1056,85 @@ async function handleCancelOrder(item) {
             )
           )}
         </div>
+
+        {!loading && !error && filteredOrders.length > 0 && (
+          <nav
+            aria-label="Phân trang đơn hàng"
+            className="mt-8 flex flex-col items-center gap-4"
+          >
+            <p className="text-center text-sm font-medium text-slate-500">
+              Hiển thị{' '}
+              {(safePage - 1) * PAGE_SIZE + 1}
+              {' - '}
+              {Math.min(safePage * PAGE_SIZE, filteredOrders.length)}
+              {' / '}
+              {filteredOrders.length} đơn hàng
+            </p>
+
+            <div className="flex max-w-full flex-wrap items-center justify-center gap-2">
+              <button
+                type="button"
+                disabled={safePage === 1}
+                onClick={() => goToPage(safePage - 1)}
+                className="min-h-10 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 transition hover:border-blue-300 hover:text-blue-600 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                ‹ Trước
+              </button>
+
+              {Array.from(
+                { length: totalPages },
+                (_, index) => index + 1
+              )
+                .filter((page) =>
+                  page === 1 ||
+                  page === totalPages ||
+                  Math.abs(page - safePage) <= 1
+                )
+                .reduce((items, page, index, pages) => {
+                  if (index > 0 && page - pages[index - 1] > 1) {
+                    items.push('ellipsis-' + page)
+                  }
+                  items.push(page)
+                  return items
+                }, [])
+                .map((page) =>
+                  typeof page === 'string' ? (
+                    <span
+                      key={page}
+                      className="px-1 text-slate-400"
+                    >
+                      ...
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      key={page}
+                      aria-label={'Trang ' + page}
+                      aria-current={safePage === page ? 'page' : undefined}
+                      onClick={() => goToPage(page)}
+                      className={
+                        'flex min-h-10 min-w-10 items-center justify-center rounded-xl border px-3 text-sm font-black transition ' +
+                        (safePage === page
+                          ? 'border-blue-600 bg-blue-600 text-white shadow-md shadow-blue-100'
+                          : 'border-slate-200 bg-white text-slate-700 hover:border-blue-300 hover:text-blue-600')
+                      }
+                    >
+                      {page}
+                    </button>
+                  )
+                )}
+
+              <button
+                type="button"
+                disabled={safePage === totalPages}
+                onClick={() => goToPage(safePage + 1)}
+                className="min-h-10 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 transition hover:border-blue-300 hover:text-blue-600 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Tiếp ›
+              </button>
+            </div>
+          </nav>
+        )}
       </div>
 
       <AnimatePresence>

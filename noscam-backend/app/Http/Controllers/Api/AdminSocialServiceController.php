@@ -320,7 +320,7 @@ class AdminSocialServiceController extends Controller
             'platform' => [
                 'required_without:social_service_id',
                 'nullable',
-                'in:facebook,instagram,tiktok,other',
+                'in:facebook,instagram,tiktok,threads,youtube,telegram,twitter,discord,spotify,soundcloud,pinterest,linkedin,twitch,reddit,snapchat,whatsapp,zalo,other',
             ],
 
             'category' => [
@@ -731,7 +731,7 @@ class AdminSocialServiceController extends Controller
 
             'platform' => [
                 'required',
-                'in:facebook,instagram,tiktok,other',
+                'in:facebook,instagram,tiktok,threads,youtube,telegram,twitter,discord,spotify,soundcloud,pinterest,linkedin,twitch,reddit,snapchat,whatsapp,zalo,other',
             ],
 
             'category' => [
