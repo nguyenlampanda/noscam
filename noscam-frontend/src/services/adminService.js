@@ -1,29 +1,21 @@
 import apiClient, {
   API_BASE_URL,
 } from './apiClient'
+import { readAuthToken, saveAuthToken, clearAuthToken } from './authExpiry'
 
 const TOKEN_KEY =
   'noscam_admin_token'
 
 export function getAdminToken() {
-  return localStorage.getItem(
-    TOKEN_KEY,
-  )
+  return readAuthToken(TOKEN_KEY)
 }
 
-export function setAdminToken(
-  token,
-) {
-  localStorage.setItem(
-    TOKEN_KEY,
-    token,
-  )
+export function setAdminToken(token) {
+  saveAuthToken(TOKEN_KEY, token)
 }
 
 export function removeAdminToken() {
-  localStorage.removeItem(
-    TOKEN_KEY,
-  )
+  clearAuthToken(TOKEN_KEY)
 }
 
 function authOptions() {

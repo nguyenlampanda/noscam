@@ -1,17 +1,18 @@
 import apiClient from './apiClient'
+import { readAuthToken, saveAuthToken, clearAuthToken } from './authExpiry'
 
 const TOKEN_KEY = 'noscam_customer_token'
 
 export function getCustomerToken() {
-  return localStorage.getItem(TOKEN_KEY)
+  return readAuthToken(TOKEN_KEY)
 }
 
 export function setCustomerToken(token) {
-  localStorage.setItem(TOKEN_KEY, token)
+  saveAuthToken(TOKEN_KEY, token)
 }
 
 export function removeCustomerToken() {
-  localStorage.removeItem(TOKEN_KEY)
+  clearAuthToken(TOKEN_KEY)
 }
 
 function authOptions() {

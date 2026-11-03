@@ -196,6 +196,22 @@ function Header() {
     }
   }, [])
 
+  // NOSCAM_AUTH_48H_HEADER
+  useEffect(() => {
+    const onExpired = (event) => {
+      if (event.detail?.key !== 'noscam_customer_token') return
+      setUser(null)
+      setBalance(null)
+      setAccountOpen(false)
+      setIsMenuOpen(false)
+    }
+
+    window.addEventListener('noscam-auth-expired', onExpired)
+    return () => {
+      window.removeEventListener('noscam-auth-expired', onExpired)
+    }
+  }, [])
+
   function closeMenu() {
     setIsMenuOpen(false)
   }

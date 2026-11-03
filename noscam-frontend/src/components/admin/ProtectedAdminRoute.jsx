@@ -57,6 +57,20 @@ function ProtectedAdminRoute({
     }
   }, [])
 
+  // NOSCAM_AUTH_48H_ADMIN_ROUTE
+  useEffect(() => {
+    const onExpired = (event) => {
+      if (event.detail?.key === 'noscam_admin_token') {
+        setStatus('guest')
+      }
+    }
+
+    window.addEventListener('noscam-auth-expired', onExpired)
+    return () => {
+      window.removeEventListener('noscam-auth-expired', onExpired)
+    }
+  }, [])
+
   if (
     status === 'checking'
   ) {
