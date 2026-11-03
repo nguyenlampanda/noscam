@@ -21,3 +21,8 @@ debug/
 **/vendor/
 **/dist/
 **/.DS_Store
+
+# NoScam temporary auth backups
+.auth-48h-backup-*/
+.auth-backup-*/
+sanctum.php.backup-*
