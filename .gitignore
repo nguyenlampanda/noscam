@@ -26,3 +26,5 @@ debug/
 .auth-48h-backup-*/
 .auth-backup-*/
 sanctum.php.backup-*
+
+/noscam_latest.sql
