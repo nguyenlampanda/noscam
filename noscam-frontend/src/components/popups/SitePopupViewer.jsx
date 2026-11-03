@@ -126,7 +126,7 @@ export default function SitePopupViewer() {
         aria-modal="true"
         aria-labelledby="noscam-popup-title"
         aria-describedby="noscam-popup-content"
-        className="relative w-full max-w-[490px] overflow-hidden rounded-[28px] border border-white/70 bg-white shadow-[0_30px_100px_rgba(2,6,23,0.3)]"
+        className="relative flex max-h-[85dvh] w-full max-w-[420px] flex-col overflow-hidden rounded-[20px] border border-white/70 bg-white shadow-[0_30px_100px_rgba(2,6,23,0.3)]"
       >
             <button
               type="button"
@@ -141,13 +141,13 @@ export default function SitePopupViewer() {
           <img
             src={image}
             alt=""
-            className="max-h-64 w-full object-cover"
+            className="max-h-[20dvh] w-full shrink-0 object-contain"
             loading="lazy"
           />
         )}
 
-        <div className="p-6 sm:p-8">
-          <div className="mb-6 flex items-start justify-between gap-4">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 pt-12 sm:p-6 sm:pt-12">
+          <div className="mb-3 flex items-start justify-between gap-4">
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -175,21 +175,21 @@ export default function SitePopupViewer() {
 
           <h2
             id="noscam-popup-title"
-            className="mt-2 break-words text-2xl font-black tracking-tight text-slate-950"
+            className="mt-2 break-words text-xl font-black tracking-tight text-slate-950"
           >
             {current.title}
           </h2>
 
           <p
             id="noscam-popup-content"
-            className="mt-4 whitespace-pre-wrap break-words text-[15px] leading-7 text-slate-600"
+            className="mt-3 whitespace-pre-wrap break-words text-[14px] leading-6 text-slate-600"
           >
             {renderLinkedContent(current.content)}
           </p>
 
 
 
-          <div className="mt-7 flex justify-end border-t border-slate-100 pt-5">
+          <div className="mt-4 flex justify-end border-t border-slate-100 pt-3">
             <button
               type="button"
               onClick={dismiss}
