@@ -87,7 +87,7 @@ function AdminLoginPage() {
               }
               required
               className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
-              placeholder="admin@noscam.vn"
+              placeholder="admin.noscam.vn@gmail.com"
             />
           </div>
 
