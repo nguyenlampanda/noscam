@@ -1656,6 +1656,7 @@ export default function AdminSocialServicesPage() {
                   <th className="px-2 py-4 w-[8%] ">Giá API</th>
 
                   <th className="px-2 py-4 w-[9%] ">Giá vốn VND</th>
+                  <th className="px-2 py-4 w-[9%]">Giá bán / 1.000</th>
                   <th className="px-2 py-4 w-[11%] ">Min / Max</th>
                   <th className="px-2 py-4 w-[6%] ">Map</th>
                   <th className="px-2 py-4 w-[8%] ">Admin bật/tắt</th>
@@ -1668,7 +1669,7 @@ export default function AdminSocialServicesPage() {
                 {loading ? (
                   <tr>
                     <td
-                      colSpan="10"
+                      colSpan="11"
                       className="px-5 py-16 text-center font-semibold text-slate-400"
                     >
                       Đang tải...
@@ -1677,7 +1678,7 @@ export default function AdminSocialServicesPage() {
                 ) : items.length === 0 ? (
                   <tr>
                     <td
-                      colSpan="10"
+                      colSpan="11"
                       className="px-5 py-16 text-center font-semibold text-slate-400"
                     >
                       Không có dịch vụ.
@@ -1754,6 +1755,19 @@ export default function AdminSocialServicesPage() {
                           </div>
                         )}
                       </td>
+                      <td className="px-2 py-4 align-middle break-words">
+                        {item.is_mapped &&
+                        item.service?.sell_price_per_1000 != null ? (
+                          <div className="font-black text-emerald-700">
+                            {vnd(item.service.sell_price_per_1000)}
+                          </div>
+                        ) : (
+                          <span className="text-xs font-semibold text-slate-400">
+                            Chưa có giá bán
+                          </span>
+                        )}
+                      </td>
+
 
                       <td className="px-5 py-4 text-sm font-semibold text-slate-600">
                         {money(item.min_quantity)}
