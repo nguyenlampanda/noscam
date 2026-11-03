@@ -360,10 +360,10 @@ function MapModal({ item, onClose, onDone }) {
   const [error, setError] = useState('')
 
   // Gia von API duoc hieu la VND / 1 luot.
-  const cost1 = Number(
+  const cost1000 = Number(
     item.cost_price_vnd ?? item.cost_price_per_1000 ?? 0
   )
-  const cost1000 = cost1 * 1000
+  const cost1 = cost1000 / 1000
 
   // Hiển thị giá vốn mỗi lượt từ chuỗi giá vốn / 1000.
   // Dịch dấu thập phân, không làm tròn.
@@ -1039,10 +1039,10 @@ function MapModal({ item, onClose, onDone }) {
 function PriceModal({ item, onClose, onDone }) {
   const service = item.service || {}
   // Gia von API duoc hieu la VND / 1 luot.
-  const cost1 = Number(
+  const cost1000 = Number(
     item.cost_price_vnd ?? item.cost_price_per_1000 ?? 0
   )
-  const cost1000 = cost1 * 1000
+  const cost1 = cost1000 / 1000
 
   const [name, setName] = useState(service.name || '')
   const [platform, setPlatform] = useState(service.platform || 'other')
