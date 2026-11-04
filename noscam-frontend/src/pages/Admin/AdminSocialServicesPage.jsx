@@ -1646,8 +1646,14 @@ export default function AdminSocialServicesPage() {
         )}
 
         <div className="mt-5 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[1440px] table-fixed text-left text-xs lg:text-sm">
+          <div
+              className="overflow-x-auto"
+              style={{ width: '100%', maxWidth: '100%', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}
+            >
+            <table
+                style={{ minWidth: '1600px', width: '100%', tableLayout: 'fixed' }}
+                className="w-full min-w-[1440px] table-fixed text-left text-xs lg:text-sm"
+              >
               <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-400">
                 <tr>
                   <th className="px-2 py-4 w-[9%] ">Provider</th>

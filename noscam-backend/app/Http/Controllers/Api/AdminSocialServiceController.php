@@ -78,7 +78,7 @@ class AdminSocialServiceController extends Controller
         $query = SocialProviderService::query()
             ->with([
                 'provider:id,name,slug,driver,currency,exchange_rate_to_vnd,price_multiplier',
-                'service:id,code,platform,category,name,sell_price_per_1000,is_active',
+                'service:id,code,platform,category,name,description,min_quantity,max_quantity,sell_price_per_1000,is_active,sort_order',
             ]);
 
         if ($request->filled('provider_id')) {
