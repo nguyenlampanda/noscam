@@ -212,7 +212,7 @@ class SocialOrderService
 
             $availableVnd = $balance * $exchangeRate;
 
-            $requiredVnd = $providerService->costPriceVnd()
+            $requiredVnd = ($providerService->costPriceVnd() * ($isVietnamFb ? 1000 : 1))
                 * $quantity / 1000;
 
             if ($availableVnd < $requiredVnd) {
@@ -224,7 +224,7 @@ class SocialOrderService
             );
         }
 
-        $costPer1000 = $providerService->costPriceVnd();
+        $costPer1000 = ($providerService->costPriceVnd() * ($isVietnamFb ? 1000 : 1));
 
         if (
             (float) $service->sell_price_per_1000
@@ -246,7 +246,7 @@ class SocialOrderService
         );
 
         $costAmount = round(
-            $providerService->costPriceVnd()
+            ($providerService->costPriceVnd() * ($isVietnamFb ? 1000 : 1))
             * $quantity /
             1000,
             4
