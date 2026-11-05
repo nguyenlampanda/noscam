@@ -55,7 +55,7 @@ class VietnamFbProvider implements SocialProviderInterface
             ->acceptJson()
             ->timeout(30)
             ->post(
-                rtrim($this->apiUrl, '/').'?'.http_build_query([
+                $this->endpoint().'?'.http_build_query([
                     'mc' => $mc,
                     'site' => $site,
                     'api_key' => $this->apiKey,
@@ -98,10 +98,10 @@ class VietnamFbProvider implements SocialProviderInterface
             isset($json['success']) &&
             (int) $json['success'] === 0
         ) {
-            throw new \App\Services\Social\ProviderOrderRejectedException(
+            throw new RuntimeException(
                 (string) (
                     $json['message']
-                    ?? 'VietnamFB API báo lỗi.'
+                    ?? 'VietnamFB API báo lỗi, cần đối soát.'
                 )
             );
         }
@@ -302,15 +302,44 @@ class VietnamFbProvider implements SocialProviderInterface
             );
         }
 
+        // NOSCAM_VIETNAMFB_FULL_ROUTES_V1
+        // Mapping theo Postman Collection VietnamFB.
         $routes = [
-            'BUFF_LIKE' => 'buff',
-            'BUFF_COMMENT' => 'buff_comment',
-            'BUFF_SUB' => 'buff_sub',
-            'INSTAGRAM_SUB' => 'instagram',
-            'BUFF_LIVE' => 'buff_live',
-            'TIKTOK_VIEW' => 'tiktok_view',
-            'TIKTOK_SUB' => 'tiktok_sub',
+            'BUFF_LIKE' => ['buff', 'create', 'id'],
+            'BUFF_COMMENT' => ['buff_comment', 'create', 'id'],
+            'BUFF_SUB' => ['buff_sub', 'create', 'id'],
+            'BUFF_LIVE' => ['buff_live', 'create', 'id'],
+            'BUFF_VIEW_NEW' => ['buff_view_new', 'create', 'link'],
+            'BUFF_REEL' => ['buff_reel', 'create', 'link_or_id'],
+            'LIKE_PAGE2' => ['like_page2', 'create', 'id'],
+            'FANPAGE_REVIEW' => ['fanpage_review', 'create', 'id'],
+            'STORY_VIEW' => ['story_view', 'create', 'link'],
+            'SHARELIVE' => ['sharelive', 'create', 'id'],
+            'VIPLIKE' => ['viplike', 'create', 'id'],
+            'VIPCMT' => ['vipcmt', 'create', 'id'],
+            'VIPMAT' => ['vipmat', 'create', 'id'],
+            'VIPSHARELIVE' => ['vipsharelive', 'create', 'id'],
+            'INSTAGRAM_SUB' => ['instagram', 'create', 'id'],
+            'INSTAGRAM_LIKE' => ['instagram_like', 'create', 'id'],
+            'INSTAGRAM_COMMENT' => ['instagram_comment', 'create', 'id'],
+            'TIKTOK_SUB' => ['tiktok_sub', 'create', 'link'],
+            'PANEL' => ['panel', 'create', 'link'],
+            'COVID_LIKEPOST' => ['covid_likepost', 'add_new', 'id'],
+            'COVID_LIKEPOST4' => ['covid_likepost4', 'add_new', 'id'],
         ];
+
+        $aliases = [
+            'VIP_LIKE' => 'VIPLIKE',
+            'VIP_COMMENT' => 'VIPCMT',
+            'VIP_CMT' => 'VIPCMT',
+            'VIP_MAT' => 'VIPMAT',
+            'VIP_SHARE_LIVE' => 'VIPSHARELIVE',
+            'BUFF_SHARELIVE' => 'SHARELIVE',
+            'INSTAGRAM_FOLLOW' => 'INSTAGRAM_SUB',
+            'TIKTOK_FOLLOW' => 'TIKTOK_SUB',
+        ];
+
+        $group = $aliases[$group] ?? $group;
 
         if (!isset($routes[$group])) {
             throw new \App\Services\Social\ProviderOrderRejectedException(
@@ -318,61 +347,118 @@ class VietnamFbProvider implements SocialProviderInterface
             );
         }
 
-        $payload = [
-            'amount' => $quantity,
-            'channel_number' => $channel,
+        if ($quantity < 1 || trim($target) === '') {
+            throw new \App\Services\Social\ProviderOrderRejectedException(
+                'VietnamFB yêu cầu ID/link và số lượng hợp lệ.'
+            );
+        }
+
+        [$mc, $site, $targetField] = $routes[$group];
+
+        $extra = $options['payload'] ?? [];
+
+        if (!is_array($extra)) {
+            throw new \App\Services\Social\ProviderOrderRejectedException(
+                'VietnamFB payload không hợp lệ.'
+            );
+        }
+
+        // Cho phép truyền tham số dịch vụ qua options.
+        foreach ($options as $key => $value) {
+            if (
+                $key !== 'payload'
+                && $key !== 'comments'
+                && !array_key_exists($key, $extra)
+            ) {
+                $extra[$key] = $value;
+            }
+        }
+
+        if (isset($options['comments']) && !isset($extra['comments'])) {
+            $extra['comments'] = $options['comments'];
+        }
+
+        $required = [
+            'BUFF_LIVE' => ['mins'],
+            'FANPAGE_REVIEW' => ['comments'],
+            'BUFF_COMMENT' => ['comments'],
+            'INSTAGRAM_COMMENT' => ['comments'],
+            'VIPLIKE' => ['package', 'time', 'post_per_day'],
+            'VIPCMT' => ['time', 'package', 'post_per_day', 'content'],
+            'VIPMAT' => ['time', 'package', 'max_order_per_day', 'max_time_per_order'],
+            'VIPSHARELIVE' => ['quantity', 'time', 'totalshare'],
+            'TIKTOK_SUB' => ['package_type'],
+            'PANEL' => ['service_id'],
         ];
 
-        if (str_starts_with($group, 'TIKTOK_')) {
-            $payload['link'] = $target;
+        foreach ($required[$group] ?? [] as $field) {
+            $value = $extra[$field] ?? null;
+
+            if (
+                $value === null
+                || (is_string($value) && trim($value) === '')
+            ) {
+                throw new \App\Services\Social\ProviderOrderRejectedException(
+                    'VietnamFB thiếu tham số bắt buộc: '.$field
+                );
+            }
+        }
+
+        $payload = $extra;
+
+        // Các trường quan trọng không cho payload ghi đè.
+        $payload[$targetField] = $target;
+        $payload['channel_number'] = $channel;
+
+        if ($group === 'VIPSHARELIVE') {
+            // API VIP Share dùng quantity thay vì amount.
+            $payload['quantity'] = $quantity;
+            unset($payload['amount']);
+        } elseif (in_array($group, ['VIPLIKE', 'VIPCMT', 'VIPMAT'], true)) {
+            // VIP dùng package/time, không có amount trong tài liệu.
+            unset($payload['amount']);
         } else {
-            $payload['id'] = $target;
+            $payload['amount'] = $quantity;
         }
 
-        if ($group === 'BUFF_LIKE') {
-            $payload['reaction'] = $options['reaction'] ?? 'LIKE';
+        if (in_array($group, [
+            'BUFF_LIKE',
+            'COVID_LIKEPOST',
+            'COVID_LIKEPOST4',
+        ], true)) {
+            $payload['reaction'] = $extra['reaction'] ?? 'LIKE';
         }
 
-        if ($group === 'BUFF_COMMENT') {
-            $comments = trim((string) ($options['comments'] ?? ''));
+        if (in_array($group, [
+            'BUFF_COMMENT',
+            'INSTAGRAM_COMMENT',
+            'FANPAGE_REVIEW',
+        ], true)) {
+            $comments = $payload['comments'] ?? '';
 
-            if ($comments === '') {
+            if (!is_string($comments) || trim($comments) === '') {
                 throw new \App\Services\Social\ProviderOrderRejectedException(
                     'Vui lòng nhập nội dung bình luận.'
                 );
             }
 
-            $lines = array_values(array_filter(
-                preg_split('/\r\n|\r|\n/', $comments),
-                fn ($line) => trim($line) !== ''
-            ));
+            if ($group === 'BUFF_COMMENT') {
+                $lines = array_values(array_filter(
+                    preg_split('/\r\n|\r|\n/', $comments),
+                    fn ($line) => trim($line) !== ''
+                ));
 
-            if (count($lines) !== $quantity) {
-                throw new \App\Services\Social\ProviderOrderRejectedException(
-                    'Số lượng phải bằng số dòng bình luận.'
-                );
+                if (count($lines) !== $quantity) {
+                    throw new \App\Services\Social\ProviderOrderRejectedException(
+                        'Số lượng phải bằng số dòng bình luận.'
+                    );
+                }
+
+                $payload['comments'] = implode("\n", $lines);
             }
-
-            $payload['comments'] = implode("\n", $lines);
         }
 
-        if ($group === 'BUFF_LIVE') {
-            throw new \App\Services\Social\ProviderOrderRejectedException(
-                'BUFF_LIVE cần tham số mins.'
-            );
-        }
-
-        if ($group === 'TIKTOK_SUB') {
-            throw new \App\Services\Social\ProviderOrderRejectedException(
-                'TIKTOK_SUB cần package_type.'
-            );
-        }
-
-        return $this->post(
-            $routes[$group],
-            'create',
-            array_merge($payload, $options['payload'] ?? [])
-        );
+        return $this->post($mc, $site, $payload);
     }
 
 

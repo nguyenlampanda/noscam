@@ -50,6 +50,7 @@ class DigitalOrderTest extends TestCase
             'service_id' => $service->id,
             'request_data' => [
                 'profile_url' => 'https://example.com/profile',
+                'zalo_phone' => '0901234567',
                 'details' => 'Cần hỗ trợ kiểm tra.',
             ],
         ];

@@ -43,6 +43,7 @@ class GuestDigitalOrderTest extends TestCase
             'guest_email' => 'guest@example.com',
             'request_data' => [
                 'profile_url' => 'https://example.com/profile',
+                'zalo_phone' => '0901234567',
             ],
         ];
     }
