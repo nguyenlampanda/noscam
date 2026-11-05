@@ -304,10 +304,23 @@ class SocialOrderProviderService
             }
 
             if (
-                $order->provider->driver ===
-                'vietnamfb'
+                $order->provider->driver === 'vietnamfb'
             ) {
-                return $order;
+                $providerServiceId = strtoupper(trim(
+                    (string) (
+                        $order->providerService?->provider_service_id
+                        ?? ''
+                    )
+                ));
+
+                if (
+                    !preg_match(
+                        '/^INSTAGRAM_SUB:[0-9]+$/',
+                        $providerServiceId
+                    )
+                ) {
+                    return $order;
+                }
             }
 
             $api =

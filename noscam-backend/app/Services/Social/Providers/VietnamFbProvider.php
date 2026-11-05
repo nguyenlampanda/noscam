@@ -51,14 +51,30 @@ class VietnamFbProvider implements SocialProviderInterface
         string $site,
         array $data = []
     ): array {
+        // Xac thuc API tao don theo PHP SDK goc VietnamFB.
+        $username = trim((string) $this->username);
+
+        if ($username === '') {
+            throw new RuntimeException(
+                'VietnamFB chua cau hinh username_api.'
+            );
+        }
+
+        $baseUrl = preg_replace(
+            '~/api/?$~',
+            '',
+            rtrim($this->apiUrl, '/')
+        );
+
         $response = Http::asForm()
             ->acceptJson()
             ->timeout(30)
             ->post(
-                $this->endpoint().'?'.http_build_query([
+                $baseUrl.'/?'.http_build_query([
                     'mc' => $mc,
                     'site' => $site,
-                    'api_key' => $this->apiKey,
+                    'username_api' => $username,
+                    'key_api' => $this->apiKey,
                 ]),
                 $data
             );
@@ -319,7 +335,7 @@ class VietnamFbProvider implements SocialProviderInterface
             'VIPCMT' => ['vipcmt', 'create', 'id'],
             'VIPMAT' => ['vipmat', 'create', 'id'],
             'VIPSHARELIVE' => ['vipsharelive', 'create', 'id'],
-            'INSTAGRAM_SUB' => ['instagram', 'create', 'id'],
+            'INSTAGRAM_SUB' => ['instagram_sub', 'create', 'id'],
             'INSTAGRAM_LIKE' => ['instagram_like', 'create', 'id'],
             'INSTAGRAM_COMMENT' => ['instagram_comment', 'create', 'id'],
             'TIKTOK_SUB' => ['tiktok_sub', 'create', 'link'],
@@ -460,6 +476,24 @@ class VietnamFbProvider implements SocialProviderInterface
             }
         }
 
+        // Chuan hoa URL Instagram Sub truoc khi gui VietnamFB.
+        if (
+            $group === 'INSTAGRAM_SUB' &&
+            isset($payload['id']) &&
+            is_string($payload['id'])
+        ) {
+            $parts = parse_url(trim($payload['id']));
+
+            if (
+                is_array($parts) &&
+                isset($parts['scheme'], $parts['host'])
+            ) {
+                $payload['id'] =
+                    $parts['scheme'].'://'.$parts['host'].
+                    ($parts['path'] ?? '');
+            }
+        }
+
         return $this->post($mc, $site, $payload);
     }
 
@@ -491,9 +525,39 @@ class VietnamFbProvider implements SocialProviderInterface
     public function orderStatus(
         string $orderId
     ): array {
-        throw new RuntimeException(
-            'VietnamFB chưa cấu hình lấy trạng thái đơn.'
-        );
+        $response = $this->probeInstagramOrderStatus($orderId);
+
+        if ((int) ($response['success'] ?? 0) !== 1) {
+            throw new RuntimeException('VietnamFB status response unsuccessful.');
+        }
+
+        $data = $response['data'] ?? null;
+
+        if (!is_array($data) || count($data) !== 1) {
+            throw new RuntimeException('VietnamFB status data invalid.');
+        }
+
+        $item = $data[0] ?? null;
+
+        if (
+            !is_array($item) ||
+            (string) ($item['id'] ?? '') !== $orderId
+        ) {
+            throw new RuntimeException('VietnamFB order ID mismatch.');
+        }
+
+        $providerStatus = strtoupper(trim(
+            (string) ($item['status'] ?? '')
+        ));
+
+        return [
+            'status' => match ($providerStatus) {
+                'DANG_XU_LY' => 'in_progress',
+                default => '',
+            },
+            'vietnamfb_status' => $providerStatus,
+            'vietnamfb_data' => $item,
+        ];
     }
 
     public function refill(
