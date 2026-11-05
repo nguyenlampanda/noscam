@@ -187,24 +187,24 @@ class VietnamFbProvider implements SocialProviderInterface
                             : 0,
 
                     'min' =>
-                        is_numeric($channel['min'] ?? null)
-                        && (int) $channel['min'] > 0
-                            ? (int) $channel['min']
+                        is_numeric($channel['min'] ?? $channel['min_quantity'] ?? null)
+                        && (int) ($channel['min'] ?? $channel['min_quantity']) > 0
+                            ? (int) ($channel['min'] ?? $channel['min_quantity'])
                             : 1,
 
                     'max' =>
-                        is_numeric($channel['max'] ?? null)
-                        && (int) $channel['max'] > 0
-                            ? (int) $channel['max']
+                        is_numeric($channel['max'] ?? $channel['max_quantity'] ?? null)
+                        && (int) ($channel['max'] ?? $channel['max_quantity']) > 0
+                            ? (int) ($channel['max'] ?? $channel['max_quantity'])
                             : 1000000,
 
                     'min_verified' =>
-                        is_numeric($channel['min'] ?? null)
-                        && (int) $channel['min'] > 0,
+                        is_numeric($channel['min'] ?? $channel['min_quantity'] ?? null)
+                        && (int) ($channel['min'] ?? $channel['min_quantity']) > 0,
 
                     'max_verified' =>
-                        is_numeric($channel['max'] ?? null)
-                        && (int) $channel['max'] > 0,
+                        is_numeric($channel['max'] ?? $channel['max_quantity'] ?? null)
+                        && (int) ($channel['max'] ?? $channel['max_quantity']) > 0,
 
                     'group' => $groupName,
 
@@ -329,6 +329,8 @@ class VietnamFbProvider implements SocialProviderInterface
         ];
 
         $aliases = [
+            'LIKEPAGE_2' => 'LIKE_PAGE2',
+            'SHARE_LIVE' => 'SHARELIVE',
             'VIP_LIKE' => 'VIPLIKE',
             'VIP_COMMENT' => 'VIPCMT',
             'VIP_CMT' => 'VIPCMT',

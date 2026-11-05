@@ -18,6 +18,8 @@ class VietnamFbAllRoutesTest extends TestCase
             'BUFF_VIEW_NEW' => 'buff_view_new',
             'BUFF_REEL' => 'buff_reel',
             'LIKE_PAGE2' => 'like_page2',
+            'LIKEPAGE_2' => 'like_page2',
+            'SHARE_LIVE' => 'sharelive',
             'FANPAGE_REVIEW' => 'fanpage_review',
             'STORY_VIEW' => 'story_view',
             'SHARELIVE' => 'sharelive',

@@ -113,4 +113,37 @@ class VietnamFbProviderTest extends TestCase
             100
         );
     }
+
+    public function test_panel_min_max_quantity_mapping(): void
+    {
+        \Illuminate\Support\Facades\Http::fake([
+            '*' => \Illuminate\Support\Facades\Http::response([
+                'PANEL' => [
+                    [
+                        'id' => 123,
+                        'name' => 'Test PANEL',
+                        'price' => 100,
+                        'min_quantity' => 50,
+                        'max_quantity' => 5000,
+                    ],
+                ],
+            ]),
+        ]);
+
+        $provider = new \App\Services\Social\Providers\VietnamFbProvider(
+            'https://example.com/api',
+            'test-key',
+            'test-user'
+        );
+
+        $services = $provider->services();
+
+        $this->assertCount(1, $services);
+        $this->assertSame('PANEL:123', $services[0]['service']);
+        $this->assertSame(50, $services[0]['min']);
+        $this->assertSame(5000, $services[0]['max']);
+        $this->assertTrue($services[0]['min_verified']);
+        $this->assertTrue($services[0]['max_verified']);
+    }
+
 }
