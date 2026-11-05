@@ -1,6 +1,7 @@
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react'
 import {
@@ -17,6 +18,15 @@ import SocialGuideModal from '../components/social/SocialGuideModal'
 import customerService, {
   getCustomerToken,
 } from '../services/customerService'
+
+function readWalletBalance(response) {
+  const value = response?.data?.balance
+  if (value === null || value === undefined || value === '') {
+    return null
+  }
+  const amount = Number(value)
+  return Number.isFinite(amount) && amount >= 0 ? amount : null
+}
 
 function money(value) {
   return `${Math.round(
@@ -351,12 +361,7 @@ export default function SocialServicesPage() {
       .then((response) => {
         if (!active) return
 
-        setBalance(
-          Number(
-            response?.data
-              ?.balance || 0,
-          ),
-        )
+        setBalance(readWalletBalance(response))
       })
       .catch(() => {
         if (active) {
@@ -824,15 +829,20 @@ export default function SocialServicesPage() {
 
   const [adminNotice, setAdminNotice] =
     useState(false)
+  const [orderResult, setOrderResult] = useState(null)
+  const orderSubmittingRef = useRef(false)
 
   async function confirmOrder() {
     if (
+      orderSubmittingRef.current ||
       submitting ||
       !selected
     ) {
       return
     }
 
+    orderSubmittingRef.current = true
+    setOrderResult(null)
     setSubmitting(true)
     setError('')
 
@@ -880,10 +890,21 @@ export default function SocialServicesPage() {
 
       setConfirmOpen(false)
 
-      navigate('/my-orders', {
-        state: {
-          orderCreated: true,
-        },
+      let updatedBalance = null
+      try {
+        const walletResponse = await customerService.wallet()
+        const walletValue = readWalletBalance(walletResponse)
+        if (walletValue !== null) {
+          updatedBalance = walletValue
+          setBalance(walletValue)
+        }
+      } catch {
+        // Không suy đoán số dư nếu API ví lỗi.
+      }
+
+      setOrderResult({
+        type: 'success',
+        balance: updatedBalance,
       })
     } catch (err) {
       setConfirmOpen(false)
@@ -901,22 +922,25 @@ export default function SocialServicesPage() {
         setAdminNotice(true)
       } else {
         setError(message)
+        const uncertain = !err?.status || Number(err.status) >= 500
+        setOrderResult({
+          type: 'error',
+          message: uncertain
+            ? 'Chưa xác định được kết quả tạo đơn. Vui lòng kiểm tra lịch sử đơn hàng hoặc liên hệ hỗ trợ trước khi thử lại, để tránh đặt trùng.'
+            : message,
+        })
       }
 
       try {
         const response =
           await customerService.wallet()
 
-        setBalance(
-          Number(
-            response?.data
-              ?.balance || 0,
-          ),
-        )
+        setBalance(readWalletBalance(response))
       } catch {
         // Giữ lỗi đặt đơn.
       }
     } finally {
+      orderSubmittingRef.current = false
       setSubmitting(false)
     }
   }
@@ -1993,9 +2017,20 @@ export default function SocialServicesPage() {
                       LINK / USERNAME / ID
                     </div>
 
-                    <div className="mt-1 break-all font-bold">
-                      {target}
-                    </div>
+                    {/^https?:\/\/[^\s]+$/i.test(target.trim()) ? (
+                      <a
+                        href={target.trim()}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-1 block break-all font-bold text-blue-600 underline underline-offset-2 hover:text-blue-800"
+                      >
+                        {target}
+                      </a>
+                    ) : (
+                      <div className="mt-1 break-all font-bold">
+                        {target}
+                      </div>
+                    )}
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
@@ -2020,6 +2055,21 @@ export default function SocialServicesPage() {
                         {money(total)}
                       </div>
                     </div>
+                  </div>
+                </div>
+
+                <div className="mt-3 rounded-2xl border border-blue-100 bg-blue-50/60 p-4">
+                  <div className="flex justify-between gap-3 text-sm">
+                    <span className="text-slate-600">Số dư hiện tại</span>
+                    <strong>
+                      {balance === null ? 'Chưa xác định' : money(balance)}
+                    </strong>
+                  </div>
+                  <div className="mt-2 flex justify-between gap-3 text-sm">
+                    <span className="text-slate-600">Dự kiến sau thanh toán</span>
+                    <strong className="text-blue-600">
+                      {balance === null ? 'Chưa xác định' : money(balance - total)}
+                    </strong>
                   </div>
                 </div>
 
@@ -2058,6 +2108,81 @@ export default function SocialServicesPage() {
             </motion.div>
           )}
       </AnimatePresence>
+
+      {submitting && (
+        <div
+          className="fixed inset-0 z-[300] flex items-center justify-center bg-[#0b1736a8] p-5"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Đang xử lý đơn hàng"
+        >
+          <div className="w-full max-w-[400px] rounded-[22px] bg-white px-7 py-9 text-center shadow-2xl">
+            <div className="mb-5 flex items-center justify-center gap-2.5 text-[23px] font-extrabold">
+              <span className="grid h-11 w-11 place-items-center rounded-[13px] bg-gradient-to-br from-[#175cff] to-cyan-500 text-2xl text-white">
+                N
+              </span>
+              <span>NoScam<span className="text-[#175cff]">.vn</span></span>
+            </div>
+            <div className="mx-auto h-[42px] w-[42px] animate-spin rounded-full border-4 border-[#dce8ff] border-t-[#175cff]" />
+            <div className="mt-5 text-[19px] font-extrabold">
+              Đang xử lý đơn hàng
+            </div>
+            <p className="mt-2 text-sm leading-relaxed text-slate-500">
+              Hệ thống đang gửi và kiểm tra đơn hàng.
+              Vui lòng không gửi yêu cầu nhiều lần.
+            </p>
+            <div className="mt-6 h-1.5 overflow-hidden rounded-full bg-[#e9eef7]">
+              <div className="h-full w-1/3 animate-pulse rounded-full bg-gradient-to-r from-[#175cff] to-cyan-500" />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {orderResult && !submitting && (
+        <div
+          className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-950/60 p-5"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Kết quả đặt hàng"
+        >
+          <div className="w-full max-w-md rounded-[24px] bg-white p-7 text-center shadow-2xl">
+            <div className={`mx-auto grid h-14 w-14 place-items-center rounded-full text-2xl font-black ${
+              orderResult.type === 'success'
+                ? 'bg-emerald-100 text-emerald-700'
+                : 'bg-rose-100 text-rose-700'
+            }`}>
+              {orderResult.type === 'success' ? '✓' : '!'}
+            </div>
+            <h2 className="mt-4 text-xl font-black">
+              {orderResult.type === 'success'
+                ? 'Đặt hàng thành công'
+                : 'Chưa xác nhận được đơn hàng'}
+            </h2>
+            <p className="mt-2 text-sm leading-relaxed text-slate-600">
+              {orderResult.type === 'success'
+                ? 'Đơn hàng đã được ghi nhận. Bạn có thể tiếp tục đặt hàng tại đây.'
+                : orderResult.message}
+            </p>
+            {orderResult.type === 'success' && (
+              <div className="mt-4 rounded-xl bg-blue-50 p-4 text-sm">
+                Số dư ví sau mua:
+                <strong className="ml-2 text-blue-600">
+                  {orderResult.balance === null
+                    ? 'Chưa cập nhật được'
+                    : money(orderResult.balance)}
+                </strong>
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={() => setOrderResult(null)}
+              className="mt-6 w-full rounded-xl bg-blue-600 px-5 py-3 font-bold text-white"
+            >
+              {orderResult.type === 'success' ? 'Tiếp tục đặt hàng' : 'Đóng'}
+            </button>
+          </div>
+        </div>
+      )}
 
       <SocialGuideModal
         open={guideOpen}
