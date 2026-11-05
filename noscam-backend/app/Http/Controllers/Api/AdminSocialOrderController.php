@@ -104,10 +104,16 @@ class AdminSocialOrderController extends Controller
         SocialOrder $order,
         SocialOrderProviderService $providerService
     ): JsonResponse {
-        $order = $providerService->cancel(
-            $order,
-            $request->user()?->id
-        );
+        try {
+            $order = $providerService->cancel(
+                $order,
+                $request->user()?->id
+            );
+        } catch (\RuntimeException $e) {
+            return response()->json([
+                'message' => $e->getMessage(),
+            ], 409);
+        }
 
         return response()->json([
             'message' => $order->status === 'cancelled'

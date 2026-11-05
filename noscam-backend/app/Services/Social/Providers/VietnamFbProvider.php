@@ -304,6 +304,7 @@ class VietnamFbProvider implements SocialProviderInterface
         $routes = [
             'BUFF_LIKE' => 'buff',
             'BUFF_COMMENT' => 'buff_comment',
+            'INSTAGRAM_SUB' => 'instagram',
             'BUFF_LIVE' => 'buff_live',
             'TIKTOK_VIEW' => 'tiktok_view',
             'TIKTOK_SUB' => 'tiktok_sub',
