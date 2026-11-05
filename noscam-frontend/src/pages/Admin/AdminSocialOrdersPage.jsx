@@ -305,6 +305,18 @@ export default function AdminSocialOrdersPage() {
   async function confirmCancel() {
     if (!cancelOrder?.id) return
 
+    const reasonInput = document.getElementById('noscam-refund-reason')
+    const refundReason = reasonInput?.value?.trim() || ''
+
+    const canRefundNow =
+      !cancelOrder.provider_order_id &&
+      Number(cancelOrder.attempts || 0) === 0
+
+    if (canRefundNow && !refundReason) {
+      setError('Vui lòng nhập lý do hoàn tiền.')
+      return
+    }
+
     setBusyId(cancelOrder.id)
     setError('')
 
@@ -312,6 +324,7 @@ export default function AdminSocialOrdersPage() {
       await adminService
         .cancelSocialOrder(
           cancelOrder.id,
+          refundReason,
         )
 
       setCancelOrder(null)
@@ -809,6 +822,25 @@ export default function AdminSocialOrdersPage() {
                   </p>
                 </div>
               )}
+
+              {!cancelOrder.provider_order_id &&
+                Number(cancelOrder.attempts || 0) === 0 && (
+                  <div className="mt-4">
+                    <label
+                      htmlFor="noscam-refund-reason"
+                      className="mb-2 block text-sm font-bold text-slate-700"
+                    >
+                      Lý do hoàn tiền
+                    </label>
+                    <textarea
+                      id="noscam-refund-reason"
+                      rows={3}
+                      maxLength={1000}
+                      placeholder="Ví dụ: Chưa mở công khai"
+                      className="w-full rounded-xl border border-slate-200 p-3 text-sm outline-none focus:border-blue-500"
+                    />
+                  </div>
+                )}
 
               <div className="mt-6 grid grid-cols-2 gap-3">
                 <button

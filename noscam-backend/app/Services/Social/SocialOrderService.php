@@ -519,7 +519,8 @@ class SocialOrderService
 
     public function refund(
         SocialOrder $order,
-        ?int $createdBy = null
+        ?int $createdBy = null,
+        ?string $refundReason = null
     ): SocialOrder {
         if (!$order->user_id) {
             throw new RuntimeException(
@@ -530,7 +531,8 @@ class SocialOrderService
         return DB::transaction(
             function () use (
                 $order,
-                $createdBy
+                $createdBy,
+                $refundReason
             ) {
                 $locked = SocialOrder::query()
                     ->lockForUpdate()
@@ -570,12 +572,14 @@ class SocialOrderService
                         $locked->id,
                     description:
                         'Hoàn tiền đơn '
-                        .$locked->code,
+                        .$locked->code
+                        .($refundReason ? ' - '.$refundReason : ''),
                     createdBy:
                         $createdBy,
                     meta: [
                         'order_code' =>
                             $locked->code,
+                        'refund_reason' => $refundReason,
                     ]
                 );
 

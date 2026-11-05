@@ -6,9 +6,11 @@ use App\Models\SocialOrder;
 use App\Services\Social\ProviderOrderRejectedException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 use Throwable;
 
+// NOSCAM_SOCIAL_SAFE_V1
 class SocialOrderProviderService
 {
     public function __construct(
@@ -205,6 +207,20 @@ class SocialOrderProviderService
 
                         $this->orders->refund($locked);
                     }, 3);
+
+                    Log::notice('social_order_auto_refund_before_http', [
+                        'social_order_id' => $order->id,
+                        'code' => $order->code,
+                        'reason' => $e->getMessage(),
+                    ]);
+                }
+
+                if (!($e instanceof ProviderOrderRejectedException)) {
+                    Log::warning('social_order_requires_reconciliation', [
+                        'social_order_id' => $order->id,
+                        'code' => $order->code,
+                        'reason' => mb_substr($e->getMessage(), 0, 500),
+                    ]);
                 }
 
                 $failed =
@@ -461,7 +477,8 @@ class SocialOrderProviderService
 
     public function cancel(
         SocialOrder $order,
-        ?int $createdBy = null
+        ?int $createdBy = null,
+        ?string $refundReason = null
     ): SocialOrder {
         $lock = Cache::lock(
             'social-order-operation-'.$order->id,
@@ -524,7 +541,8 @@ class SocialOrderProviderService
                 return $this->orders
                     ->refund(
                         $order,
-                        $createdBy
+                        $createdBy,
+                        $refundReason
                     );
             }
 

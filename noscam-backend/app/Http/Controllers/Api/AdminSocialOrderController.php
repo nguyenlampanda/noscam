@@ -104,10 +104,15 @@ class AdminSocialOrderController extends Controller
         SocialOrder $order,
         SocialOrderProviderService $providerService
     ): JsonResponse {
+        $data = $request->validate([
+            'reason' => 'nullable|string|max:1000',
+        ]);
+
         try {
             $order = $providerService->cancel(
                 $order,
-                $request->user()?->id
+                $request->user()?->id,
+                trim((string) ($data['reason'] ?? ''))
             );
         } catch (\RuntimeException $e) {
             return response()->json([

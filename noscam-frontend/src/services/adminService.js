@@ -575,12 +575,12 @@ export const adminService = {
     ))
   },
 
-  async cancelSocialOrder(id) {
+  async cancelSocialOrder(id, reason = '') {
     return adminRequest(
       () =>
         apiClient.post(
           `/admin/social/orders/${id}/cancel`,
-          {},
+          { reason },
           authOptions(),
         ),
     )

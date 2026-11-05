@@ -87,6 +87,11 @@ class WalletService
                 $wallet->total_refunded =
                     (float) $wallet->total_refunded
                     + $amount;
+
+                $wallet->total_spent = max(
+                    0,
+                    (float) $wallet->total_spent - $amount
+                );
             }
 
             $wallet->save();

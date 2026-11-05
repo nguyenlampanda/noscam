@@ -276,6 +276,7 @@ class VietnamFbProvider implements SocialProviderInterface
         return true;
     }
 
+    // NOSCAM_SOCIAL_SAFE_V1: validation before HTTP
     public function createOrder(
         string $serviceId,
         string $target,
@@ -285,7 +286,7 @@ class VietnamFbProvider implements SocialProviderInterface
         $parts = explode(':', $serviceId, 2);
 
         if (count($parts) !== 2) {
-            throw new RuntimeException(
+            throw new \App\Services\Social\ProviderOrderRejectedException(
                 'VietnamFB service ID không hợp lệ: '.$serviceId
             );
         }
@@ -296,7 +297,7 @@ class VietnamFbProvider implements SocialProviderInterface
         $channel = trim($channel);
 
         if ($channel === '' || !ctype_digit($channel)) {
-            throw new RuntimeException(
+            throw new \App\Services\Social\ProviderOrderRejectedException(
                 'VietnamFB channel_number không hợp lệ.'
             );
         }
@@ -311,7 +312,7 @@ class VietnamFbProvider implements SocialProviderInterface
         ];
 
         if (!isset($routes[$group])) {
-            throw new RuntimeException(
+            throw new \App\Services\Social\ProviderOrderRejectedException(
                 'VietnamFB chưa hỗ trợ tạo đơn nhóm: '.$group
             );
         }
@@ -335,7 +336,7 @@ class VietnamFbProvider implements SocialProviderInterface
             $comments = trim((string) ($options['comments'] ?? ''));
 
             if ($comments === '') {
-                throw new RuntimeException(
+                throw new \App\Services\Social\ProviderOrderRejectedException(
                     'Vui lòng nhập nội dung bình luận.'
                 );
             }
@@ -346,7 +347,7 @@ class VietnamFbProvider implements SocialProviderInterface
             ));
 
             if (count($lines) !== $quantity) {
-                throw new RuntimeException(
+                throw new \App\Services\Social\ProviderOrderRejectedException(
                     'Số lượng phải bằng số dòng bình luận.'
                 );
             }
@@ -355,13 +356,13 @@ class VietnamFbProvider implements SocialProviderInterface
         }
 
         if ($group === 'BUFF_LIVE') {
-            throw new RuntimeException(
+            throw new \App\Services\Social\ProviderOrderRejectedException(
                 'BUFF_LIVE cần tham số mins.'
             );
         }
 
         if ($group === 'TIKTOK_SUB') {
-            throw new RuntimeException(
+            throw new \App\Services\Social\ProviderOrderRejectedException(
                 'TIKTOK_SUB cần package_type.'
             );
         }
@@ -371,6 +372,31 @@ class VietnamFbProvider implements SocialProviderInterface
             'create',
             array_merge($payload, $options['payload'] ?? [])
         );
+    }
+
+
+    public function probeInstagramOrderStatus(string $orderId): array
+    {
+        $username = trim((string) $this->username);
+
+        if ($username === '' || trim($orderId) === '') {
+            throw new RuntimeException('VietnamFB thieu thong tin.');
+        }
+
+        $response = Http::asForm()
+            ->acceptJson()
+            ->timeout(20)
+            ->post(
+                $this->endpoint().'?'.http_build_query([
+                    'mc' => 'instagram_sub',
+                    'site' => 'get_info_order',
+                    'username' => $username,
+                    'api_key' => $this->apiKey,
+                ]),
+                ['ids' => $orderId]
+            );
+
+        return $this->parseResponse($response);
     }
 
     public function orderStatus(
