@@ -22,7 +22,8 @@ class SocialOrderService
         SocialService $service,
         string $target,
         int $quantity,
-        string $idempotencyKey
+        string $idempotencyKey,
+        array $options = []
     ): SocialOrder {
         if (!$service->is_active) {
             throw new RuntimeException(
@@ -36,6 +37,93 @@ class SocialOrderService
         ) {
             throw new RuntimeException(
                 'Số lượng không nằm trong giới hạn dịch vụ.'
+            );
+        }
+
+        /*
+         * Normalize options before idempotency comparison.
+         * Reject invalid combinations before wallet debit.
+         */
+        $platform = strtolower(trim((string) $service->platform));
+        $category = strtolower(trim((string) $service->category));
+
+        if ($platform === 'facebook' && $category === 'comment') {
+            if (
+                !isset($options['comments'])
+                || array_key_exists('reaction', $options)
+                || array_diff(array_keys($options), ['comments'])
+            ) {
+                throw new RuntimeException(
+                    'Vui lòng nhập nội dung bình luận hợp lệ.'
+                );
+            }
+
+            $comments = str_replace(
+                ["\r\n", "\r"],
+                "\n",
+                (string) $options['comments']
+            );
+
+            $lines = explode("\n", trim($comments));
+
+            if (
+                count($lines) !== $quantity
+                || count(array_filter(
+                    $lines,
+                    fn ($line) => trim($line) !== ''
+                )) !== $quantity
+            ) {
+                throw new RuntimeException(
+                    'Số dòng bình luận phải bằng số lượng đặt.'
+                );
+            }
+
+            $options = [
+                'comments' => implode(
+                    "\n",
+                    array_map('trim', $lines)
+                ),
+            ];
+        } elseif (
+            $platform === 'facebook'
+            && $category === 'reaction'
+        ) {
+            if (
+                array_key_exists('comments', $options)
+                || array_diff(array_keys($options), ['reaction'])
+            ) {
+                throw new RuntimeException(
+                    'Tùy chọn Reaction không hợp lệ.'
+                );
+            }
+
+            $reaction = strtoupper(
+                trim((string) ($options['reaction'] ?? 'LIKE'))
+            );
+
+            if (!in_array($reaction, [
+                'LIKE', 'LOVE', 'CARE', 'HAHA',
+                'WOW', 'SAD', 'ANGRY'
+            ], true)) {
+                throw new RuntimeException(
+                    'Cảm xúc Facebook không hợp lệ.'
+                );
+            }
+
+            $options = ['reaction' => $reaction];
+        } elseif ($options !== []) {
+            throw new RuntimeException(
+                'Dịch vụ này không hỗ trợ Comment/Reaction.'
+            );
+        }
+
+        // Temporary safety gate until VietnamFB URL support is verified.
+        if (
+            $platform === 'facebook'
+            && in_array($category, ['comment', 'reaction'], true)
+        ) {
+            throw new RuntimeException(
+                'Dịch vụ đang được kiểm tra kết nối API. Vui lòng thử lại sau.'
             );
         }
 
@@ -53,6 +141,17 @@ class SocialOrderService
             ) {
                 throw new RuntimeException(
                     'Idempotency key không hợp lệ.'
+                );
+            }
+
+            if (
+                (int) $existing->social_service_id !== (int) $service->id
+                || trim((string) $existing->target) !== trim($target)
+                || (int) $existing->quantity !== $quantity
+                || (array) ($existing->order_options ?? []) !== $options
+            ) {
+                throw new RuntimeException(
+                    'Khóa đặt đơn đã được sử dụng cho nội dung khác.'
                 );
             }
 
@@ -98,6 +197,37 @@ class SocialOrderService
             throw new RuntimeException(
                 'Dịch vụ chưa có nguồn API khả dụng.'
             );
+        }
+
+        /*
+         * Check the actual provider before charging.
+         */
+        if (
+            $platform === 'facebook'
+            && in_array($category, ['comment', 'reaction'], true)
+        ) {
+            $driver = strtolower(
+                (string) ($providerService->provider?->driver ?? '')
+            );
+
+            $providerCode = strtoupper(
+                (string) $providerService->provider_service_id
+            );
+
+            $group = explode(':', $providerCode, 2)[0];
+
+            $expectedGroup = $category === 'comment'
+                ? 'BUFF_COMMENT'
+                : 'BUFF_LIKE';
+
+            if (
+                $driver !== 'vietnamfb'
+                || $group !== $expectedGroup
+            ) {
+                throw new RuntimeException(
+                    'Dịch vụ chưa được cấu hình đúng API VietnamFB.'
+                );
+            }
         }
 
         /*
@@ -260,6 +390,7 @@ class SocialOrderService
                 $target,
                 $quantity,
                 $idempotencyKey,
+                $options,
                 $sellAmount,
                 $costAmount
             ) {
@@ -273,6 +404,18 @@ class SocialOrderService
                         ->first();
 
                 if ($existing) {
+                    if (
+                        (int) $existing->user_id !== (int) $user->id
+                        || (int) $existing->social_service_id !== (int) $service->id
+                        || trim((string) $existing->target) !== trim($target)
+                        || (int) $existing->quantity !== $quantity
+                        || (array) ($existing->order_options ?? []) !== $options
+                    ) {
+                        throw new RuntimeException(
+                            'Khóa đặt đơn đã được sử dụng cho nội dung khác.'
+                        );
+                    }
+
                     return $existing;
                 }
 
@@ -323,6 +466,9 @@ class SocialOrderService
 
                     'idempotency_key' =>
                         $idempotencyKey,
+
+                    'order_options' =>
+                        $options,
 
                     'attempts' =>
                         0,

@@ -331,9 +331,26 @@ class VietnamFbProvider implements SocialProviderInterface
         }
 
         if ($group === 'BUFF_COMMENT') {
-            throw new RuntimeException(
-                'BUFF_COMMENT cần nội dung bình luận riêng.'
-            );
+            $comments = trim((string) ($options['comments'] ?? ''));
+
+            if ($comments === '') {
+                throw new RuntimeException(
+                    'Vui lòng nhập nội dung bình luận.'
+                );
+            }
+
+            $lines = array_values(array_filter(
+                preg_split('/\r\n|\r|\n/', $comments),
+                fn ($line) => trim($line) !== ''
+            ));
+
+            if (count($lines) !== $quantity) {
+                throw new RuntimeException(
+                    'Số lượng phải bằng số dòng bình luận.'
+                );
+            }
+
+            $payload['comments'] = implode("\n", $lines);
         }
 
         if ($group === 'BUFF_LIVE') {

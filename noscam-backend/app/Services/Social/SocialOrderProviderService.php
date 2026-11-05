@@ -116,7 +116,8 @@ class SocialOrderProviderService
                         (string)
                             $order->target,
                         (int)
-                            $order->quantity
+                            $order->quantity,
+                        (array) ($order->order_options ?? [])
                     );
 
                 $providerOrderId =

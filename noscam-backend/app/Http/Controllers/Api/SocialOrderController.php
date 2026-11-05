@@ -96,6 +96,16 @@ class SocialOrderController extends Controller
                 'min:1',
                 'max:100000000',
             ],
+            'reaction' => [
+                'sometimes',
+                'string',
+                'in:LIKE,LOVE,CARE,HAHA,WOW,SAD,ANGRY',
+            ],
+            'comments' => [
+                'sometimes',
+                'string',
+                'max:100000',
+            ],
             'idempotency_key' => [
                 'required',
                 'string',
@@ -115,7 +125,11 @@ class SocialOrderController extends Controller
             target: $data['target'],
             quantity: (int) $data['quantity'],
             idempotencyKey:
-                $data['idempotency_key']
+                $data['idempotency_key'],
+            options: array_filter([
+                'reaction' => $data['reaction'] ?? null,
+                'comments' => $data['comments'] ?? null,
+            ], fn ($value) => $value !== null)
         );
 
         return response()->json([

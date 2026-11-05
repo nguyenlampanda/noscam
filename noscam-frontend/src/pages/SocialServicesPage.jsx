@@ -48,11 +48,32 @@ function createKey() {
     .slice(2)}`
 }
 
-function getOrderKey(serviceId, target, quantity) {
+function isFacebookLikeService(service) {
+  if (!service) return false
+
+  const platform = String(service.platform || '').toLowerCase()
+  const category = String(service.category || '').toLowerCase()
+  const code = String(service.code || '').toUpperCase()
+  const name = String(service.name || '').toUpperCase()
+
+  return (
+    platform === 'facebook' &&
+    (
+      category === 'like' ||
+      category === 'reaction' ||
+      code.includes('BUFF_LIKE') ||
+      name.includes('BUFF LIKE')
+    )
+  )
+}
+
+function getOrderKey(serviceId, target, quantity, options = {}) {
   const fingerprint = JSON.stringify([
     String(serviceId),
     String(target).trim(),
     Number(quantity),
+    options.reaction || '',
+    options.comments || '',
   ])
 
   const storageKey = 'noscam-social-pending-order'
@@ -235,6 +256,7 @@ export default function SocialServicesPage() {
     useState('')
 
   const [comments, setComments] = useState('')
+  const [reaction, setReaction] = useState('LIKE')
 
   const [quantity, setQuantity] =
     useState('')
@@ -641,6 +663,7 @@ export default function SocialServicesPage() {
     setSelectedId('')
     setTarget('')
     setComments('')
+    setReaction('LIKE')
     setQuantity('')
     setError('')
   }
@@ -652,6 +675,7 @@ export default function SocialServicesPage() {
     setSelectedId('')
     setTarget('')
     setComments('')
+    setReaction('LIKE')
     setQuantity('')
     setError('')
   }
@@ -661,6 +685,7 @@ export default function SocialServicesPage() {
     setServiceOpen(false)
     setTarget('')
     setComments('')
+    setReaction('LIKE')
     setError('')
 
     const service =
@@ -786,13 +811,6 @@ export default function SocialServicesPage() {
       return
     }
 
-    if (requiresComments) {
-      setError(
-        'Chức năng đặt Comment đang chờ kết nối Backend.'
-      )
-      return
-    }
-
     if (
       !/^https?:\/\/[^\s/]+\.[^\s/]+/i.test(target.trim())
     ) {
@@ -819,8 +837,21 @@ export default function SocialServicesPage() {
     setError('')
 
     try {
+      const isFacebookReaction =
+        isFacebookLikeService(selected)
+
+      const orderOptions = {
+        ...(requiresComments
+          ? { comments: commentLines.join('\n') }
+          : {}),
+        ...(isFacebookReaction
+          ? { reaction }
+          : {}),
+      }
+
       await customerService.createOrder({
         service_id: selected.id,
+        ...orderOptions,
         target: target.trim(),
         quantity:
           numericQuantity,
@@ -829,6 +860,7 @@ export default function SocialServicesPage() {
             selected.id,
             target,
             numericQuantity,
+            orderOptions,
           ),
       })
 
@@ -1569,6 +1601,40 @@ export default function SocialServicesPage() {
                           </p>
                         )}
                     </div>
+                    {isFacebookLikeService(selected) && (
+                        <div>
+                          <label className="mb-2 block text-sm font-black text-slate-700">
+                            5. Chọn cảm xúc Facebook
+                          </label>
+                          <div className="grid grid-cols-4 gap-2 sm:grid-cols-7">
+                            {[
+                              ['LIKE', '👍', 'Thích'],
+                              ['LOVE', '❤️', 'Yêu thích'],
+                              ['CARE', '🥰', 'Thương thương'],
+                              ['HAHA', '😆', 'Haha'],
+                              ['WOW', '😮', 'Wow'],
+                              ['SAD', '😢', 'Buồn'],
+                              ['ANGRY', '😡', 'Giận'],
+                            ].map(([value, emoji, label]) => (
+                              <button
+                                key={value}
+                                type="button"
+                                onClick={() => setReaction(value)}
+                                aria-pressed={reaction === value}
+                                className={`rounded-xl border p-2 text-center transition ${
+                                  reaction === value
+                                    ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200'
+                                    : 'border-slate-200 bg-white'
+                                }`}
+                              >
+                                <span className="block text-2xl">{emoji}</span>
+                                <span className="block text-xs font-semibold">{label}</span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
                     {requiresComments && (
                       <div>
                         <label className="mb-2 block text-sm font-black text-slate-700">
