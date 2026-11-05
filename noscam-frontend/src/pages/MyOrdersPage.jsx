@@ -84,7 +84,7 @@ const statusMeta = {
   },
 
   partial: {
-    label: 'Một phần',
+    label: 'Hoàn thành một phần',
     badge:
       'bg-orange-50 text-orange-600 border-orange-100',
     dot: 'bg-orange-500',
@@ -207,34 +207,60 @@ const [cancelBusyId, setCancelBusyId] = useState(null)
     useState('')
 
 
-useEffect(() => {
+  useEffect(() => {
     let active = true
+    let inFlight = false
 
-    customerService
-      .orders()
-      .then((response) => {
+    const refreshOrders = async (initial = false) => {
+      if (!active || inFlight || document.visibilityState !== 'visible') return
+      inFlight = true
+
+      try {
+        const allOrders = []
+        let page = 1
+        let lastPage = 1
+
+        do {
+          const response = await customerService.orders(page)
+          if (!active) return
+
+          const items = Array.isArray(response?.data)
+            ? response.data
+            : Array.isArray(response?.data?.data)
+              ? response.data.data
+              : []
+
+          allOrders.push(...items)
+          lastPage = Number(response?.last_page ?? response?.data?.last_page ?? 1)
+          page += 1
+        } while (page <= lastPage && page <= 100)
+
         if (!active) return
-
-        setOrders(
-          response?.data || [],
-        )
-      })
-      .catch((err) => {
-        if (!active) return
-
-        setError(
-          err?.message ||
-            'Không tải được đơn hàng.',
-        )
-      })
-      .finally(() => {
-        if (active) {
-          setLoading(false)
+        setOrders(allOrders)
+        setError('')
+      } catch (err) {
+        if (active && initial) {
+          setError(err?.message || 'Không tải được đơn hàng.')
         }
-      })
+      } finally {
+        inFlight = false
+        if (active && initial) setLoading(false)
+      }
+    }
+
+    refreshOrders(true)
+
+    const timer = window.setInterval(() => refreshOrders(), 15000)
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') refreshOrders()
+    }
+
+    document.addEventListener('visibilitychange', onVisible)
 
     return () => {
       active = false
+      window.clearInterval(timer)
+      document.removeEventListener('visibilitychange', onVisible)
     }
   }, [])
 

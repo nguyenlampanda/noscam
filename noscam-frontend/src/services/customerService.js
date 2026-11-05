@@ -208,10 +208,10 @@ const customerService = {
     )
   },
 
-  async orders() {
+  async orders(page = 1) {
     return customerRequest(() =>
       apiClient.get(
-        '/social/orders',
+        `/social/orders?page=${encodeURIComponent(page)}`,
         authOptions(),
       ),
     )

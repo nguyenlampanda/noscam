@@ -213,9 +213,11 @@ export default function AdminSocialOrdersPage() {
   }, [])
 
   const load = useCallback(
-    async () => {
-      setLoading(true)
-      setError('')
+    async (silent = false) => {
+      if (!silent) {
+        setLoading(true)
+        setError('')
+      }
 
       try {
         const response =
@@ -253,7 +255,7 @@ export default function AdminSocialOrdersPage() {
             'Không tải được đơn hàng.',
         )
       } finally {
-        setLoading(false)
+        if (!silent) setLoading(false)
       }
     },
     [auditOnly, page, search, status],
@@ -270,6 +272,17 @@ export default function AdminSocialOrdersPage() {
   useEffect(() => {
     loadAuditCount()
   }, [loadAuditCount])
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        load(true)
+        loadAuditCount()
+      }
+    }, 15000)
+
+    return () => window.clearInterval(timer)
+  }, [load, loadAuditCount])
 
   async function confirmNoRefund() {
     // NOSCAM_NO_REFUND_AUTO_REASON_V1
@@ -496,11 +509,7 @@ export default function AdminSocialOrdersPage() {
                       <div className="flex flex-col items-end gap-1">
                         <StatusBadge
                           status={
-                            item.status === 'pending' &&
-                            Number(item.attempts || 0) >= 1 &&
-                            !item.provider_order_id
-                              ? 'api_reconciliation'
-                              : item.status
+                            item.status
                           }
                         />
                         <span className="text-[11px] font-medium text-slate-400">
