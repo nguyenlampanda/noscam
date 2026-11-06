@@ -132,10 +132,146 @@ function StatusBadge({
   )
 }
 
+
+const PROVIDER_PAYMENT = {
+  vietnamfb: {
+    bank: 'Vietcombank',
+    account: '0691000399075',
+    owner: 'NGUYỄN VĂN TRUNG',
+    content: 'lam200109 vnfb',
+  },
+  sub24h: {
+    bank: 'MB Bank',
+    account: '2004556677',
+    owner: 'BUI DUC HAI',
+    content: 'SUB24H lam200109',
+  },
+  hacklike17: {
+    bank: 'Vietcombank',
+    account: 'QRPP2S1ZZZZ59102184',
+    owner: 'HKD NGUYEN VAN HOA MEDIA',
+    content: 'nguyen lam chuyen tien',
+  },
+}
+
+function getProviderPayment(provider) {
+  const slug = String(provider.slug || '').toLowerCase()
+  const driver = String(provider.driver || '').toLowerCase()
+  const name = String(provider.name || '').toLowerCase()
+
+  return Object.entries(PROVIDER_PAYMENT).find(
+    ([key]) =>
+      slug === key ||
+      driver === key ||
+      name.replace(/[^a-z0-9]/g, '').includes(key),
+  )?.[1] || null
+}
+
+function PaymentModal({ provider, payment, onClose }) {
+  const [copied, setCopied] = useState('')
+
+  async function copyValue(label, value) {
+    try {
+      await navigator.clipboard.writeText(value)
+      setCopied(label)
+    } catch {
+      setCopied('Không thể sao chép tự động')
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/60 p-4"
+      onClick={onClose}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Thông tin nạp tiền"
+        className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h3 className="text-xl font-black text-slate-950">
+              Nạp tiền {provider.name}
+            </h3>
+            <p className="mt-1 text-sm text-slate-500">
+              Chuyển khoản thủ công qua ngân hàng
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg bg-slate-100 px-3 py-2 text-sm font-bold"
+          >
+            Đóng
+          </button>
+        </div>
+
+        <div className="mt-5 space-y-3">
+          {[
+            ['Ngân hàng', payment.bank],
+            ['Số tài khoản', payment.account],
+            ['Người nhận', payment.owner],
+            ['Nội dung chuyển khoản', payment.content],
+          ].map(([label, value]) => (
+            <div
+              key={label}
+              className="rounded-2xl bg-slate-50 p-3"
+            >
+              <div className="text-xs font-bold text-slate-500">
+                {label}
+              </div>
+              <div className="mt-1 break-all font-bold text-slate-950">
+                {value}
+              </div>
+              <button
+                type="button"
+                onClick={() => copyValue(label, value)}
+                className="mt-2 text-sm font-bold text-blue-600"
+              >
+                Sao chép
+              </button>
+            </div>
+          ))}
+        </div>
+
+        {copied && (
+          <p className="mt-3 text-sm font-semibold text-blue-700">
+            {copied === 'Không thể sao chép tự động'
+              ? copied
+              : `Đã sao chép: ${copied}`}
+          </p>
+        )}
+
+        <a
+          href="https://techcombank.com"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-5 block rounded-xl bg-blue-600 px-4 py-3 text-center font-bold text-white"
+        >
+          Mở Techcombank
+        </a>
+
+        <p className="mt-3 text-xs leading-5 text-slate-500">
+          Kiểm tra đúng tên người nhận trong ứng dụng ngân hàng
+          trước khi xác nhận chuyển khoản. Nút này không tự
+          thực hiện giao dịch.
+        </p>
+      </div>
+    </div>
+  )
+}
+
 function ProviderCard({
   provider,
   onRefresh,
+  balanceStatus,
 }) {
+  const [paymentOpen, setPaymentOpen] = useState(false)
+  const payment = getProviderPayment(provider)
+
   const [editing, setEditing] =
     useState(false)
 
@@ -331,6 +467,32 @@ function ProviderCard({
               {providerBalanceVnd(
                 provider,
               )}
+            </div>
+            <div className="mt-2 text-xs font-bold">
+              {balanceStatus === 'loading' ? (
+                <span className="text-blue-600">
+                  Đang cập nhật số dư...
+                </span>
+              ) : balanceStatus === 'success' ? (
+                <span className="text-emerald-600">
+                  Đã cập nhật số dư
+                </span>
+              ) : balanceStatus === 'error' ? (
+                <span className="text-amber-600">
+                  Không cập nhật được - đang hiển thị số dư cũ
+                </span>
+              ) : (
+                <span className="text-slate-400">
+                  Số dư đã lưu
+                </span>
+              )}
+            </div>
+            <div className="mt-2 text-xs font-medium text-slate-500">
+              {provider.last_checked_at
+                ? `Lần kiểm tra: ${new Date(
+                    provider.last_checked_at,
+                  ).toLocaleString('vi-VN')}`
+                : 'Chưa có thời gian kiểm tra'}
             </div>
           </div>
 
@@ -692,6 +854,16 @@ function ProviderCard({
         )}
 
         <div className="mt-5 flex flex-wrap gap-3">
+          {payment && (
+            <button
+              type="button"
+              onClick={() => setPaymentOpen(true)}
+              className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-700"
+            >
+              Nạp tiền
+            </button>
+          )}
+
           <button
             type="button"
             disabled={
@@ -737,6 +909,13 @@ function ProviderCard({
           </button>
         </div>
       </div>
+      {paymentOpen && payment && (
+        <PaymentModal
+          provider={provider}
+          payment={payment}
+          onClose={() => setPaymentOpen(false)}
+        />
+      )}
     </motion.div>
   )
 }
@@ -747,6 +926,9 @@ export default function AdminSocialPage() {
 
   const [providers, setProviders] =
     useState([])
+
+  const [balanceStatuses, setBalanceStatuses] =
+    useState({})
 
   const [loading, setLoading] =
     useState(true)
@@ -811,7 +993,92 @@ export default function AdminSocialPage() {
   )
 
   useEffect(() => {
-    load()
+    let stopped = false
+    let running = false
+
+    async function refreshBalances() {
+      if (stopped || running || document.hidden) return
+
+      running = true
+
+      try {
+        const response = await adminService.getSocialProviders()
+        const payload =
+          response?.data?.data ??
+          response?.data ??
+          response ??
+          []
+
+        if (!Array.isArray(payload)) return
+
+        const targets = payload.filter(
+          (provider) => provider.has_api_key,
+        )
+
+        for (const provider of targets) {
+          if (stopped) break
+
+          setBalanceStatuses((previous) => ({
+            ...previous,
+            [provider.id]: 'loading',
+          }))
+
+          try {
+            await adminService.refreshSocialProviderBalance(provider.id)
+
+            if (!stopped) {
+              setBalanceStatuses((previous) => ({
+                ...previous,
+                [provider.id]: 'success',
+              }))
+            }
+          } catch (error) {
+            if (!stopped) {
+              setBalanceStatuses((previous) => ({
+                ...previous,
+                [provider.id]: 'error',
+              }))
+            }
+            console.warn(
+              'Không cập nhật được số dư provider:',
+              provider.id,
+              error?.message,
+            )
+          }
+        }
+
+        if (!stopped) {
+          const updated = await adminService.getSocialProviders()
+          const updatedPayload =
+            updated?.data?.data ??
+            updated?.data ??
+            updated ??
+            []
+
+          if (Array.isArray(updatedPayload)) {
+            setProviders(updatedPayload)
+          }
+        }
+      } catch (error) {
+        console.warn(
+          'Không thể làm mới số dư API:',
+          error?.message,
+        )
+      } finally {
+        running = false
+      }
+    }
+
+    load().then(() => {
+      if (!stopped) refreshBalances()
+    })
+
+    const interval = setInterval(refreshBalances, 60000)
+
+    return () => {
+      stopped = true
+      clearInterval(interval)
+    }
   }, [load])
 
   const data =
@@ -928,6 +1195,9 @@ export default function AdminSocialPage() {
                   }
                   onRefresh={
                     load
+                  }
+                  balanceStatus={
+                    balanceStatuses[provider.id]
                   }
                 />
               ),

@@ -318,6 +318,17 @@ export const adminService = {
     )
   },
 
+  async refreshSocialProviderBalance(id) {
+    return adminRequest(
+      () =>
+        apiClient.post(
+          `/admin/social/providers/${id}/refresh-balance`,
+          undefined,
+          authOptions(),
+        ),
+    )
+  },
+
   async syncSocialProvider(id) {
     return adminRequest(
       () =>

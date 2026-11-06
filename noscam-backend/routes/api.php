@@ -772,6 +772,11 @@ Route::prefix('admin')
         );
 
         Route::post(
+            '/social/providers/{provider}/refresh-balance',
+            [AdminSocialProviderController::class, 'refreshBalance']
+        );
+
+        Route::post(
             '/social/providers/{provider}/sync',
             [AdminSocialProviderController::class, 'sync']
         );

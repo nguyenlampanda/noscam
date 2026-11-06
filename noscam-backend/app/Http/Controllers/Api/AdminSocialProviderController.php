@@ -264,6 +264,78 @@ class AdminSocialProviderController extends Controller
         }
     }
 
+
+    public function refreshBalance(
+        SocialProvider $provider,
+        SocialProviderManager $manager
+    ): JsonResponse {
+        if (empty($provider->api_key)) {
+            return response()->json([
+                'message' => 'Nhà cung cấp chưa có API key.',
+            ], 422);
+        }
+
+        try {
+            $result = $manager
+                ->make($provider)
+                ->balance();
+
+            $balance = $this->extractBalance($result);
+
+            if (
+                $balance === null
+                || !is_finite((float) $balance)
+                || $balance < 0
+            ) {
+                return response()->json([
+                    'message' => 'API không trả về số dư hợp lệ.',
+                ], 422);
+            }
+
+            $currency = strtoupper(
+                (string) (
+                    data_get($result, 'currency')
+                    ?? data_get($result, 'data.currency')
+                    ?? $provider->currency
+                    ?? 'VND'
+                )
+            );
+
+            $provider->update([
+                'balance' => $balance,
+                'currency' => $currency,
+                'last_checked_at' => now(),
+            ]);
+
+            return response()->json([
+                'message' => 'Đã cập nhật số dư API.',
+                'data' => [
+                    'balance' => $balance,
+                    'currency' => $currency,
+                    'balance_vnd' => $balance
+                        * (float) (
+                            $provider->exchange_rate_to_vnd ?: 1
+                        ),
+                    'last_checked_at' =>
+                        $provider->last_checked_at,
+                ],
+            ]);
+        } catch (Throwable $e) {
+            Log::warning(
+                'Social provider balance refresh failed',
+                [
+                    'provider_id' => $provider->id,
+                    'driver' => $provider->driver,
+                    'error' => $e->getMessage(),
+                ]
+            );
+
+            return response()->json([
+                'message' => 'Không thể cập nhật số dư API.',
+            ], 422);
+        }
+    }
+
     public function sync(
         SocialProvider $provider,
         SocialProviderManager $manager
