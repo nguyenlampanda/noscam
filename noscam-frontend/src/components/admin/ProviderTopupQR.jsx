@@ -133,17 +133,38 @@ export default function ProviderTopupQR({ payment, providerName }) {
         </div>
       )}
 
-      <div className="min-w-0 flex-1 space-y-2">
-      <span className="block break-all text-center text-xs text-slate-600">
-        {payment.bank} - {payment.account}
-      </span>
-      <span className="block text-sm font-semibold text-slate-800">
-        {payment.content}
-      </span>
-      <span className="block text-xs text-amber-700">
-        Kiem tra nguoi nhan truoc khi chuyen tien
-      </span>
-      </div>
+      <dl className="min-w-0 flex-1 space-y-3 text-sm">
+        <div>
+          <dt className="mb-1 text-xs font-medium text-slate-500">
+            Ngân hàng
+          </dt>
+          <dd className="font-semibold text-slate-900">
+            {payment.bank}
+          </dd>
+        </div>
+
+        <div>
+          <dt className="mb-1 text-xs font-medium text-slate-500">
+            Số tài khoản
+          </dt>
+          <dd className="break-all font-semibold text-slate-900">
+            {payment.account}
+          </dd>
+        </div>
+
+        <div>
+          <dt className="mb-1 text-xs font-medium text-slate-500">
+            Nội dung chuyển khoản
+          </dt>
+          <dd className="break-words font-semibold text-slate-900">
+            {payment.content}
+          </dd>
+        </div>
+
+        <p className="text-xs text-amber-700">
+          Kiểm tra người nhận trước khi chuyển tiền.
+        </p>
+      </dl>
       </div>
     </div>
   )
