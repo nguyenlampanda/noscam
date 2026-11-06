@@ -30,7 +30,7 @@ function createProviderPayload(payment) {
   const account = String(payment.account || '')
   const memo = String(payment.content || '')
 
-  if (!bin || !/^\\d{1,19}$/.test(account) ||
+  if (!bin || !/^\d{1,19}$/.test(account) ||
       !/^[A-Za-z0-9 ]{1,50}$/.test(memo)) {
     throw new Error('Thong tin ngan hang chua ho tro VietQR')
   }
@@ -60,7 +60,7 @@ export default function ProviderTopupQR({ payment, providerName }) {
 
   const supported = Boolean(
     BANK_BIN[payment.bank] &&
-    /^\\d{1,19}$/.test(String(payment.account || ''))
+    /^\d{1,19}$/.test(String(payment.account || ''))
   )
 
   useEffect(() => {
