@@ -94,10 +94,15 @@ export default function ProviderTopupQR({ payment, providerName }) {
     ? generated.error : ''
 
   return (
-    <div className="flex flex-col items-center gap-2 rounded-xl border border-slate-200 bg-white p-3">
-      <span className="text-xs font-bold text-slate-700">
-        Quet QR nap tien
-      </span>
+    <div className="w-full max-w-2xl rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:p-5">
+      <div className="mb-3">
+        <h3 className="text-sm font-bold text-slate-900">
+          Quét QR nạp tiền
+        </h3>
+        <p className="mt-1 text-xs text-slate-500">
+          Mở ứng dụng ngân hàng để quét trực tiếp
+        </p>
+      </div>
 
       {error && (
         <span role="alert" className="text-xs text-red-600">
@@ -105,14 +110,16 @@ export default function ProviderTopupQR({ payment, providerName }) {
         </span>
       )}
 
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
       {image && (
+        <div className="flex shrink-0 flex-col items-center gap-2 rounded-xl bg-white p-3 shadow-sm">
         <>
           <img
             src={image}
             alt={'QR chuyen khoan ' + providerName}
             width={240}
             height={240}
-            className="h-60 w-60 max-w-full object-contain"
+            className="h-48 w-48 max-w-full object-contain sm:h-52 sm:w-52"
           />
 
           <a
@@ -123,17 +130,21 @@ export default function ProviderTopupQR({ payment, providerName }) {
             Luu anh QR
           </a>
         </>
+        </div>
       )}
 
-      <span className="max-w-60 break-all text-center text-xs text-slate-600">
+      <div className="min-w-0 flex-1 space-y-2">
+      <span className="block break-all text-center text-xs text-slate-600">
         {payment.bank} - {payment.account}
       </span>
-      <span className="max-w-60 text-center text-xs font-semibold text-slate-800">
+      <span className="block text-sm font-semibold text-slate-800">
         {payment.content}
       </span>
-      <span className="max-w-60 text-center text-xs text-amber-700">
+      <span className="block text-xs text-amber-700">
         Kiem tra nguoi nhan truoc khi chuyen tien
       </span>
+      </div>
+      </div>
     </div>
   )
 }

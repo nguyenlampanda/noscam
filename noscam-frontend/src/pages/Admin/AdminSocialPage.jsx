@@ -756,16 +756,25 @@ function ProviderCard({
           </motion.div>
         )}
 
-        <div className="mt-5 flex flex-wrap gap-3">
+        {payment && (
+          <div className="mt-5">
+            <ProviderTopupQR
+              payment={payment}
+              providerName={provider.name}
+            />
+          </div>
+        )}
+
+        <div className="mt-5 flex flex-wrap items-center gap-3">
           {payment && (
-            <div className="flex items-center gap-3">
+            <div className="contents">
               <a
                 href="https://dl.vietqr.io/pay?app=tcb"
                 className="inline-flex items-center justify-center rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-700"
               >
                 Nạp tiền
               </a>
-              <ProviderTopupQR payment={payment} providerName={provider.name} />
+
             </div>
           )}
 
