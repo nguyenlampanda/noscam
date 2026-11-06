@@ -25,14 +25,14 @@ function crc16(value) {
   return crc.toString(16).toUpperCase().padStart(4, '0')
 }
 
-function createProviderPayload(payment) {
+function createPayload(payment) {
   const bin = BANK_BIN[payment.bank]
   const account = String(payment.account || '')
   const memo = String(payment.content || '')
 
-  if (!bin || !/^\d{1,19}$/.test(account) ||
+  if (!bin || !/^[0-9]{1,19}$/.test(account) ||
       !/^[A-Za-z0-9 ]{1,50}$/.test(memo)) {
-    throw new Error('Thong tin ngan hang chua ho tro VietQR')
+    throw new Error('Thong tin VietQR khong hop le')
   }
 
   const accountInfo = tlv('00', bin) + tlv('01', account)
@@ -54,107 +54,86 @@ function createProviderPayload(payment) {
 }
 
 export default function ProviderTopupQR({ payment, providerName }) {
-  const [image, setImage] = useState('')
-  const [open, setOpen] = useState(false)
-  const [error, setError] = useState('')
+  const [generated, setGenerated] = useState(null)
 
-  const supported = Boolean(
-    BANK_BIN[payment.bank] &&
-    /^\d{1,19}$/.test(String(payment.account || ''))
-  )
+  const hacklike = payment.account === 'QRPP2S1ZZZZ59102184'
+  const key = JSON.stringify([
+    payment.bank, payment.account, payment.content,
+  ])
 
   useEffect(() => {
+    if (hacklike) return undefined
+
     let active = true
-    if (!supported) return undefined
 
     async function generate() {
       try {
-        const payload = createProviderPayload(payment)
-        const url = await QRCode.toDataURL(payload, {
+        const payload = createPayload(payment)
+        const image = await QRCode.toDataURL(payload, {
           width: 600,
           margin: 3,
           errorCorrectionLevel: 'M',
         })
-        if (active) {
-          setImage(url)
-          setError('')
-        }
+        if (active) setGenerated({ key, image, error: '' })
       } catch (err) {
-        if (active) setError(err.message)
+        if (active) {
+          setGenerated({ key, image: '', error: err.message })
+        }
       }
     }
 
     generate()
     return () => { active = false }
-  }, [payment, supported])
+  }, [key, hacklike])
 
-  if (!supported) {
-    return (
-      <span className="text-xs text-amber-700">
-        QR chua ho tro tai khoan nay
-      </span>
-    )
-  }
+  const image = hacklike
+    ? '/provider-qr/hacklike17.png'
+    : generated?.key === key ? generated.image : ''
+
+  const error = !hacklike && generated?.key === key
+    ? generated.error : ''
 
   return (
-    <>
-      {error && <span className="text-xs text-red-600">{error}</span>}
+    <div className="flex flex-col items-center gap-2 rounded-xl border border-slate-200 bg-white p-3">
+      <span className="text-xs font-bold text-slate-700">
+        Quet QR nap tien
+      </span>
+
+      {error && (
+        <span role="alert" className="text-xs text-red-600">
+          {error}
+        </span>
+      )}
+
       {image && (
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          aria-label={'Xem QR nap tien ' + providerName}
-          className="rounded-lg border border-slate-200 bg-white p-1.5"
-        >
-          <img src={image} alt={'VietQR ' + providerName}
-            className="h-12 w-12" />
-        </button>
-      )}
-      {open && image && (
-        <div
-          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 p-4"
-          onClick={() => setOpen(false)}
-        >
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-label={'QR nap tien ' + providerName}
-            className="max-h-[90dvh] w-full max-w-sm overflow-y-auto rounded-2xl bg-white p-5 text-center shadow-xl"
-            onClick={(event) => event.stopPropagation()}
+        <>
+          <img
+            src={image}
+            alt={'QR chuyen khoan ' + providerName}
+            width={240}
+            height={240}
+            className="h-60 w-60 max-w-full object-contain"
+          />
+
+          <a
+            href={image}
+            download={'VietQR-' + providerName + '.png'}
+            className="rounded-lg bg-slate-100 px-3 py-2 text-xs font-bold text-slate-800"
           >
-            <h3 className="text-lg font-bold text-slate-900">
-              {providerName}
-            </h3>
-            <img src={image} alt={'QR chuyen khoan ' + providerName}
-              className="mx-auto mt-3 w-full max-w-[320px]" />
-            <p className="mt-2 text-sm text-slate-700">
-              {payment.bank} - {payment.account}
-            </p>
-            <p className="mt-1 text-sm font-semibold text-slate-900">
-              {payment.content}
-            </p>
-            <p className="mt-2 text-xs text-slate-500">
-              Kiem tra ten nguoi nhan trong app ngan hang.
-              QR khong co so tien co dinh.
-            </p>
-            <div className="mt-4 flex justify-center gap-3">
-              <a href={image}
-                download={'VietQR-' + providerName + '.png'}
-                className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white"
-              >
-                Luu anh QR
-              </a>
-              <button type="button" onClick={() => setOpen(false)}
-                className="rounded-lg bg-slate-100 px-4 py-2 text-sm font-bold">
-                Dong
-              </button>
-            </div>
-            <p className="mt-3 text-xs text-slate-500">
-              Tren iPhone co the nhan giu anh de luu vao Anh.
-            </p>
-          </div>
-        </div>
+            Luu anh QR
+          </a>
+        </>
       )}
-    </>
+
+      <span className="max-w-60 break-all text-center text-xs text-slate-600">
+        {payment.bank} - {payment.account}
+      </span>
+      <span className="max-w-60 text-center text-xs font-semibold text-slate-800">
+        {payment.content}
+      </span>
+      <span className="max-w-60 text-center text-xs text-amber-700">
+        Kiem tra nguoi nhan truoc khi chuyen tien
+      </span>
+    </div>
   )
 }
