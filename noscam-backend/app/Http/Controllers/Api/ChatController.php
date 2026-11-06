@@ -24,6 +24,47 @@ class ChatController extends Controller
         return $request->user()->role === 'admin';
     }
 
+    // NOSCAM_CHAT_UNREAD_V4
+    public function customerUnread(Request $request)
+    {
+        if (!$this->isCustomer($request)) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+
+        $conversation = ChatConversation::where(
+            'customer_id', $request->user()->id
+        )->first();
+
+        $count = $conversation
+            ? $conversation->messages()
+                ->where('sender_id', '!=', $request->user()->id)
+                ->whereNull('read_at')
+                ->count()
+            : 0;
+
+        return response()->json([
+            'unread_count' => $count
+        ]);
+    }
+
+    public function adminUnread(Request $request)
+    {
+        if (!$this->isAdmin($request)) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+
+        $count = ChatMessage::query()
+            ->whereNull('read_at')
+            ->whereHas('sender', function ($query) {
+                $query->where('role', 'user');
+            })
+            ->count();
+
+        return response()->json([
+            'unread_count' => $count
+        ]);
+    }
+
     public function customerMessages(Request $request)
     {
         if (!$this->isCustomer($request)) {

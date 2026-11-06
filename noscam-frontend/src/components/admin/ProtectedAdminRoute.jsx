@@ -1,3 +1,4 @@
+import AdminFloatingChat from './AdminFloatingChat'
 import {
   useEffect,
   useState,
@@ -93,7 +94,7 @@ function ProtectedAdminRoute({
     )
   }
 
-  return children
+  return <>{children}<AdminFloatingChat /></>
 }
 
 export default ProtectedAdminRoute

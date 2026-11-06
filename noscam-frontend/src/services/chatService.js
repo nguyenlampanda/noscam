@@ -32,6 +32,12 @@ function adminAuth() {
 
 const chatService = {
   customer: {
+    unreadCount() {
+      return apiClient.get(
+        '/chat/unread-count',
+        customerAuth()
+      )
+    },
     messages() {
       return apiClient.get('/chat/messages', customerAuth())
     },
@@ -54,6 +60,12 @@ const chatService = {
   },
 
   admin: {
+    unreadCount() {
+      return apiClient.get(
+        '/admin/chat/unread-count',
+        adminAuth()
+      )
+    },
     conversations(page = 1) {
       return apiClient.get(
         `/admin/chat/conversations?page=${encodeURIComponent(page)}`,

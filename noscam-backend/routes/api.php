@@ -1017,6 +1017,11 @@ Route::prefix('admin')
     'throttle:customer-api',
 ])->group(function () {
     \Illuminate\Support\Facades\Route::get(
+        '/chat/unread-count',
+        [\App\Http\Controllers\Api\ChatController::class, 'customerUnread']
+    );
+
+    \Illuminate\Support\Facades\Route::get(
         '/chat/messages',
         [\App\Http\Controllers\Api\ChatController::class, 'customerMessages']
     );
@@ -1039,6 +1044,11 @@ Route::prefix('admin')
         'throttle:admin-api',
     ])
     ->group(function () {
+        \Illuminate\Support\Facades\Route::get(
+            '/unread-count',
+            [\App\Http\Controllers\Api\ChatController::class, 'adminUnread']
+        );
+
         \Illuminate\Support\Facades\Route::get(
             '/conversations',
             [\App\Http\Controllers\Api\ChatController::class, 'adminConversations']

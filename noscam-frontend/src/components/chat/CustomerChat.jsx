@@ -7,6 +7,7 @@ import customerService, { getCustomerToken } from '../../services/customerServic
 
 export default function CustomerChat() {
   const [open, setOpen] = useState(false)
+  const [unread, setUnread] = useState(0)
   const [messages, setMessages] = useState([])
   const [conversationId, setConversationId] = useState(null)
   const [currentUserId, setCurrentUserId] = useState(null)
@@ -17,6 +18,43 @@ export default function CustomerChat() {
   const bottomRef = useRef(null)
 
   const loggedIn = Boolean(getCustomerToken())
+
+  useEffect(() => {
+    if (!loggedIn) {
+      setUnread(0)
+      return
+    }
+
+    let active = true
+
+    async function refreshUnread() {
+      try {
+        const response = await chatService.customer.unreadCount()
+        if (!active) return
+
+        const data = response?.data ?? response
+        const count = Number(data?.unread_count ?? 0)
+
+        setUnread(Number.isFinite(count) ? Math.max(0, count) : 0)
+      } catch {
+        // Giữ giao diện ổn định khi API gặp lỗi.
+      }
+    }
+
+    if (!open) {
+      refreshUnread()
+      const timer = window.setInterval(refreshUnread, 5000)
+
+      return () => {
+        active = false
+        window.clearInterval(timer)
+      }
+    }
+
+    return () => {
+      active = false
+    }
+  }, [loggedIn, open])
 
   async function loadMessages() {
     if (!getCustomerToken()) return
@@ -64,6 +102,13 @@ export default function CustomerChat() {
         const items = data?.messages?.data ?? data?.messages ?? []
         setMessages(Array.isArray(items) ? items : [])
         setConversationId(data?.conversation_id ?? null)
+
+        try {
+          await chatService.customer.markRead()
+          if (active) setUnread(0)
+        } catch {
+          // Giữ badge nếu đánh dấu đã đọc thất bại.
+        }
       } catch (err) {
         if (active) {
           setError(err?.message || 'Không tải được tin nhắn.')
@@ -109,7 +154,9 @@ export default function CustomerChat() {
           currentUserId !== null &&
           Number(incoming.sender_id) !== Number(currentUserId)
         ) {
-          chatService.customer.markRead().catch(() => {})
+          chatService.customer.markRead()
+            .then(() => setUnread(0))
+            .catch(() => {})
         }
       }
     )
@@ -245,6 +292,14 @@ export default function CustomerChat() {
         className="ml-auto flex min-h-11 items-center gap-2 rounded-full bg-blue-600 px-3 py-2.5 text-xs font-bold text-white shadow-xl ring-2 ring-white transition hover:bg-blue-700 sm:px-5 sm:py-4 sm:text-sm"
       >
         <span aria-hidden="true">✉</span>
+        {!open && loggedIn && unread > 0 && (
+          <span
+            aria-label={`${unread} tin nhắn chưa đọc`}
+            className="absolute -right-1 -top-1 flex min-h-6 min-w-6 items-center justify-center rounded-full border-2 border-white bg-red-600 px-1 text-xs font-bold text-white"
+          >
+            {unread >= 10 ? '10+' : unread}
+          </span>
+        )}
         {open ? 'Đóng' : 'Chat'}<span className="hidden sm:inline">{open ? '' : ' hỗ trợ'}</span>
       </button>
     </div>

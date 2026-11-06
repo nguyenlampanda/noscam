@@ -45,12 +45,20 @@ export default function AdminChatPage() {
       const response = await chatService.admin.messages(conversationId)
       setMessages(extractItems(response, 'messages'))
       setError('')
+
+      try {
+        await chatService.admin.markRead(conversationId)
+        window.dispatchEvent(new Event('noscam-chat-unread-refresh'))
+        await loadConversations()
+      } catch {
+        // Không đánh dấu đã đọc nếu API thất bại.
+      }
     } catch (err) {
       setError(err?.message || 'Không tải được tin nhắn.')
     } finally {
       setLoadingMessages(false)
     }
-  }, [])
+  }, [loadConversations])
 
   useEffect(() => {
     let active = true
@@ -79,7 +87,6 @@ export default function AdminChatPage() {
   useEffect(() => {
     if (!selected) return
     loadMessages(selected.id)
-    chatService.admin.markRead(selected.id).catch(() => {})
   }, [selected, loadMessages])
 
 
@@ -114,7 +121,14 @@ export default function AdminChatPage() {
           currentUserId !== null &&
           Number(incoming.sender_id) !== Number(currentUserId)
         ) {
-          chatService.admin.markRead(selected.id).catch(() => {})
+          chatService.admin.markRead(selected.id)
+            .then(() => {
+              window.dispatchEvent(
+                new Event('noscam-chat-unread-refresh')
+              )
+              loadConversations()
+            })
+            .catch(() => {})
         }
 
         loadConversations()
@@ -180,7 +194,7 @@ export default function AdminChatPage() {
         )}
 
         <div className="grid min-h-[620px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm md:grid-cols-[320px_1fr]">
-          <aside className="border-b border-slate-200 md:border-b-0 md:border-r">
+          <aside className={`${selected ? "hidden md:block" : "block"} border-b border-slate-200 md:border-b-0 md:border-r`}>
             <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
               <h2 className="font-bold">Cuộc trò chuyện</h2>
               <button
@@ -219,7 +233,7 @@ export default function AdminChatPage() {
                     </span>
                     {conversation.unread_count > 0 && (
                       <span className="rounded-full bg-blue-600 px-2 py-0.5 text-xs text-white">
-                        {conversation.unread_count}
+                        {conversation.unread_count >= 10 ? '10+' : conversation.unread_count}
                       </span>
                     )}
                   </div>
@@ -231,7 +245,7 @@ export default function AdminChatPage() {
             </div>
           </aside>
 
-          <section className="flex min-h-[540px] flex-col">
+          <section className={`${selected ? "flex" : "hidden md:flex"} min-h-[540px] flex-col`}>
             {!selected ? (
               <div className="flex flex-1 items-center justify-center p-8 text-center text-slate-500">
                 Chọn một cuộc trò chuyện để xem tin nhắn.
@@ -239,6 +253,13 @@ export default function AdminChatPage() {
             ) : (
               <>
                 <header className="border-b border-slate-100 px-5 py-4">
+                  <button
+                    type="button"
+                    onClick={() => setSelected(null)}
+                    className="mb-3 rounded-lg bg-blue-50 px-3 py-2 text-sm font-bold text-blue-700 md:hidden"
+                  >
+                    ← Quay lại danh sách
+                  </button>
                   <h2 className="font-bold text-slate-900">
                     {selected.customer?.name ||
                       `Khách hàng #${selected.customer_id}`}

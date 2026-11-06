@@ -602,9 +602,14 @@ export default function AdminSocialOrdersPage() {
                         </div>
                         <div className="mt-1 text-xs text-slate-400">
                           #{item.id}
-                          {item.user?.username
-                            ? ` · @${item.user.username}`
-                            : ''}
+                          {' · Tài khoản #' + (item.user_id ?? item.user?.id ?? '—')}
+                          {item.user?.username ? ` · @${item.user.username}` : ''}
+                        </div>
+                        <div className="mt-2 text-xs font-semibold text-slate-700">
+                          Người đặt: {item.user?.name || 'Chưa có tên'}
+                        </div>
+                        <div className="mt-1 break-all text-xs text-slate-500">
+                          {item.user?.email || 'Chưa có email'}
                         </div>
                       </div>
 
