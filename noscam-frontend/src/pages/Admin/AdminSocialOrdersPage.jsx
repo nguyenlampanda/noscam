@@ -25,6 +25,108 @@ function number(value) {
   ).toLocaleString('vi-VN')
 }
 
+
+// NOSCAM_ORDER_PROGRESS_V2
+function OrderProgress({ item }) {
+  const readNumber = (value) => {
+    if (value === null || value === undefined || value === '') {
+      return null
+    }
+
+    const n = Number(value)
+    return Number.isFinite(n) && n >= 0 ? n : null
+  }
+
+  const quantity = readNumber(item.quantity)
+  const start = readNumber(item.start_count)
+  const remains = readNumber(item.remains)
+
+  const validProgress =
+    quantity !== null &&
+    quantity > 0 &&
+    remains !== null &&
+    remains <= quantity
+
+  const delivered = validProgress
+    ? quantity - remains
+    : null
+
+  const percent = validProgress
+    ? Math.min(100, Math.max(0, delivered / quantity * 100))
+    : null
+
+  const formatNumber = (value) =>
+    value === null
+      ? 'Chưa có dữ liệu'
+      : value.toLocaleString('vi-VN')
+
+  const fields = [
+    { label: 'Start count', value: start },
+    { label: 'Số lượng đặt', value: quantity },
+    { label: 'Đã tăng', value: delivered },
+    { label: 'Còn lại', value: remains },
+  ]
+
+  const syncedAt = item.last_synced_at
+    ? new Date(item.last_synced_at)
+    : null
+
+  return (
+    <section className="mt-4 min-w-0 rounded-2xl border border-blue-100 bg-blue-50/40 p-3 sm:p-4">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <h3 className="text-sm font-black text-slate-900">
+          Tiến độ đơn hàng
+        </h3>
+
+        <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-blue-700">
+          {percent === null
+            ? 'Chưa có tiến độ'
+            : `${percent.toLocaleString('vi-VN', {
+                maximumFractionDigits: 1,
+              })}%`}
+        </span>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {fields.map((field) => (
+          <div
+            key={field.label}
+            className="min-w-0 rounded-xl border border-slate-100 bg-white p-3"
+          >
+            <p className="text-[11px] font-semibold text-slate-500">
+              {field.label}
+            </p>
+
+            <p className="mt-1 break-words text-base font-black tabular-nums text-slate-950">
+              {formatNumber(field.value)}
+            </p>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-slate-200">
+        <div
+          className="h-full rounded-full bg-blue-600 transition-all duration-300"
+          style={{ width: `${percent ?? 0}%` }}
+        />
+      </div>
+
+      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-500">
+        <span>
+          Cập nhật API:{' '}
+          {syncedAt && !Number.isNaN(syncedAt.getTime())
+            ? syncedAt.toLocaleString('vi-VN')
+            : 'Chưa có dữ liệu'}
+        </span>
+
+        <span>
+          Mã đơn API: {item.provider_order_id || 'Chưa có'}
+        </span>
+      </div>
+    </section>
+  )
+}
+
 function margin(item) {
   const sell = Number(
     item.sell_amount || 0,
@@ -590,6 +692,8 @@ export default function AdminSocialOrdersPage() {
                         </div>
                       </div>
                     </div>
+
+                    <OrderProgress item={item} />
 
                     <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-100 bg-slate-50/70 p-3">
                       <div className="min-w-0">
