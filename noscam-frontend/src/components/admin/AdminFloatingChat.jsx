@@ -175,18 +175,27 @@ export default function AdminFloatingChat() {
               </div>
 
               <div className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-slate-50 p-3">
-                {messages.map((message) => (
-                  <div key={message.id} className="rounded-xl border border-slate-200 bg-white p-3">
-                    <p className="mb-1 text-xs font-semibold text-slate-500">
-                      {Number(message.sender_id) === Number(selected.customer_id)
-                        ? 'Khách hàng'
-                        : 'Admin'}
-                    </p>
-                    <p className="whitespace-pre-wrap break-words text-sm text-slate-800">
-                      {message.body}
-                    </p>
-                  </div>
-                ))}
+                {messages.map((message) => {
+                  const isCustomer =
+                    Number(message.sender_id) === Number(selected.customer_id)
+
+                  return (
+                    <div
+                      key={message.id}
+                      className={`flex ${isCustomer ? 'justify-start' : 'justify-end'}`}
+                    >
+                      <div
+                        className={`max-w-[82%] whitespace-pre-wrap break-words rounded-2xl px-4 py-3 text-sm shadow-sm ${
+                          isCustomer
+                            ? 'rounded-bl-md border border-slate-200 bg-white text-slate-800'
+                            : 'rounded-br-md bg-blue-600 text-white'
+                        }`}
+                      >
+                        {message.body}
+                      </div>
+                    </div>
+                  )
+                })}
                 <div ref={bottomRef} />
               </div>
 
