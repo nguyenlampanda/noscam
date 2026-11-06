@@ -560,6 +560,136 @@ class VietnamFbProvider implements SocialProviderInterface
         ];
     }
 
+
+    // NOSCAM_VIETNAMFB_AUTO_SYNC_V1
+    // Read-only provider status lookup; never submits an order.
+    public function orderStatusForService(
+        string $orderId,
+        string $serviceId
+    ): array {
+        $group = strtoupper(trim(explode(':', $serviceId, 2)[0]));
+
+        $routes = [
+            'BUFF_SUB' => 'buff_sub',
+            'BUFF_LIKE' => 'buff_like',
+            'BUFF_COMMENT' => 'buff_comment',
+            'BUFF_LIVE' => 'buff_live',
+            'BUFF_VIEW_NEW' => 'buff_view_new',
+            'LIKE_PAGE2' => 'like_page2',
+            'LIKEPAGE_2' => 'like_page2',
+            'INSTAGRAM_SUB' => 'instagram_sub',
+            'INSTAGRAM_FOLLOW' => 'instagram_sub',
+            'INSTAGRAM_LIKE' => 'instagram_like',
+            'TIKTOK_SUB' => 'tiktok_sub',
+            'TIKTOK_FOLLOW' => 'tiktok_sub',
+            'VIPLIKE' => 'viplike',
+            'VIPCMT' => 'vipcmt',
+            'VIPMAT' => 'vipmat',
+            'COVID_LIKEPOST' => 'covid_likepost',
+            'COVID_LIKEPOST4' => 'covid_likepost4',
+        ];
+
+        $mc = $routes[$group] ?? null;
+
+        if ($mc === null) {
+            throw new RuntimeException(
+                'VietnamFB status route not configured: '.$group
+            );
+        }
+
+        $username = trim((string) $this->username);
+
+        if (
+            $username === '' ||
+            trim($this->apiKey) === '' ||
+            trim($orderId) === ''
+        ) {
+            throw new RuntimeException(
+                'VietnamFB status credentials/order ID missing.'
+            );
+        }
+
+        $response = Http::asForm()
+            ->acceptJson()
+            ->timeout(20)
+            ->post(
+                $this->endpoint().'?'.http_build_query([
+                    'mc' => $mc,
+                    'site' => 'get_info_order',
+                    'username' => $username,
+                    'api_key' => $this->apiKey,
+                ]),
+                ['ids' => $orderId]
+            );
+
+        $json = $this->parseResponse($response);
+
+        if ((int) ($json['success'] ?? 0) !== 1) {
+            throw new RuntimeException(
+                'VietnamFB status API unsuccessful.'
+            );
+        }
+
+        $data = $json['data'] ?? null;
+
+        if (
+            !is_array($data) ||
+            count($data) !== 1 ||
+            !isset($data[0]) ||
+            !is_array($data[0])
+        ) {
+            throw new RuntimeException(
+                'VietnamFB status response structure invalid.'
+            );
+        }
+
+        $item = $data[0];
+
+        if ((string) ($item['id'] ?? '') !== $orderId) {
+            throw new RuntimeException(
+                'VietnamFB status order ID mismatch.'
+            );
+        }
+
+        $rawStatus = strtoupper(trim(
+            (string) ($item['status'] ?? '')
+        ));
+
+        $status = match ($rawStatus) {
+            'THANH_CONG' => 'completed',
+            'DANG_XU_LY' => 'in_progress',
+            default => '',
+        };
+
+        $result = [
+            'status' => $status,
+            'vietnamfb_status' => $rawStatus,
+            'vietnamfb_data' => $item,
+        ];
+
+        if (
+            isset($item['first_count']) &&
+            ctype_digit((string) $item['first_count'])
+        ) {
+            $result['start_count'] = (int) $item['first_count'];
+        }
+
+        if (
+            isset($item['quantity'], $item['run_count']) &&
+            ctype_digit((string) $item['quantity']) &&
+            ctype_digit((string) $item['run_count'])
+        ) {
+            $quantity = (int) $item['quantity'];
+            $runCount = (int) $item['run_count'];
+
+            if ($quantity > 0 && $runCount <= $quantity) {
+                $result['remains'] = $quantity - $runCount;
+            }
+        }
+
+        return $result;
+    }
+
     public function refill(
         string $orderId
     ): array {

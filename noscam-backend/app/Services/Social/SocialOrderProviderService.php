@@ -303,25 +303,8 @@ class SocialOrderProviderService
                 return $order;
             }
 
-            if (
-                $order->provider->driver === 'vietnamfb'
-            ) {
-                $providerServiceId = strtoupper(trim(
-                    (string) (
-                        $order->providerService?->provider_service_id
-                        ?? ''
-                    )
-                ));
-
-                if (
-                    !preg_match(
-                        '/^INSTAGRAM_SUB:[0-9]+$/',
-                        $providerServiceId
-                    )
-                ) {
-                    return $order;
-                }
-            }
+            // NOSCAM_VIETNAMFB_AUTO_SYNC_V1
+            // VietnamFB is synced using its actual service group.
 
             $api =
                 $this->providers->make(
@@ -329,11 +312,14 @@ class SocialOrderProviderService
                 );
 
             $response =
-                $api->orderStatus(
-                    (string)
-                        $order
-                            ->provider_order_id
-                );
+                $order->provider->driver === 'vietnamfb'
+                    ? $api->orderStatusForService(
+                        (string) $order->provider_order_id,
+                        (string) ($order->providerService?->provider_service_id ?? '')
+                    )
+                    : $api->orderStatus(
+                        (string) $order->provider_order_id
+                    );
 
             $providerStatus =
                 strtolower(
