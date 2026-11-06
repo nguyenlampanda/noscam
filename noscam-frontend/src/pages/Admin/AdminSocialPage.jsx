@@ -12,6 +12,7 @@ import {
 import AdminNav from '../../components/admin/AdminNav'
 import SocialAdminNav from '../../components/admin/social/SocialAdminNav'
 import adminService from '../../services/adminService'
+import ProviderTopupQR from '../../components/admin/ProviderTopupQR'
 
 function money(value) {
   return new Intl.NumberFormat(
@@ -757,12 +758,15 @@ function ProviderCard({
 
         <div className="mt-5 flex flex-wrap gap-3">
           {payment && (
-            <a
-              href="https://dl.vietqr.io/pay?app=tcb"
-              className="inline-flex items-center justify-center rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-700"
-            >
-              Nạp tiền
-            </a>
+            <div className="flex items-center gap-3">
+              <a
+                href="https://dl.vietqr.io/pay?app=tcb"
+                className="inline-flex items-center justify-center rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-700"
+              >
+                Nạp tiền
+              </a>
+              <ProviderTopupQR payment={payment} providerName={provider.name} />
+            </div>
           )}
 
           <button
