@@ -321,6 +321,7 @@ class VietnamFbProvider implements SocialProviderInterface
         // NOSCAM_VIETNAMFB_FULL_ROUTES_V1
         // Mapping theo Postman Collection VietnamFB.
         $routes = [
+            'GROUP_MEMBER' => ['group_member', 'create', 'id'],
             'BUFF_LIKE' => ['buff', 'create', 'id'],
             'BUFF_COMMENT' => ['buff_comment', 'create', 'id'],
             'BUFF_SUB' => ['buff_sub', 'create', 'id'],
