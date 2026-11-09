@@ -86,7 +86,13 @@ class SocialOrderService
             ];
         } elseif (
             $platform === 'facebook'
-            && $category === 'reaction'
+            && (
+                $category === 'reaction'
+                || (
+                    $category === 'like'
+                    && (string) $service->code === 'FACEBOOK_LIKE_BUFF_LIKE_KENH_1'
+                )
+            )
         ) {
             if (
                 array_key_exists('comments', $options)

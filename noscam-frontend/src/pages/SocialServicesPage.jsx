@@ -227,6 +227,15 @@ function AnimatedCategoryIcon({ category, className = '' }) {
   )
 }
 
+
+// NOSCAM_CHANNEL_REACTION_V3
+function supportsChannelReaction(service) {
+  const code = String(service?.code || '').toUpperCase()
+  if (code === 'FACEBOOK_LIKE_BUFF_LIKE_VIET_KENH_4') return false
+  if (code === 'FACEBOOK_LIKE_BUFF_LIKE_KENH_1') return true
+  return isFacebookLikeService(service)
+}
+
 export default function SocialServicesPage() {
   // NOSCAM_SOCIAL_GUIDE_V2
   const [guideOpen, setGuideOpen] = useState(false)
@@ -848,7 +857,7 @@ export default function SocialServicesPage() {
 
     try {
       const isFacebookReaction =
-        isFacebookLikeService(selected)
+        supportsChannelReaction(selected)
 
       const orderOptions = {
         ...(requiresComments
@@ -1625,7 +1634,7 @@ export default function SocialServicesPage() {
                           </p>
                         )}
                     </div>
-                    {isFacebookLikeService(selected) && (
+                    {supportsChannelReaction(selected) && (
                         <div>
                           <label className="mb-2 block text-sm font-black text-slate-700">
                             5. Chọn cảm xúc Facebook
