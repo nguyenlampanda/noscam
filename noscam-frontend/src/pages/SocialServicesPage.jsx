@@ -848,8 +848,7 @@ export default function SocialServicesPage() {
 
     try {
       const isFacebookReaction =
-        String(selected?.platform || '').toLowerCase() === 'facebook' &&
-        String(selected?.category || '').toLowerCase() === 'reaction'
+        isFacebookLikeService(selected)
 
       const orderOptions = {
         ...(requiresComments
@@ -1626,8 +1625,7 @@ export default function SocialServicesPage() {
                           </p>
                         )}
                     </div>
-                    {String(selected?.platform || '').toLowerCase() === 'facebook' &&
-                      String(selected?.category || '').toLowerCase() === 'reaction' && (
+                    {isFacebookLikeService(selected) && (
                         <div>
                           <label className="mb-2 block text-sm font-black text-slate-700">
                             5. Chọn cảm xúc Facebook
