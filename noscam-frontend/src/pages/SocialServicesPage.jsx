@@ -230,9 +230,30 @@ function AnimatedCategoryIcon({ category, className = '' }) {
 
 // NOSCAM_CHANNEL_REACTION_V3
 function supportsChannelReaction(service) {
-  const code = String(service?.code || '').toUpperCase()
-  if (code === 'FACEBOOK_LIKE_BUFF_LIKE_VIET_KENH_4') return false
-  if (code === 'FACEBOOK_LIKE_BUFF_LIKE_KENH_1') return true
+  if (!service) return false
+
+  const code = String(service.code || '').toUpperCase()
+  const name = String(service.name || '').toUpperCase()
+  const platform = String(service.platform || '').toLowerCase()
+
+  if (platform !== 'facebook') return false
+
+  // Kênh 4 chỉ hỗ trợ LIKE.
+  if (
+    code === 'FACEBOOK_LIKE_BUFF_LIKE_VIET_KENH_4' ||
+    (name.includes('BUFF LIKE') && /KÊNH\s*4\b/.test(name))
+  ) {
+    return false
+  }
+
+  // Kênh 1 hỗ trợ 7 cảm xúc.
+  if (
+    code === 'FACEBOOK_LIKE_BUFF_LIKE_KENH_1' ||
+    (name.includes('BUFF LIKE') && /KÊNH\s*1\b/.test(name))
+  ) {
+    return true
+  }
+
   return isFacebookLikeService(service)
 }
 
