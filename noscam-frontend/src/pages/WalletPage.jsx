@@ -100,8 +100,19 @@ export default function WalletPage() {
   }, [sortedHistory, safeHistoryPage])
 
 
+  // NOSCAM_TOPUP_QR_V1
   const [amount, setAmount] =
     useState('')
+
+  const [selectedBank, setSelectedBank] = useState('techcombank')
+
+  const vietinUsername = String(user?.username || '').trim()
+  const vietinContent = /^[a-zA-Z0-9_.-]{1,50}$/.test(vietinUsername)
+    ? `NOSCAM ${vietinUsername}`
+    : ''
+
+  // Chỉ bật khi backend SePay đã kiểm thử và triển khai.
+  const vietinReady = false
 
   const [loading, setLoading] =
     useState(true)
@@ -153,55 +164,35 @@ export default function WalletPage() {
     load()
   }, [load])
 
-  const transferContent =
-    useMemo(() => {
-      if (!user?.username) {
-        return 'NOSCAM'
-      }
-
-      return `NOSCAM ${user.username}`
-        .replace(
-          /[^a-zA-Z0-9 ]/g,
-          '',
-        )
-        .slice(0, 25)
-    }, [user])
+  const transferContent = vietinContent
 
   const numericAmount =
     Number(amount) || 0
 
   const qrUrl = useMemo(() => {
-    if (numericAmount < 10000) {
-      return ''
-    }
+    if (
+      !transferContent ||
+      !Number.isInteger(numericAmount) ||
+      numericAmount < 10000 ||
+      numericAmount > 100000000
+    ) return ''
 
-    const params =
-      new URLSearchParams({
-        amount:
-          String(
-            Math.round(
-              numericAmount,
-            ),
-          ),
+    const bank = selectedBank === 'vietinbank'
+      ? {
+          bankId: 'ICB',
+          accountNumber: '888838906789',
+          accountName: 'NGUYEN LAM'
+        }
+      : BANK
 
-        addInfo:
-          transferContent,
+    const params = new URLSearchParams({
+      amount: String(numericAmount),
+      addInfo: transferContent,
+      accountName: bank.accountName
+    })
 
-        accountName:
-          BANK.accountName,
-      })
-
-    return (
-      `https://img.vietqr.io/image/` +
-      `${BANK.bankId}-` +
-      `${BANK.accountNumber}-` +
-      `compact2.png?` +
-      params.toString()
-    )
-  }, [
-    numericAmount,
-    transferContent,
-  ])
+    return `https://img.vietqr.io/image/${bank.bankId}-${bank.accountNumber}-compact2.png?${params.toString()}`
+  }, [numericAmount, transferContent, selectedBank])
 
   if (loading) {
     return (
@@ -279,6 +270,48 @@ export default function WalletPage() {
           )}
         </div>
 
+        <div className="mt-7 grid gap-3 sm:grid-cols-2">
+          <button
+            type="button"
+            onClick={() => setSelectedBank('techcombank')}
+            className={`rounded-2xl border p-5 text-left transition ${
+              selectedBank === 'techcombank'
+                ? 'border-blue-500 bg-blue-50'
+                : 'border-slate-200 bg-white hover:border-blue-200'
+            }`}
+          >
+            <div className="text-base font-black text-slate-900">
+              Techcombank
+            </div>
+            <div className="mt-1 text-sm text-slate-500">
+              Nạp tiền thủ công
+            </div>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setSelectedBank('vietinbank')}
+            className={`rounded-2xl border p-5 text-left transition ${
+              selectedBank === 'vietinbank'
+                ? 'border-emerald-500 bg-emerald-50'
+                : 'border-slate-200 bg-white hover:border-emerald-200'
+            }`}
+          >
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-base font-black text-slate-900">
+                VietinBank
+              </span>
+              <span className="rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-black text-emerald-700">
+                TỰ ĐỘNG
+              </span>
+            </div>
+            <div className="mt-1 text-sm font-semibold text-emerald-700">
+              Nạp tiền tự động
+            </div>
+          </button>
+        </div>
+
+        {selectedBank === 'techcombank' ? (
         <div className="mt-7 grid gap-6 lg:grid-cols-2">
           <div className="rounded-3xl border border-slate-200 bg-white p-6">
             <div className="text-sm font-black uppercase tracking-[0.15em] text-blue-600">
@@ -302,11 +335,10 @@ export default function WalletPage() {
                 type="number"
                 min="10000"
                 value={amount}
-                onChange={(e) =>
-                  setAmount(
-                    e.target.value,
-                  )
-                }
+                onChange={(e) => {
+                  setAmount(e.target.value)
+                                    
+                }}
                 placeholder="100000"
                 className="w-full rounded-2xl border border-slate-200 px-4 py-4 pr-12 text-xl font-black outline-none focus:border-blue-500"
               />
@@ -325,11 +357,10 @@ export default function WalletPage() {
                 <button
                   key={value}
                   type="button"
-                  onClick={() =>
-                    setAmount(
-                      String(value),
-                    )
-                  }
+                  onClick={() => {
+                    setAmount(String(value))
+                                        
+                  }}
                   className="rounded-xl bg-slate-50 px-2 py-3 text-xs font-black transition hover:bg-blue-50 hover:text-blue-600"
                 >
                   {money(value)}
@@ -433,18 +464,15 @@ export default function WalletPage() {
                   </div>
                 </div>
 
-                <CopyButton
-                  value={
-                    transferContent
-                  }
-                />
+                {transferContent && (
+                  <CopyButton value={transferContent} />
+                )}
               </div>
             </div>
           </div>
 
           <div className="flex min-h-[520px] items-center justify-center rounded-3xl border border-slate-200 bg-white p-6">
-            {numericAmount >=
-            10000 ? (
+            {qrUrl ? (
               <motion.div
                 key={qrUrl}
                 initial={{
@@ -509,7 +537,231 @@ export default function WalletPage() {
             )}
           </div>
         </div>
+        ) : (
+          <div className="mt-7 grid gap-6 lg:grid-cols-2">
+          <div className="rounded-3xl border border-slate-200 bg-white p-6">
+            <div className="text-sm font-black uppercase tracking-[0.15em] text-blue-600">
+              Nạp tiền
+            </div>
 
+            <h2 className="mt-2 text-2xl font-black">
+              Nhập số tiền
+            </h2>
+
+            <p className="mt-2 text-sm text-slate-500">
+              QR chuyển khoản sẽ được tạo tự động.
+            </p>
+
+            <label className="mt-6 block text-sm font-bold">
+              Số tiền muốn nạp
+            </label>
+
+            <div className="relative mt-2">
+              <input
+                type="number"
+                min="10000"
+                value={amount}
+                onChange={(e) => {
+                  setAmount(e.target.value)
+                                    
+                }}
+                placeholder="100000"
+                className="w-full rounded-2xl border border-slate-200 px-4 py-4 pr-12 text-xl font-black outline-none focus:border-blue-500"
+              />
+
+              <span className="absolute right-4 top-1/2 -translate-y-1/2 font-black text-slate-400">
+                đ
+              </span>
+            </div>
+
+            <div className="mt-3 grid grid-cols-3 gap-2">
+              {[
+                50000,
+                100000,
+                200000,
+              ].map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => {
+                    setAmount(String(value))
+                                        
+                  }}
+                  className="rounded-xl bg-slate-50 px-2 py-3 text-xs font-black transition hover:bg-blue-50 hover:text-blue-600"
+                >
+                  {money(value)}
+                </button>
+              ))}
+            </div>
+
+            <div className="mt-6 space-y-3">
+              <div className="flex items-center justify-between rounded-2xl bg-slate-50 p-4">
+                <div>
+                  <div className="text-xs font-bold text-slate-400">
+                    NGÂN HÀNG
+                  </div>
+                  <div className="mt-3 flex min-w-0 items-center gap-3 sm:gap-4">
+                    {/* NOSCAM_VIETIN_ICON_V1 */}
+                    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white shadow-lg shadow-slate-900/10 ring-1 ring-slate-100 sm:h-16 sm:w-16">
+                      <svg
+                        viewBox="0 0 64 64"
+                        className="h-11 w-11 sm:h-12 sm:w-12"
+                        role="img"
+                        aria-label="Biểu tượng VietinBank"
+                      >
+                        <circle
+                          cx="32"
+                          cy="32"
+                          r="27"
+                          fill="#0066A6"
+                        />
+                        <path
+                          d="M14 24 L25 43 L33 43 L44 24 L36 24 L29 36 L22 24 Z"
+                          fill="white"
+                        />
+                        <circle
+                          cx="45"
+                          cy="18"
+                          r="9"
+                          fill="#E32736"
+                        />
+                      </svg>
+                    </div>
+
+                    <div className="min-w-0">
+                      <div className="text-base font-black text-slate-950 sm:text-lg">
+                        VietinBank
+                      </div>
+                      <div className="mt-1 text-[10px] font-black tracking-[0.18em] text-[#0066A6] sm:text-xs">
+                        NẠP TIỀN TỰ ĐỘNG
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between gap-4 rounded-2xl bg-slate-50 p-4">
+                <div>
+                  <div className="text-xs font-bold text-slate-400">
+                    SỐ TÀI KHOẢN
+                  </div>
+
+                  <div className="mt-1 text-xl font-black">
+                    888838906789
+                  </div>
+                </div>
+
+                <CopyButton
+                  value="888838906789"
+                >
+                  Copy STK
+                </CopyButton>
+              </div>
+
+              <div className="flex items-center justify-between rounded-2xl bg-slate-50 p-4">
+                <div>
+                  <div className="text-xs font-bold text-slate-400">
+                    CHỦ TÀI KHOẢN
+                  </div>
+
+                  <div className="mt-1 font-black">
+                    NGUYEN LAM
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between gap-4 rounded-2xl border border-blue-200 bg-blue-50 p-4">
+                <div>
+                  <div className="text-xs font-bold text-blue-500">
+                    NỘI DUNG
+                  </div>
+
+                  <div className="mt-1 font-black text-blue-700">
+                    {transferContent}
+                  </div>
+                </div>
+
+                {transferContent && (
+                  <CopyButton value={transferContent} />
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex min-h-[520px] items-center justify-center rounded-3xl border border-slate-200 bg-white p-6">
+            {qrUrl ? (
+              <motion.div
+                key={qrUrl}
+                initial={{
+                  opacity: 0,
+                  scale: 0.96,
+                }}
+                animate={{
+                  opacity: 1,
+                  scale: 1,
+                }}
+                className="w-full text-center"
+              >
+                <div className="text-sm font-black uppercase tracking-[0.15em] text-blue-600">
+                  Quét mã để chuyển khoản
+                </div>
+
+                <div className="mx-auto mt-5 max-w-[360px] overflow-hidden rounded-3xl border border-slate-100 bg-white p-3 shadow-lg shadow-slate-950/5">
+                  <img
+                    src={qrUrl}
+                    alt="QR chuyển khoản VietinBank"
+                    className="w-full"
+                  />
+                </div>
+
+                <div className="mt-5 text-3xl font-black text-blue-600">
+                  {money(
+                    numericAmount,
+                  )}
+                </div>
+
+                <p className="mt-2 text-sm text-slate-500">
+                  VietinBank • 888838906789
+                </p>
+
+                <p className="mt-1 text-sm font-bold text-slate-700">
+                  {transferContent}
+                </p>
+
+                
+                {!vietinReady && (
+                  <p className="mx-auto mt-3 max-w-sm rounded-2xl bg-amber-50 p-3 text-sm text-amber-800">
+                    Nạp tự động chưa được kích hoạt.
+                    Vui lòng chưa chuyển tiền thật.
+                  </p>
+                )}
+<div className="mx-auto mt-5 max-w-sm rounded-2xl bg-amber-50 p-4 text-sm leading-6 text-amber-800">
+                  Kiểm tra đúng tên người nhận
+                  <strong>
+                    {' '}
+                    NGUYEN LAM
+                  </strong>{' '}
+                  trước khi chuyển tiền.
+                </div>
+              </motion.div>
+            ) : (
+              <div className="text-center">
+                <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-3xl bg-slate-100 text-4xl">
+                  ▦
+                </div>
+
+                <h3 className="mt-5 text-xl font-black">
+                  QR chuyển khoản
+                </h3>
+
+                <p className="mt-2 text-sm text-slate-400">
+                  Nhập số tiền từ 10.000đ để tạo QR.
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+        )}
 
         {/* NOSCAM_WALLET_HISTORY_CSS_V4 */}
         <section className="mt-7 overflow-hidden rounded-3xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-900/5 sm:p-6">
