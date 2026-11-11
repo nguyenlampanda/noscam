@@ -571,6 +571,7 @@ class VietnamFbProvider implements SocialProviderInterface
         $group = strtoupper(trim(explode(':', $serviceId, 2)[0]));
 
         $routes = [
+            'GROUP_MEMBER' => 'group_member',
             'BUFF_SUB' => 'buff_sub',
             'BUFF_LIKE' => 'buff_like',
             'BUFF_COMMENT' => 'buff_comment',
