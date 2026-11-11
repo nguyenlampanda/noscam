@@ -164,7 +164,9 @@ export default function WalletPage() {
     load()
   }, [load])
 
-  const transferContent = vietinContent
+  const transferContent = selectedBank === 'vietinbank'
+    ? (vietinContent ? `SEVQR ${vietinContent}` : '')
+    : vietinContent
 
   const numericAmount =
     Number(amount) || 0
