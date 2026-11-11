@@ -112,7 +112,7 @@ export default function WalletPage() {
     : ''
 
   // Chỉ bật khi backend SePay đã kiểm thử và triển khai.
-  const vietinReady = false
+  const vietinReady = true
 
   const [loading, setLoading] =
     useState(true)
