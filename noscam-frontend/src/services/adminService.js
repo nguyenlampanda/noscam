@@ -104,6 +104,47 @@ export const adminService = {
     }
   },
 
+  async getFinancePromotions() {
+    return adminRequest(() =>
+      apiClient.get('/admin/finance/promotions', authOptions()),
+    )
+  },
+
+  async createFinancePromotion(data) {
+    return adminRequest(() =>
+      apiClient.post('/admin/finance/promotions', data, authOptions()),
+    )
+  },
+
+  async updateFinancePromotion(id, data) {
+    return adminRequest(() =>
+      apiClient.put(`/admin/finance/promotions/${id}`, data, authOptions()),
+    )
+  },
+
+  async toggleFinancePromotion(id, is_enabled) {
+    return adminRequest(() =>
+      apiClient.patch(
+        `/admin/finance/promotions/${id}/toggle`,
+        { is_enabled },
+        authOptions(),
+      ),
+    )
+  },
+
+  async getFinanceSummary(params = {}) {
+    const query = new URLSearchParams()
+    if (params.from) query.set('from', params.from)
+    if (params.to) query.set('to', params.to)
+
+    return adminRequest(() =>
+      apiClient.get(
+        `/admin/finance/summary${query.toString() ? '?' + query.toString() : ''}`,
+        authOptions(),
+      ),
+    )
+  },
+
   async getDashboard(params = {}) {
     const query = new URLSearchParams()
     if (params.from) query.set('from', params.from)
@@ -512,6 +553,16 @@ export const adminService = {
           `/admin/social/orders/audit?page=${encodeURIComponent(page)}`,
           authOptions(),
         ),
+    )
+  },
+
+  async resolveSocialOrderReconciliation(id, data) {
+    return adminRequest(
+      () => apiClient.post(
+        `/admin/social/orders/${id}/reconcile`,
+        data,
+        authOptions(),
+      ),
     )
   },
 

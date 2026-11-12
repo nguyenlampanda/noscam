@@ -62,9 +62,9 @@ class AdminSocialOrderReconciliationPreviewController extends Controller
                 'action' => $eligible ? $action : null,
                 'provider_order_id' => $audit?->provider_order_id,
                 'estimated_refund' => $estimatedRefund,
-                'execution_enabled' => false,
+                'execution_enabled' => $eligible,
                 'message' => $eligible
-                    ? 'Đủ điều kiện dữ liệu sơ bộ. Chưa xác minh độc lập với Provider; chức năng xử lý vẫn khóa.'
+                    ? 'Đủ điều kiện dữ liệu. Hãy kiểm tra bằng chứng Provider trước khi xác nhận thực thi.'
                     : 'Đơn chưa đủ điều kiện xử lý đối soát.',
             ],
         ]);

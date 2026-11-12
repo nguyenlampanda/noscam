@@ -193,7 +193,35 @@ const statusMap = {
   ],
 }
 
-function StatusBadge({ status }) {
+function refundStatusLabel(order) {
+  const status = String(order?.status || '').toLowerCase()
+
+  if (!['cancelled', 'canceled'].includes(status)) {
+    return null
+  }
+
+  const total = Number(order?.sell_amount)
+  const refunded = Number(order?.refunded_amount || 0)
+
+  if (!Number.isFinite(total) || total <= 0 ||
+      !Number.isFinite(refunded) || refunded < 0) {
+    return 'Đã hủy · Chưa hoàn tiền'
+  }
+
+  if (refunded >= total - 0.0001) {
+    return 'Đã hủy & hoàn tiền'
+  }
+
+  if (refunded > 0) {
+    return 'Đã hủy · Hoàn một phần'
+  }
+
+  return 'Đã hủy · Chưa hoàn tiền'
+}
+
+function StatusBadge({ status, order }) {
+  const refundLabel = refundStatusLabel(order)
+
   const [
     label,
     className,
@@ -207,7 +235,7 @@ function StatusBadge({ status }) {
     <span
       className={`inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-black ${className}`}
     >
-      {label}
+      {refundLabel || label}
     </span>
   )
 }
@@ -290,6 +318,7 @@ export default function AdminSocialOrdersPage() {
   const [noRefundReason, setNoRefundReason] = useState('')
   const [noRefundConfirm, setNoRefundConfirm] = useState(false)
   const [noRefundError, setNoRefundError] = useState('')
+  const [cancelError, setCancelError] = useState('')
 
   const [busyId, setBusyId] =
     useState(null)
@@ -428,12 +457,12 @@ export default function AdminSocialOrdersPage() {
       Number(cancelOrder.attempts || 0) === 0
 
     if (canRefundNow && !refundReason) {
-      setError('Vui lòng nhập lý do hoàn tiền.')
+      setCancelError('Vui lòng nhập lý do hoàn tiền.')
       return
     }
 
     setBusyId(cancelOrder.id)
-    setError('')
+    setCancelError('')
 
     try {
       await adminService
@@ -447,7 +476,8 @@ export default function AdminSocialOrdersPage() {
       await load()
       await loadAuditCount()
     } catch (err) {
-      setError(
+      setCancelError(
+        err?.response?.data?.message ||
         err?.data?.message ||
           err?.message ||
           'Không hủy được đơn hàng.',
@@ -615,9 +645,8 @@ export default function AdminSocialOrdersPage() {
 
                       <div className="flex flex-col items-end gap-1">
                         <StatusBadge
-                          status={
-                            item.status
-                          }
+                          status={item.status}
+                          order={item}
                         />
                         <span className="text-[11px] font-medium text-slate-400">
                           {item.provider_order_id
@@ -739,15 +768,6 @@ export default function AdminSocialOrdersPage() {
     <button
       type="button"
       disabled={busyId === item.id}
-      onClick={() => setNoRefundOrder(item)}
-      className="flex-1 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs font-black text-amber-800 transition hover:bg-amber-100 disabled:opacity-50 sm:flex-none"
-    >
-      Hủy không hoàn tiền
-    </button>
-
-    <button
-      type="button"
-      disabled={busyId === item.id}
       onClick={() => setCancelOrder(item)}
       className="flex-1 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-xs font-black text-red-700 transition hover:bg-red-100 disabled:opacity-50 sm:flex-none"
     >
@@ -839,9 +859,15 @@ export default function AdminSocialOrdersPage() {
         createPortal(
           <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-slate-950/60 p-4">
             <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl">
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-red-50 text-2xl font-black text-red-600">
+              <button
+                type="button"
+                aria-label="Đóng cửa sổ hủy đơn"
+                disabled={busyId === cancelOrder.id}
+                onClick={() => setCancelOrder(null)}
+                className="flex h-14 w-14 items-center justify-center rounded-2xl bg-red-50 text-2xl font-black text-red-600 transition hover:bg-red-100 disabled:opacity-50"
+              >
                 ×
-              </div>
+              </button>
 
               <h2 className="mt-5 text-2xl font-black text-slate-950">
                 {(cancelOrder.provider_order_id || Number(cancelOrder.attempts || 0) >= 1)
@@ -934,9 +960,7 @@ export default function AdminSocialOrdersPage() {
                   </div>
 
                   <p className="mt-1 text-sm font-semibold leading-6 text-amber-700">
-                    NoScam sẽ gửi yêu cầu hủy đến nhà cung cấp.
-                    Chỉ khi nhà cung cấp xác nhận đơn đã hủy,
-                    hệ thống mới hoàn tiền cho khách.
+                    Đơn đã thử gửi API. Hãy mở mục Đối soát và kiểm tra trực tiếp với nhà cung cấp. Chỉ hoàn tiền sau khi xác minh nhà cung cấp không nhận đơn hoặc đã xác nhận hủy và không tính phí.
                   </p>
                 </div>
               )}
@@ -960,6 +984,12 @@ export default function AdminSocialOrdersPage() {
                   </div>
                 )}
 
+              {cancelError && (
+                <div role="alert" className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700">
+                  {cancelError}
+                </div>
+              )}
+
               <div className="mt-6 grid grid-cols-2 gap-3">
                 <button
                   type="button"
@@ -981,16 +1011,21 @@ export default function AdminSocialOrdersPage() {
                     busyId ===
                     cancelOrder.id
                   }
-                  onClick={
-                    confirmCancel
-                  }
+                  onClick={() => {
+                    if (cancelOrder.provider_order_id || Number(cancelOrder.attempts || 0) >= 1) {
+                      setCancelOrder(null)
+                      setAuditOrder(cancelOrder)
+                      return
+                    }
+                    confirmCancel()
+                  }}
                   className="rounded-2xl bg-red-600 px-4 py-3 font-black text-white transition hover:bg-red-700 disabled:opacity-50"
                 >
                   {busyId ===
                   cancelOrder.id
                     ? 'Đang xử lý...'
-                    : cancelOrder.provider_order_id
-                      ? 'Gửi yêu cầu hủy'
+                    : (cancelOrder.provider_order_id || Number(cancelOrder.attempts || 0) >= 1)
+                      ? 'Mở đối soát'
                       : `Hủy & hoàn ${money(
                           Math.max(
                             0,

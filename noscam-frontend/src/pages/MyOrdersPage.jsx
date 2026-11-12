@@ -108,7 +108,43 @@ const statusMeta = {
   },
 }
 
-function getStatus(status) {
+function refundStatusLabel(order) {
+  const status = String(order?.status || '').toLowerCase()
+
+  if (!['cancelled', 'canceled'].includes(status)) {
+    return null
+  }
+
+  const total = Number(order?.sell_amount)
+  const refunded = Number(order?.refunded_amount || 0)
+
+  if (!Number.isFinite(total) || total <= 0 ||
+      !Number.isFinite(refunded) || refunded < 0) {
+    return 'Đã hủy · Chưa hoàn tiền'
+  }
+
+  if (refunded >= total - 0.0001) {
+    return 'Đã hủy & hoàn tiền'
+  }
+
+  if (refunded > 0) {
+    return 'Đã hủy · Hoàn một phần'
+  }
+
+  return 'Đã hủy · Chưa hoàn tiền'
+}
+
+function getStatus(order) {
+  const status = order?.status
+  const refundLabel = refundStatusLabel(order)
+
+  if (refundLabel) {
+    return {
+      ...statusMeta.cancelled,
+      label: refundLabel,
+    }
+  }
+
   return (
     statusMeta[status] || {
       label: status || 'Không rõ',
@@ -869,7 +905,7 @@ async function handleCancelOrder(item) {
               (item, index) => {
                 const meta =
                   getStatus(
-                    item.status,
+                    item,
                   )
 
                 const progress =

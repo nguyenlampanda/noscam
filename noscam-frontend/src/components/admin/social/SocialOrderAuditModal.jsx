@@ -32,6 +32,9 @@ export default function SocialOrderAuditModal({ order, onClose }) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [executing, setExecuting] = useState(false)
+  const [confirmed, setConfirmed] = useState(false)
+
 
   const eligible =
     order?.status === 'pending' &&
@@ -151,6 +154,34 @@ export default function SocialOrderAuditModal({ order, onClose }) {
     }
   }
 
+  async function executeResolution() {
+    if (!preview?.eligible || !preview?.execution_enabled ||
+        !preview?.audit_id || !confirmed || executing) return
+
+    setExecuting(true)
+    setError('')
+    setSuccess('')
+
+    try {
+      await adminService.resolveSocialOrderReconciliation(order.id, {
+        audit_id: preview.audit_id,
+        confirmation: 'CONFIRM_RECONCILIATION',
+      })
+      setSuccess('Đã xử lý đối soát. Vui lòng tải lại danh sách đơn.')
+      setConfirmed(false)
+      notify('Đã xử lý đối soát thành công.', 'success')
+      onClose()
+    } catch (err) {
+      const message = err?.response?.data?.message ||
+        err?.data?.message || err?.message ||
+        'Không thể xử lý đối soát.'
+      setError(message)
+      notify(message, 'error')
+    } finally {
+      setExecuting(false)
+    }
+  }
+
   return createPortal(
     <div className="fixed inset-0 z-[100000] flex items-center justify-center bg-slate-950/65 p-4">
       <motion.div
@@ -174,7 +205,7 @@ export default function SocialOrderAuditModal({ order, onClose }) {
               Provider: {order.provider?.name || '—'} · Lần thử gửi: {order.attempts || 0}
             </p>
           </div>
-          <button type="button" onClick={onClose} disabled={saving} className="rounded-xl bg-slate-100 px-3 py-2 font-black text-slate-600 disabled:opacity-50">
+          <button type="button" onClick={onClose} disabled={saving || executing} className="rounded-xl bg-slate-100 px-3 py-2 font-black text-slate-600 disabled:opacity-50">
             Đóng
           </button>
         </div>
@@ -281,9 +312,34 @@ export default function SocialOrderAuditModal({ order, onClose }) {
                 </p>
               )}
 
-              <p className="font-black text-amber-700">
-                Chức năng thực thi hiện đang khóa.
-              </p>
+              {preview.execution_enabled && preview.eligible ? (
+                <div className="mt-4 space-y-3">
+                  <label className="flex items-start gap-2 text-sm font-bold text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={confirmed}
+                      onChange={(e) => setConfirmed(e.target.checked)}
+                      className="mt-1"
+                    />
+                    Tôi đã kiểm tra bằng chứng trực tiếp với Provider và xác nhận quyết định này.
+                  </label>
+                  <button
+                    type="button"
+                    disabled={!confirmed || executing || saving}
+                    onClick={executeResolution}
+                    className="w-full rounded-xl bg-red-600 px-4 py-3 font-black text-white disabled:opacity-40"
+                  >
+                    {executing ? 'Đang xử lý...' :
+                      preview.action === 'refund_after_reconciliation'
+                        ? 'Xác nhận hủy & hoàn tiền'
+                        : 'Xác nhận khôi phục mã Provider'}
+                  </button>
+                </div>
+              ) : (
+                <p className="font-black text-amber-700">
+                  Chưa đủ điều kiện thực thi đối soát.
+                </p>
+              )}
             </div>
           )}
         </div>
