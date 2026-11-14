@@ -1941,6 +1941,7 @@ export default function AdminSocialServicesPage() {
       <AnimatePresence>
         {selected && (
           <MapModal
+            key={selected.id}
             item={selected}
             services={services}
             onClose={() =>

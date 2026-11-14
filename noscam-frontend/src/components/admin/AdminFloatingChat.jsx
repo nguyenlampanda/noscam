@@ -53,9 +53,20 @@ export default function AdminFloatingChat() {
   }, [refreshUnread, refreshConversations])
 
   useEffect(() => {
-    refreshUnread()
-    const timer = window.setInterval(refreshUnread, 5000)
-    return () => window.clearInterval(timer)
+    const pollUnread = () => {
+      if (document.visibilityState === 'visible') {
+        refreshUnread()
+      }
+    }
+
+    pollUnread()
+    const timer = window.setInterval(pollUnread, 30000)
+    document.addEventListener('visibilitychange', pollUnread)
+
+    return () => {
+      window.clearInterval(timer)
+      document.removeEventListener('visibilitychange', pollUnread)
+    }
   }, [refreshUnread])
 
   useEffect(() => {

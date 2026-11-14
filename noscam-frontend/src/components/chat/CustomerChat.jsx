@@ -43,12 +43,20 @@ export default function CustomerChat() {
     }
 
     if (!open) {
-      refreshUnread()
-      const timer = window.setInterval(refreshUnread, 5000)
+      const pollUnread = () => {
+        if (document.visibilityState === 'visible') {
+          refreshUnread()
+        }
+      }
+
+      pollUnread()
+      const timer = window.setInterval(pollUnread, 30000)
+      document.addEventListener('visibilitychange', pollUnread)
 
       return () => {
         active = false
         window.clearInterval(timer)
+        document.removeEventListener('visibilitychange', pollUnread)
       }
     }
 
