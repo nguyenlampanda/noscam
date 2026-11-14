@@ -333,6 +333,7 @@ function MapModal({ item, onClose, onDone }) {
   const detectedCategory =
     /\bfollow(?:ers?|ing)?\b/i.test(source) ? 'follow' :
     /\bcomments?\b/i.test(source) ? 'comment' :
+    /\breposts?\b/i.test(source) ? 'repost' :
     /\bshares?\b/i.test(source) ? 'share' :
     /\bviews?\b|\bwatch\b/i.test(source) ? 'view' :
     /\breactions?\b|\breact\b/i.test(source) ? 'reaction' :
@@ -643,6 +644,7 @@ function MapModal({ item, onClose, onDone }) {
       follow: 'Follow',
       comment: 'Comment',
       share: 'Share',
+      repost: 'Repost',
       view: 'View',
       reaction: 'Reaction',
       member: 'Member',
@@ -854,6 +856,7 @@ function MapModal({ item, onClose, onDone }) {
               <option value="comment">Comment</option>
               <option value="view">View</option>
               <option value="share">Share</option>
+              <option value="repost">Repost</option>
               <option value="reaction">Reaction</option>
               <option value="member">Member</option>
               <option value="save">Save</option>
@@ -1231,7 +1234,7 @@ function PriceModal({ item, onClose, onDone }) {
             >
               {![
                 'follow', 'like', 'view', 'comment', 'share',
-                'reaction', 'member', 'save', 'other'
+                'reaction', 'member', 'save', 'repost', 'other'
               ].includes(category) && (
                 <option value={category}>{category}</option>
               )}
@@ -1240,6 +1243,7 @@ function PriceModal({ item, onClose, onDone }) {
               <option value="view">View</option>
               <option value="comment">Comment</option>
               <option value="share">Share</option>
+              <option value="repost">Repost</option>
               <option value="reaction">Reaction</option>
               <option value="member">Member</option>
               <option value="save">Save</option>
