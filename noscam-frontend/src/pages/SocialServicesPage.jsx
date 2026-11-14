@@ -145,6 +145,7 @@ const categoryLabels = {
   view: 'View',
   comment: 'Comment',
   share: 'Share',
+  repost: 'Repost',
   reaction: 'Reaction',
   member: 'Member',
   save: 'Save',
@@ -167,6 +168,12 @@ function AnimatedCategoryIcon({ category, className = '' }) {
     ),
     like: (
       <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z" />
+    ),
+    repost: (
+      <>
+        <path d="M4 7h14l-3-3m3 3-3 3" />
+        <path d="M20 17H6l3-3m-3 3 3 3" />
+      </>
     ),
     share: (
       <>
@@ -557,6 +564,13 @@ export default function SocialServicesPage() {
       description:
         'Tăng bình luận cho bài viết hoặc video.',
     },
+    repost: {
+      label: 'Repost',
+      icon: '↻',
+      color: 'cyan',
+      description:
+        'Tăng lượt đăng lại bài viết hoặc video.',
+    },
     share: {
       label: 'Share',
       icon: '↗',
@@ -750,6 +764,7 @@ export default function SocialServicesPage() {
     if (/like|thích/.test(name)) return 'like'
     if (/view|xem/.test(name)) return 'view'
     if (/comment|bình luận/.test(name)) return 'comment'
+    if (/repost|đăng lại/.test(name)) return 'repost'
     if (/share|chia sẻ/.test(name)) return 'share'
     if (/save|lưu bài/.test(name)) return 'save'
     if (/subscribe|subscriber|đăng ký/.test(name)) return 'subscribe'
