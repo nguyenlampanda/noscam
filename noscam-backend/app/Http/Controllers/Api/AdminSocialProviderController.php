@@ -197,7 +197,9 @@ class AdminSocialProviderController extends Controller
                     $currency,
 
                 'status' =>
-                    'active',
+                    $provider->driver === 'vietnamfb_v2'
+                        ? $provider->status
+                        : 'active',
 
                 'last_checked_at' =>
                     now(),
@@ -221,9 +223,7 @@ class AdminSocialProviderController extends Controller
                         $balance !== null
                             ? $balance
                                 * (float) (
-                                    $provider
-                                        ->exchange_rate_to_vnd
-                                    ?: 1
+                                    $this->balanceExchangeRate($provider)
                                 )
                             : null,
                 ],
@@ -245,7 +245,9 @@ class AdminSocialProviderController extends Controller
 
             $provider->update([
                 'status' =>
-                    'error',
+                    $provider->driver === 'vietnamfb_v2'
+                        ? $provider->status
+                        : 'error',
 
                 'last_checked_at' =>
                     now(),
@@ -314,7 +316,7 @@ class AdminSocialProviderController extends Controller
                     'currency' => $currency,
                     'balance_vnd' => $balance
                         * (float) (
-                            $provider->exchange_rate_to_vnd ?: 1
+                            $this->balanceExchangeRate($provider)
                         ),
                     'last_checked_at' =>
                         $provider->last_checked_at,
@@ -599,6 +601,14 @@ class AdminSocialProviderController extends Controller
         return [];
     }
 
+    private function balanceExchangeRate(
+        SocialProvider $provider
+    ): float {
+        return $provider->driver === 'vietnamfb_v2'
+            ? 26000.0
+            : (float) ($provider->exchange_rate_to_vnd ?: 1);
+    }
+
     private function extractBalance(
         array $response
     ): ?float {
@@ -638,9 +648,7 @@ class AdminSocialProviderController extends Controller
 
         $exchangeRate =
             (float) (
-                $provider
-                    ->exchange_rate_to_vnd
-                ?: 1
+                $this->balanceExchangeRate($provider)
             );
 
         return [

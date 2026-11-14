@@ -386,7 +386,11 @@ class SocialOrderService
                 throw new RuntimeException('Tỷ giá API không hợp lệ.');
             }
 
-            $availableVnd = $balance * $exchangeRate;
+            $balanceRate = strtolower((string) $providerService->provider->driver) === 'vietnamfb_v2'
+                ? 26000
+                : $exchangeRate;
+
+            $availableVnd = $balance * $balanceRate;
 
             $requiredVnd = ($providerService->costPriceVnd() * ($isVietnamFbLegacy ? 1000 : 1))
                 * $quantity / 1000;
