@@ -85,6 +85,7 @@ class SocialOrderProviderService
                         'subs24h',
                         'hacklike17',
                         'vietnamfb',
+                        'vietnamfb_v2',
                     ],
                     true
                 )
