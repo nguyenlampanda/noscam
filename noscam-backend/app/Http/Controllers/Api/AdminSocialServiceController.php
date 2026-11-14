@@ -460,42 +460,38 @@ class AdminSocialServiceController extends Controller
                 strtolower((string) ($providerService->provider?->driver ?? ''))
                 === 'vietnamfb_v2'
             ) {
-                $metadata = $providerService->provider_data ?? [];
-                $metadata = is_array($metadata) ? $metadata : [];
-
-                $rawMin = $metadata['min'] ?? null;
-                $rawMax = $metadata['max'] ?? null;
+                // Use normalized limits saved during provider sync.
+                $sourceMin = (int) $providerService->min_quantity;
+                $sourceMax = (int) $providerService->max_quantity;
 
                 if (
-                    !is_numeric($rawMin)
-                    || !is_numeric($rawMax)
-                    || (int) $rawMin < 1
-                    || (int) $rawMax < (int) $rawMin
+                    $sourceMin < 1
+                    || $sourceMax < $sourceMin
                 ) {
                     return response()->json([
                         'message' =>
-                            'VietnamFB V2 chưa có giới hạn Min/Max hợp lệ.',
+                            'VietnamFB V2 chưa có giới hạn Min/Max hợp lệ. Vui lòng đồng bộ lại dịch vụ nguồn.',
                     ], 422);
                 }
 
                 $min = (int) (
                     $data['min_quantity']
-                    ?? $providerService->min_quantity
+                    ?? $sourceMin
                 );
 
                 $max = (int) (
                     $data['max_quantity']
-                    ?? $providerService->max_quantity
+                    ?? $sourceMax
                 );
 
                 if (
-                    $min < (int) $rawMin
-                    || $max > (int) $rawMax
+                    $min < $sourceMin
+                    || $max > $sourceMax
                     || $max < $min
                 ) {
                     return response()->json([
                         'message' =>
-                            'Giới hạn số lượng không khớp VietnamFB V2.',
+                            'Giới hạn số lượng phải nằm trong Min/Max của VietnamFB V2.',
                     ], 422);
                 }
             }
