@@ -13,6 +13,24 @@ import PlatformIcon from '../../components/social/PlatformIcon'
 import adminService from '../../services/adminService'
 import SocialOrderAuditModal from '../../components/admin/social/SocialOrderAuditModal'
 
+function orderDateTime(value) {
+  if (!value) return '—'
+
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '—'
+
+  return new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Ho_Chi_Minh',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23',
+  }).format(date).replace(', ', ' ')
+}
+
 function money(value) {
   return `${Math.round(
     Number(value || 0),
@@ -641,6 +659,9 @@ export default function AdminSocialOrdersPage() {
                         <div className="mt-1 break-all text-xs text-slate-500">
                           {item.user?.email || 'Chưa có email'}
                         </div>
+                         <div className="mt-1 text-xs font-semibold text-slate-500">
+                           Thời gian đặt: {orderDateTime(item.created_at)}
+                         </div>
                       </div>
 
                       <div className="flex flex-col items-end gap-1">
