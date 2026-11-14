@@ -41,7 +41,7 @@ class VietnamFbV2AdminMappingTest extends TestCase
             'social_provider_id' => $provider->id,
             'provider_service_id' => 'TEST-V2-001',
             'provider_service_name' => 'Instagram Followers Test',
-            'cost_price_per_1000' => 2,
+            'cost_price_per_1000' => 3000,
             'min_quantity' => 10,
             'max_quantity' => 1000,
             'provider_data' => $limits,

@@ -396,11 +396,7 @@ class AdminSocialServiceController extends Controller
 
             $cost = $providerService->costPriceVnd()
                 * (
-                    in_array(
-                        $driver,
-                        ['vietnamfb', 'vietnamfb_v2'],
-                        true
-                    ) ? 1000 : 1
+                    $driver === 'vietnamfb' ? 1000 : 1
                 );
 
             if (
@@ -522,7 +518,7 @@ class AdminSocialServiceController extends Controller
                 );
 
                 $costPer1000 =
-                    $providerService->costPriceVnd() * 1000;
+                    $providerService->costPriceVnd();
 
                 if (
                     $target->sell_price_per_1000 === null
