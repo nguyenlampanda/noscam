@@ -1091,10 +1091,16 @@ function PriceModal({ item, onClose, onDone }) {
       return
     }
 
+    const originalPrice1000 = Number(service.sell_price_per_1000)
+    const newPrice1000 = Number((price1 * 1000).toFixed(4))
+    const priceChanged =
+      service.sell_price_per_1000 == null ||
+      Math.abs(newPrice1000 - originalPrice1000) > 0.0001
+
     if (
       price.trim() === '' ||
       !Number.isFinite(price1) ||
-      price1 <= cost1
+      (priceChanged && price1 <= cost1)
     ) {
       setError(
         'Giá bán / 1 phải lớn hơn giá vốn ' +
@@ -1134,7 +1140,9 @@ function PriceModal({ item, onClose, onDone }) {
         description: description.trim() || null,
         min_quantity: minNumber,
         max_quantity: maxNumber,
-        sell_price_per_1000: Number((price1 * 1000).toFixed(4)),
+        ...(priceChanged
+          ? { sell_price_per_1000: newPrice1000 }
+          : {}),
         is_active: active,
         sort_order: Number(service.sort_order ?? 0)
       })
