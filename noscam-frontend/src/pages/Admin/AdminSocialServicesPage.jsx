@@ -357,6 +357,9 @@ function MapModal({ item, onClose, onDone }) {
   const [busy, setBusy] = useState(false)
   const [saved, setSaved] = useState(null)
   const [confirming, setConfirming] = useState(false)
+  const isVietnamFbV2 =
+    String(item.provider?.driver || '').toLowerCase() === 'vietnamfb_v2'
+  const [v2MappingConfirmed, setV2MappingConfirmed] = useState(false)
   const [error, setError] = useState('')
 
   // Gia von API duoc hieu la VND / 1 luot.
@@ -430,6 +433,7 @@ function MapModal({ item, onClose, onDone }) {
       return
     }
 
+    setV2MappingConfirmed(false)
     setConfirming(true)
   }
 
@@ -457,6 +461,7 @@ function MapModal({ item, onClose, onDone }) {
       await adminService.mapSocialProviderService(item.id, {
         platform,
         category,
+        v2_mapping_confirmed: isVietnamFbV2 && v2MappingConfirmed,
         name: name.trim(),
         description: description.trim() || null,
         sell_price_per_1000: Number((sell1 * 1000).toFixed(4)),
@@ -591,6 +596,21 @@ function MapModal({ item, onClose, onDone }) {
             </div>
           </div>
 
+          {isVietnamFbV2 && (
+            <label className="mt-5 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-slate-800">
+              <input
+                type="checkbox"
+                checked={v2MappingConfirmed}
+                onChange={(e) => setV2MappingConfirmed(e.target.checked)}
+                className="mt-1 h-4 w-4 shrink-0"
+              />
+              <span>
+                Tôi đã kiểm tra tên dịch vụ gốc, nền tảng và loại tương tác
+                của VietnamFB V2. Tôi xác nhận thông tin mapping chính xác.
+              </span>
+            </label>
+          )}
+
           <div className="mt-6 grid grid-cols-2 gap-3">
             <button
               type="button"
@@ -601,7 +621,7 @@ function MapModal({ item, onClose, onDone }) {
             </button>
             <button
               type="button"
-              disabled={busy}
+              disabled={busy || (isVietnamFbV2 && !v2MappingConfirmed)}
               onClick={confirmSubmit}
               className="rounded-xl bg-blue-600 px-4 py-3 font-bold text-white disabled:opacity-50"
             >

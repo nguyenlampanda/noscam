@@ -19,7 +19,8 @@ class VietnamFbProviderTest extends TestCase
 
         $provider = new VietnamFbProvider(
             'https://example.com/api',
-            'test-key'
+            'test-key',
+            'test-user'
         );
 
         $result = $provider->createOrder(
@@ -49,7 +50,8 @@ class VietnamFbProviderTest extends TestCase
 
         $provider = new VietnamFbProvider(
             'https://example.com/api',
-            'test-key'
+            'test-key',
+            'test-user'
         );
 
         $provider->createOrder(

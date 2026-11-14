@@ -216,6 +216,38 @@ class SocialOrderService
                 (string) ($providerService->provider?->driver ?? '')
             );
 
+            if ($driver === 'vietnamfb_v2') {
+                $metadata = $providerService->provider_data ?? [];
+                $metadata = is_array($metadata) ? $metadata : [];
+
+                $sourcePlatform = strtolower(trim(
+                    (string) ($metadata['platform'] ?? '')
+                ));
+
+                $sourceType = strtolower(trim(
+                    (string) ($metadata['type'] ?? '')
+                ));
+
+                $sourceCategory = strtolower(trim(
+                    (string) ($metadata['category'] ?? '')
+                ));
+
+                $expectedKeyword = $category === 'comment'
+                    ? 'comment'
+                    : 'reaction';
+
+                if (
+                    $sourcePlatform !== 'facebook'
+                    || (
+                        !str_contains($sourceType, $expectedKeyword)
+                        && !str_contains($sourceCategory, $expectedKeyword)
+                    )
+                ) {
+                    throw new RuntimeException(
+                        'Dich vu Facebook V2 chua duoc xac minh dung loai.'
+                    );
+                }
+            } else {
             $providerCode = strtoupper(
                 (string) $providerService->provider_service_id
             );
@@ -233,6 +265,7 @@ class SocialOrderService
                 throw new RuntimeException(
                     'Dịch vụ chưa được cấu hình đúng API VietnamFB.'
                 );
+            }
             }
         }
 
@@ -252,19 +285,26 @@ class SocialOrderService
         $rawChannel = is_array($rawChannel) ? $rawChannel : [];
 
         $isVietnamFb =
+            in_array(
+                strtolower((string) ($providerService->provider?->driver ?? '')),
+                ['vietnamfb', 'vietnamfb_v2'],
+                true
+            );
+
+        $isVietnamFbLegacy =
             strtolower((string) ($providerService->provider?->driver ?? ''))
             === 'vietnamfb';
 
         $validLimit = static fn ($value): bool =>
             is_numeric($value) && (int) $value > 0;
 
-        $minVerified = !$isVietnamFb
+        $minVerified = !$isVietnamFbLegacy
             || $validLimit($rawChannel['min'] ?? null);
 
-        $maxVerified = !$isVietnamFb
+        $maxVerified = !$isVietnamFbLegacy
             || $validLimit($rawChannel['max'] ?? null);
 
-        if ($isVietnamFb) {
+        if ($isVietnamFbLegacy) {
             $minVerified = $minVerified
                 || (
                     ($providerData['min_verified'] ?? false) === true
@@ -278,11 +318,11 @@ class SocialOrderService
                 );
         }
 
-        $providerMin = $isVietnamFb
+        $providerMin = $isVietnamFbLegacy
             ? ($rawChannel['min'] ?? $providerData['min'] ?? null)
             : $providerService->min_quantity;
 
-        $providerMax = $isVietnamFb
+        $providerMax = $isVietnamFbLegacy
             ? ($rawChannel['max'] ?? $providerData['max'] ?? null)
             : $providerService->max_quantity;
 

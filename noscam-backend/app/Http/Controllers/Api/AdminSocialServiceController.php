@@ -223,6 +223,13 @@ class AdminSocialServiceController extends Controller
                     ->max(
                         fn ($item) =>
                             $item->costPriceVnd()
+                            * (
+                                in_array(
+                                    strtolower((string) ($item->provider?->driver ?? '')),
+                                    ['vietnamfb', 'vietnamfb_v2'],
+                                    true
+                                ) ? 1000 : 1
+                            )
                     );
 
                 if (
@@ -381,7 +388,20 @@ class AdminSocialServiceController extends Controller
         ]);
 
         if (empty($data['social_service_id'])) {
-            $cost = $providerService->costPriceVnd();
+            $providerService->loadMissing('provider');
+
+            $driver = strtolower(
+                (string) ($providerService->provider?->driver ?? '')
+            );
+
+            $cost = $providerService->costPriceVnd()
+                * (
+                    in_array(
+                        $driver,
+                        ['vietnamfb', 'vietnamfb_v2'],
+                        true
+                    ) ? 1000 : 1
+                );
 
             if (
                 !isset($data['sell_price_per_1000']) ||
@@ -428,6 +448,152 @@ class AdminSocialServiceController extends Controller
                         'message' =>
                             'API VietnamFB chưa cung cấp đầy đủ Min/Max. '
                             .'Admin cần nhập giới hạn trước khi đưa dịch vụ lên bán.',
+                    ], 422);
+                }
+            }
+        }
+
+        /*
+         * VietnamFB V2: verify published provider limits.
+         * Do not silently widen the allowed quantity range.
+         */
+        if (empty($data['social_service_id'])) {
+            $providerService->loadMissing('provider');
+
+            if (
+                strtolower((string) ($providerService->provider?->driver ?? ''))
+                === 'vietnamfb_v2'
+            ) {
+                $metadata = $providerService->provider_data ?? [];
+                $metadata = is_array($metadata) ? $metadata : [];
+
+                $rawMin = $metadata['min'] ?? null;
+                $rawMax = $metadata['max'] ?? null;
+
+                if (
+                    !is_numeric($rawMin)
+                    || !is_numeric($rawMax)
+                    || (int) $rawMin < 1
+                    || (int) $rawMax < (int) $rawMin
+                ) {
+                    return response()->json([
+                        'message' =>
+                            'VietnamFB V2 chưa có giới hạn Min/Max hợp lệ.',
+                    ], 422);
+                }
+
+                $min = (int) (
+                    $data['min_quantity']
+                    ?? $providerService->min_quantity
+                );
+
+                $max = (int) (
+                    $data['max_quantity']
+                    ?? $providerService->max_quantity
+                );
+
+                if (
+                    $min < (int) $rawMin
+                    || $max > (int) $rawMax
+                    || $max < $min
+                ) {
+                    return response()->json([
+                        'message' =>
+                            'Giới hạn số lượng không khớp VietnamFB V2.',
+                    ], 422);
+                }
+            }
+        }
+
+        /*
+         * Validate an existing service before attaching VietnamFB V2.
+         * Never silently change its selling price or quantity limits.
+         */
+        if (!empty($data['social_service_id'])) {
+            $providerService->loadMissing('provider');
+
+            $driver = strtolower(
+                (string) ($providerService->provider?->driver ?? '')
+            );
+
+            if ($driver === 'vietnamfb_v2') {
+                $target = SocialService::findOrFail(
+                    $data['social_service_id']
+                );
+
+                $costPer1000 =
+                    $providerService->costPriceVnd() * 1000;
+
+                if (
+                    $target->sell_price_per_1000 === null
+                    || (float) $target->sell_price_per_1000 <= $costPer1000
+                ) {
+                    return response()->json([
+                        'message' =>
+                            'Giá bán dịch vụ hiện tại không cao hơn giá vốn VietnamFB V2.',
+                    ], 422);
+                }
+
+                $metadata = $providerService->provider_data ?? [];
+                $metadata = is_array($metadata) ? $metadata : [];
+
+                $rawMin = $metadata['min'] ?? null;
+                $rawMax = $metadata['max'] ?? null;
+
+                if (
+                    !is_numeric($rawMin)
+                    || !is_numeric($rawMax)
+                    || (int) $rawMin < 1
+                    || (int) $rawMax < (int) $rawMin
+                ) {
+                    return response()->json([
+                        'message' =>
+                            'VietnamFB V2 chưa có Min/Max hợp lệ.',
+                    ], 422);
+                }
+
+                if (
+                    (int) $target->min_quantity < (int) $rawMin
+                    || (int) $target->max_quantity > (int) $rawMax
+                    || (int) $target->max_quantity < (int) $target->min_quantity
+                ) {
+                    return response()->json([
+                        'message' =>
+                            'Min/Max dịch vụ hiện tại không phù hợp VietnamFB V2.',
+                    ], 422);
+                }
+            }
+        }
+
+        /*
+         * VietnamFB V2 requires explicit admin confirmation.
+         * Never trust inferred platform/category as verification.
+         */
+        $providerService->loadMissing('provider');
+
+        if (
+            strtolower((string) ($providerService->provider?->driver ?? ''))
+            === 'vietnamfb_v2'
+        ) {
+            $confirmed = $request->boolean('v2_mapping_confirmed');
+
+            if (!$confirmed) {
+                return response()->json([
+                    'message' =>
+                        'Vui lòng xác nhận nền tảng và loại dịch vụ VietnamFB V2.',
+                ], 422);
+            }
+
+            if (empty($data['social_service_id'])) {
+                if (
+                    empty($data['platform'])
+                    || $data['platform'] === 'other'
+                    || empty($data['category'])
+                    || $data['category'] === 'other'
+                ) {
+                    return response()->json([
+                        'message' =>
+                            'VietnamFB V2 cần nền tảng và loại dịch vụ cụ thể.',
                     ], 422);
                 }
             }
@@ -646,10 +812,21 @@ class AdminSocialServiceController extends Controller
             ?? 0
         );
 
+        $driver = strtolower(
+            (string) ($provider?->driver ?? '')
+        );
+
+        $unitFactor = in_array(
+            $driver,
+            ['vietnamfb', 'vietnamfb_v2'],
+            true
+        ) ? 1000 : 1;
+
         $costVnd =
             $rawCost
             * $exchangeRate
-            * $multiplier;
+            * $multiplier
+            * $unitFactor;
 
         return [
             'id' =>

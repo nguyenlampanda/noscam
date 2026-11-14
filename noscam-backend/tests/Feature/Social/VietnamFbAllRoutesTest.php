@@ -27,7 +27,7 @@ class VietnamFbAllRoutesTest extends TestCase
             'VIPCMT' => 'vipcmt',
             'VIPMAT' => 'vipmat',
             'VIPSHARELIVE' => 'vipsharelive',
-            'INSTAGRAM_SUB' => 'instagram',
+            'INSTAGRAM_SUB' => 'instagram_sub',
             'INSTAGRAM_LIKE' => 'instagram_like',
             'INSTAGRAM_COMMENT' => 'instagram_comment',
             'TIKTOK_SUB' => 'tiktok_sub',
@@ -46,7 +46,8 @@ class VietnamFbAllRoutesTest extends TestCase
 
             $provider = new VietnamFbProvider(
                 'https://example.com/api',
-                'test-key'
+                'test-key',
+                'test-user'
             );
 
             $options = [
@@ -74,15 +75,34 @@ class VietnamFbAllRoutesTest extends TestCase
                 $options
             );
 
-            Http::assertSent(function ($request) use ($expectedMc) {
+            $matched = false;
+            $actualMc = null;
+
+            Http::assertSentCount(1);
+
+            Http::recorded(function ($request) use (
+                &$matched,
+                &$actualMc,
+                $expectedMc
+            ) {
                 parse_str(
                     parse_url($request->url(), PHP_URL_QUERY) ?? '',
                     $query
                 );
 
-                return ($query['mc'] ?? null) === $expectedMc
-                    && ($query['site'] ?? null) !== null;
+                $actualMc = $query['mc'] ?? null;
+
+                $matched = $actualMc === $expectedMc
+                    && isset($query['site']);
+
+                return true;
             });
+
+            $this->assertTrue(
+                $matched,
+                "Route {$group}: expected mc={$expectedMc}, actual mc="
+                    .($actualMc ?? 'NULL')
+            );
 
             Http::assertSentCount(1);
         }
