@@ -81,26 +81,26 @@ class VietnamFbV2AdminMappingTest extends TestCase
         );
     }
 
-    public function test_rejects_mapping_without_confirmation(): void
+    public function test_allows_mapping_without_confirmation(): void
     {
         [$source, $target] = $this->makeData();
 
-        $this->map($source, $target, null)
-            ->assertStatus(422);
+        $this->map($source, $target, null)->assertSuccessful();
 
-        $this->assertNull(
+        $this->assertSame(
+            $target->id,
             $source->fresh()->social_service_id
         );
     }
 
-    public function test_rejects_mapping_with_false_confirmation(): void
+    public function test_allows_mapping_with_false_confirmation(): void
     {
         [$source, $target] = $this->makeData();
 
-        $this->map($source, $target, false)
-            ->assertStatus(422);
+        $this->map($source, $target, false)->assertSuccessful();
 
-        $this->assertNull(
+        $this->assertSame(
+            $target->id,
             $source->fresh()->social_service_id
         );
     }
@@ -201,15 +201,17 @@ class VietnamFbV2AdminMappingTest extends TestCase
         $this->assertSame(1000, (int) $service->max_quantity);
     }
 
-    public function test_rejects_new_v2_service_without_confirmation(): void
+    public function test_allows_new_v2_service_without_confirmation(): void
     {
         [$source] = $this->makeData();
 
         $this->createNewV2Service($source, [
             'v2_mapping_confirmed' => false,
-        ])->assertStatus(422);
+        ])->assertSuccessful();
 
-        $this->assertNull($source->fresh()->social_service_id);
+        $this->assertNotNull(
+            $source->fresh()->social_service_id
+        );
     }
 
     public function test_rejects_new_v2_service_below_cost(): void

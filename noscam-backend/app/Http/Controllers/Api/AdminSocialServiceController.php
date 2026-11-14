@@ -571,15 +571,6 @@ class AdminSocialServiceController extends Controller
             strtolower((string) ($providerService->provider?->driver ?? ''))
             === 'vietnamfb_v2'
         ) {
-            $confirmed = $request->boolean('v2_mapping_confirmed');
-
-            if (!$confirmed) {
-                return response()->json([
-                    'message' =>
-                        'Vui lòng xác nhận nền tảng và loại dịch vụ VietnamFB V2.',
-                ], 422);
-            }
-
             if (empty($data['social_service_id'])) {
                 if (
                     empty($data['platform'])
