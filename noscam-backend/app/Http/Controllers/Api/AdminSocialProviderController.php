@@ -418,6 +418,19 @@ class AdminSocialProviderController extends Controller
                             $item['max']
                             ?? 1;
 
+                        if ($provider->driver === 'vietnamfb_v2') {
+                            if (
+                                !is_numeric($rate)
+                                || (float) $rate <= 0
+                                || !is_numeric($min)
+                                || !is_numeric($max)
+                                || (int) $min < 1
+                                || (int) $max < (int) $min
+                            ) {
+                                continue;
+                            }
+                        }
+
                         $providerActive =
                             array_key_exists(
                                 'provider_active',
@@ -452,7 +465,9 @@ class AdminSocialProviderController extends Controller
                                             $name,
 
                                         'cost_price_per_1000' =>
-                                            $rate,
+                                            $provider->driver === 'vietnamfb_v2'
+                                                ? round((float) $rate * 26000, 5)
+                                                : $rate,
 
                                         'min_quantity' =>
                                             max(
