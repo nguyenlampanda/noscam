@@ -583,6 +583,7 @@ class VietnamFbProvider implements SocialProviderInterface
             'INSTAGRAM_SUB' => 'instagram_sub',
             'INSTAGRAM_FOLLOW' => 'instagram_sub',
             'INSTAGRAM_LIKE' => 'instagram_like',
+            'TIKTOK_LIKE' => 'tiktok_like',
             'TIKTOK_SUB' => 'tiktok_sub',
             'TIKTOK_FOLLOW' => 'tiktok_sub',
             'VIPLIKE' => 'viplike',

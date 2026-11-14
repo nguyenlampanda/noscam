@@ -180,4 +180,77 @@ class VietnamFbProviderTest extends TestCase
         $this->assertTrue($services[0]['max_verified']);
     }
 
+
+    public function test_tiktok_like_status_mapping(): void
+    {
+        Http::fake([
+            "*" => Http::response([
+                "success" => 1,
+                "data" => [[
+                    "id" => "308795",
+                    "quantity" => "100",
+                    "first_count" => "25",
+                    "run_count" => "30",
+                    "status" => "DANG_XU_LY",
+                ]],
+            ]),
+        ]);
+
+        $provider = new VietnamFbProvider(
+            "https://example.com/api",
+            "test-key",
+            "test-user"
+        );
+
+        $result = $provider->orderStatusForService(
+            "308795",
+            "TIKTOK_LIKE:3"
+        );
+
+        $this->assertSame("in_progress", $result["status"]);
+        $this->assertSame(25, $result["start_count"]);
+        $this->assertSame(70, $result["remains"]);
+
+        Http::assertSent(function ($request) {
+            return str_contains($request->url(), "mc=tiktok_like")
+                && str_contains($request->url(), "site=get_info_order")
+                && $request["ids"] === "308795";
+        });
+
+        Http::assertSentCount(1);
+    }
+
+    public function test_instagram_follow_null_first_count(): void
+    {
+        Http::fake([
+            "*" => Http::response([
+                "success" => 1,
+                "data" => [[
+                    "id" => "44439",
+                    "quantity" => "200",
+                    "first_count" => null,
+                    "run_count" => "72",
+                    "status" => "DANG_XU_LY",
+                ]],
+            ]),
+        ]);
+
+        $provider = new VietnamFbProvider(
+            "https://example.com/api",
+            "test-key",
+            "test-user"
+        );
+
+        $result = $provider->orderStatusForService(
+            "44439",
+            "INSTAGRAM_SUB:7"
+        );
+
+        $this->assertSame("in_progress", $result["status"]);
+        $this->assertArrayNotHasKey("start_count", $result);
+        $this->assertSame(128, $result["remains"]);
+
+        Http::assertSentCount(1);
+    }
+
 }
