@@ -339,6 +339,7 @@ class VietnamFbProvider implements SocialProviderInterface
             'INSTAGRAM_SUB' => ['instagram_sub', 'create', 'id'],
             'INSTAGRAM_LIKE' => ['instagram_like', 'create', 'id'],
             'INSTAGRAM_COMMENT' => ['instagram_comment', 'create', 'id'],
+            'TIKTOK_LIKE' => ['tiktok_like', 'create', 'link'],
             'TIKTOK_SUB' => ['tiktok_sub', 'create', 'link'],
             'PANEL' => ['panel', 'create', 'link'],
             'COVID_LIKEPOST' => ['covid_likepost', 'add_new', 'id'],

@@ -66,6 +66,38 @@ class VietnamFbProviderTest extends TestCase
         });
     }
 
+    public function test_tiktok_like_legacy_request_mapping(): void
+    {
+        Http::fake([
+            '*' => Http::response([
+                'success' => 1,
+                'order_id' => 'TEST-123',
+            ], 200),
+        ]);
+
+        $provider = new VietnamFbProvider(
+            'https://example.com/api',
+            'test-key',
+            'test-user'
+        );
+
+        $result = $provider->createOrder(
+            'TIKTOK_LIKE:3',
+            'https://vt.tiktok.com/example/',
+            100
+        );
+
+        $this->assertSame('TEST-123', $result['order_id']);
+
+        Http::assertSent(function ($request) {
+            return str_contains($request->url(), 'mc=tiktok_like')
+                && str_contains($request->url(), 'site=create')
+                && $request['link'] === 'https://vt.tiktok.com/example/'
+                && $request['channel_number'] === '3'
+                && $request['amount'] === 100;
+        });
+    }
+
     public function test_missing_required_option_never_sends_request(): void
     {
         Http::fake();
