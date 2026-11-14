@@ -816,11 +816,7 @@ class AdminSocialServiceController extends Controller
             (string) ($provider?->driver ?? '')
         );
 
-        $unitFactor = in_array(
-            $driver,
-            ['vietnamfb', 'vietnamfb_v2'],
-            true
-        ) ? 1000 : 1;
+        $unitFactor = $driver === 'vietnamfb' ? 1000 : 1;
 
         $costVnd =
             $rawCost
