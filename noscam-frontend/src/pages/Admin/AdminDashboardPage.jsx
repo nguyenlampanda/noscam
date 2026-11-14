@@ -144,7 +144,7 @@ export default function AdminDashboardPage() {
               ['Báo cáo chờ duyệt', 'reports_pending', '/admin/reports', 'CheckScam'],
               ['Đơn tương tác đang chờ', 'social_pending', '/admin/social/orders', 'Tăng tương tác'],
               ['Đơn tương tác lỗi', 'social_failed', '/admin/social/orders', 'Kiểm tra đơn lỗi'],
-              ['Yêu cầu nạp tiền', 'topups_pending', '/admin/social/topups', 'Xác nhận thanh toán'],
+              ['Quản lý tài chính', 'topups_pending', '/admin/finance', 'Xem nạp tiền và giao dịch'],
               ['Khiếu nại tương tác chéo', 'exchange_disputes_open', '/admin/exchange', 'Giải quyết khiếu nại'],
               ['Bài viết chờ duyệt', 'community_posts_pending', '/admin/community', 'Kiểm duyệt cộng đồng'],
               ['Bình luận chờ duyệt', 'community_comments_pending', '/admin/community', 'Kiểm duyệt bình luận'],
@@ -207,23 +207,31 @@ export default function AdminDashboardPage() {
           </h2>
           <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
             {[
-              ['Người dùng', 'users_total'],
-              ['Chiến dịch tương tác chéo', 'exchange_campaigns_total'],
-              ['Đơn dịch vụ số', 'digital_orders_total'],
-              ['Trung gian', 'mediators_total'],
-              ['Hội thoại', 'chat_conversations_total'],
-              ['Bài viết cộng đồng', 'community_posts_total'],
-            ].map(([title, key]) => {
+              ['Người dùng', 'users_total', '/admin/users'],
+              ['Chiến dịch tương tác chéo', 'exchange_campaigns_total', '/admin/exchange'],
+              ['Đơn dịch vụ số', 'digital_orders_total', '/admin/digital/orders'],
+              ['Trung gian', 'mediators_total', '/admin/mediators'],
+              ['Hội thoại', 'chat_conversations_total', '/admin/chat'],
+              ['Bài viết cộng đồng', 'community_posts_total', '/admin/community'],
+            ].map(([title, key, url]) => {
               const value = data?.operations?.[key]
               return (
-                <div key={key} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                  <div className="text-xs font-semibold text-slate-500">
-                    {title}
+                <Link
+                  key={key}
+                  to={url}
+                  aria-label={`Mở quản lý ${title}`}
+                  className="group rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-300 hover:bg-blue-50 hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="text-xs font-semibold text-slate-500">
+                      {title}
+                    </div>
+                    <span aria-hidden="true" className="text-blue-500 transition-transform group-hover:translate-x-1">→</span>
                   </div>
                   <div className="mt-3 text-2xl font-black text-slate-950">
                     {loading || error || value == null ? '—' : number(value)}
                   </div>
-                </div>
+                </Link>
               )
             })}
           </div>
@@ -235,11 +243,18 @@ export default function AdminDashboardPage() {
 
         <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
           {[
-            ['Doanh thu', money(finance.revenue)],
-            ['Chi phí API', money(finance.cost)],
-            ['Lợi nhuận gộp', money(finance.profit)],
-            ['Đơn hoàn thành', number(finance.orders)],
-          ].map(([label,value]) => <div key={label} className={cardClass}><div className="text-sm font-semibold text-slate-500">{label}</div><div className="mt-3 break-words text-2xl font-black text-slate-950">{loading ? '—' : value}</div></div>)}
+            ['Doanh thu', money(finance.revenue), 'border-emerald-200 bg-emerald-50', 'text-emerald-800'],
+            ['Chi phí API', money(finance.cost), 'border-rose-200 bg-rose-50', 'text-rose-800'],
+            ['Lợi nhuận gộp', money(finance.profit), 'border-sky-200 bg-sky-50', 'text-sky-800'],
+            ['Đơn hoàn thành', number(finance.orders), 'border-violet-200 bg-violet-50', 'text-violet-800'],
+          ].map(([label, value, tone, textTone]) => (
+            <div key={label} className={`rounded-2xl border p-4 shadow-sm sm:p-5 ${tone}`}>
+              <div className={`text-sm font-bold ${textTone}`}>{label}</div>
+              <div className={`mt-3 break-words text-2xl font-black ${textTone}`}>
+                {loading ? '—' : value}
+              </div>
+            </div>
+          ))}
         </div>
         
         {/* NOSCAM_SITE_OVERVIEW_V2 */}

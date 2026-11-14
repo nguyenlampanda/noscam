@@ -904,6 +904,16 @@ Route::prefix('admin')
         );
 
         Route::get(
+            '/finance/summary',
+            [\App\Http\Controllers\Api\AdminFinanceController::class, 'summary']
+        );
+
+        Route::get('/finance/promotions', [\App\Http\Controllers\Api\AdminTopupPromotionController::class, 'index']);
+        Route::post('/finance/promotions', [\App\Http\Controllers\Api\AdminTopupPromotionController::class, 'store']);
+        Route::put('/finance/promotions/{id}', [\App\Http\Controllers\Api\AdminTopupPromotionController::class, 'update']);
+        Route::patch('/finance/promotions/{id}/toggle', [\App\Http\Controllers\Api\AdminTopupPromotionController::class, 'toggle']);
+
+        Route::get(
             '/social/topups',
             [AdminWalletTopupController::class, 'index']
         );
@@ -1149,3 +1159,10 @@ Route::middleware([
         [\App\Http\Controllers\Api\HeaderSettingsController::class, 'reset']
     );
 });
+
+
+// NOSCAM_SEPAY_WEBHOOK_V1
+Route::post(
+    '/webhooks/sepay',
+    [\App\Http\Controllers\Api\SePayWebhookController::class, 'receive']
+)->middleware('throttle:60,1');

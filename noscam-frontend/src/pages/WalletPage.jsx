@@ -104,7 +104,7 @@ export default function WalletPage() {
   const [amount, setAmount] =
     useState('')
 
-  const [selectedBank, setSelectedBank] = useState('techcombank')
+  const [selectedBank, setSelectedBank] = useState('vietinbank')
 
   const vietinUsername = String(user?.username || '').trim()
   const vietinContent = /^[a-zA-Z0-9_.-]{1,50}$/.test(vietinUsername)
@@ -275,23 +275,6 @@ export default function WalletPage() {
         <div className="mt-7 grid gap-3 sm:grid-cols-2">
           <button
             type="button"
-            onClick={() => setSelectedBank('techcombank')}
-            className={`rounded-2xl border p-5 text-left transition ${
-              selectedBank === 'techcombank'
-                ? 'border-blue-500 bg-blue-50'
-                : 'border-slate-200 bg-white hover:border-blue-200'
-            }`}
-          >
-            <div className="text-base font-black text-slate-900">
-              Techcombank
-            </div>
-            <div className="mt-1 text-sm text-slate-500">
-              Nạp tiền thủ công
-            </div>
-          </button>
-
-          <button
-            type="button"
             onClick={() => setSelectedBank('vietinbank')}
             className={`rounded-2xl border p-5 text-left transition ${
               selectedBank === 'vietinbank'
@@ -311,6 +294,23 @@ export default function WalletPage() {
               Nạp tiền tự động
             </div>
           </button>
+          <button
+            type="button"
+            onClick={() => setSelectedBank('techcombank')}
+            className={`rounded-2xl border p-5 text-left transition ${
+              selectedBank === 'techcombank'
+                ? 'border-blue-500 bg-blue-50'
+                : 'border-slate-200 bg-white hover:border-blue-200'
+            }`}
+          >
+            <div className="text-base font-black text-slate-900">
+              Techcombank
+            </div>
+            <div className="mt-1 text-sm text-slate-500">
+              Nạp tiền thủ công
+            </div>
+          </button>
+
         </div>
 
         {selectedBank === 'techcombank' ? (

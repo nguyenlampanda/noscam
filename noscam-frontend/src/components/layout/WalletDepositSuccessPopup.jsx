@@ -16,6 +16,10 @@ function tokenKey(token) {
   return `noscam-deposit-seen-v1-${(hash >>> 0).toString(16)}`
 }
 
+function accountKey(userId) {
+  return `noscam-deposit-seen-v2-user-${userId}`
+}
+
 function readSeen(key) {
   try {
     const value = JSON.parse(localStorage.getItem(key) || '[]')
@@ -56,8 +60,36 @@ export default function WalletDepositSuccessPopup() {
           ? body.data
           : []
 
-      const key = tokenKey(token)
-      const seen = new Set(readSeen(key))
+      const profileResponse = await customerService.me()
+      const profileBody = profileResponse?.data ?? profileResponse
+      const userId = profileBody?.data?.user?.id ?? profileBody?.user?.id
+
+      if (!userId || getCustomerToken() !== token) return
+
+      const key = accountKey(userId)
+      const legacyKey = tokenKey(token)
+      const seen = new Set([
+        ...readSeen(key).map(String),
+        ...readSeen(legacyKey).map(String),
+      ])
+
+      // Lan dau chuyen sang lich su theo tai khoan:
+      // danh dau cac giao dich hien co de khong thong bao lai.
+      const initializedKey = `${key}-initialized`
+      if (localStorage.getItem(initializedKey) !== '1') {
+        const existingIds = transactions
+          .filter(item => item?.type === 'deposit' && item?.direction === 'credit')
+          .map(item => String(item.id))
+          .filter(Boolean)
+
+        localStorage.setItem(
+          key,
+          JSON.stringify([...new Set([...seen, ...existingIds])])
+        )
+        localStorage.setItem(initializedKey, '1')
+        return
+      }
+
       const now = Date.now()
 
       const latest = transactions
@@ -79,6 +111,16 @@ export default function WalletDepositSuccessPopup() {
         .sort((a, b) => Number(b.id) - Number(a.id))[0]
 
       if (latest && getCustomerToken() === token) {
+        try {
+          const previous = readSeen(key).map(String)
+          localStorage.setItem(
+            key,
+            JSON.stringify([...new Set([...previous, String(latest.id)])])
+          )
+        } catch {
+          // Không làm gián đoạn website nếu trình duyệt chặn lưu trữ.
+        }
+
         showing.current = true
         setStorageKey(key)
         setDeposit(latest)
@@ -120,7 +162,7 @@ export default function WalletDepositSuccessPopup() {
 
     try {
       const previous = readSeen(storageKey)
-      const next = [...new Set([...previous, String(deposit.id)])].slice(-200)
+      const next = [...new Set([...previous, String(deposit.id)])]
       localStorage.setItem(storageKey, JSON.stringify(next))
     } catch {
       // Vẫn cho phép đóng popup khi trình duyệt chặn localStorage.

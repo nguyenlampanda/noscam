@@ -22,6 +22,10 @@ const menu = [
     label: 'Tương tác chéo',
   },
   {
+    to: '/admin/finance',
+    label: 'Tài chính',
+  },
+  {
     to: '/admin/reports',
     label: 'Báo cáo',
   },

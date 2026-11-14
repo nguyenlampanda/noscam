@@ -30,6 +30,33 @@ function labelFor(options, value) {
   return options.find(([key]) => key === value)?.[1] || value || '—'
 }
 
+function OrderBadge({ value, payment = false }) {
+  const tones = payment
+    ? {
+        paid: 'bg-emerald-100 text-emerald-800',
+        unpaid: 'bg-amber-100 text-amber-800',
+        pending: 'bg-yellow-100 text-yellow-800',
+        refunded: 'bg-violet-100 text-violet-800',
+      }
+    : {
+        pending: 'bg-amber-100 text-amber-800',
+        processing: 'bg-blue-100 text-blue-800',
+        in_progress: 'bg-sky-100 text-sky-800',
+        completed: 'bg-emerald-100 text-emerald-800',
+        cancelled: 'bg-slate-100 text-slate-700',
+        rejected: 'bg-rose-100 text-rose-800',
+        failed: 'bg-red-100 text-red-800',
+      }
+
+  const options = payment ? paymentOptions : statusOptions
+
+  return (
+    <span className={`inline-flex whitespace-nowrap rounded-full px-3 py-1 text-xs font-bold ${tones[value] || 'bg-slate-100 text-slate-700'}`}>
+      {labelFor(options, value)}
+    </span>
+  )
+}
+
 function money(value) {
   if (value === null || value === undefined) return 'Chờ báo giá'
   return `${Number(value).toLocaleString('vi-VN')}đ`
@@ -104,6 +131,7 @@ export default function AdminDigitalOrdersPage() {
   const [page, setPage] = useState(1)
   const [lastPage, setLastPage] = useState(1)
   const [total, setTotal] = useState(0)
+  const [orderStats, setOrderStats] = useState(null)
   const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('')
@@ -156,6 +184,7 @@ export default function AdminDigitalOrdersPage() {
         setItems(response.data)
         setLastPage(Number(response.last_page || 1))
         setTotal(Number(response.total || 0))
+        setOrderStats(response.stats ?? null)
         setError('')
       } catch (err) {
         if (!controller.signal.aborted) {
@@ -426,6 +455,30 @@ export default function AdminDigitalOrdersPage() {
           
         </div>
 
+        <section
+          aria-label="Thống kê đơn dịch vụ số"
+          className="grid grid-cols-2 gap-3 lg:grid-cols-4"
+        >
+          {[
+            ['Tổng đơn hàng', 'total', 'border-slate-200 bg-slate-100 text-slate-800'],
+            ['Chờ xử lý', 'pending', 'border-amber-200 bg-amber-50 text-amber-800'],
+            ['Đang xử lý', 'processing', 'border-blue-200 bg-blue-50 text-blue-800'],
+            ['Hoàn thành', 'completed', 'border-emerald-200 bg-emerald-50 text-emerald-800'],
+          ].map(([label, key, tone]) => (
+            <div
+              key={key}
+              className={`rounded-2xl border p-4 shadow-sm sm:p-5 ${tone}`}
+            >
+              <p className="text-xs font-bold sm:text-sm">{label}</p>
+              <p className="mt-3 text-2xl font-black sm:text-3xl">
+                {loading || !orderStats
+                  ? '—'
+                  : Number(orderStats[key] || 0).toLocaleString('vi-VN')}
+              </p>
+            </div>
+          ))}
+        </section>
+
         <form onSubmit={applySearch} className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 md:grid-cols-[1fr_auto]">
           <input
             value={searchInput}
@@ -512,8 +565,8 @@ export default function AdminDigitalOrdersPage() {
                        </td>
                       <td className="px-4 py-4">{item.service?.name || '—'}</td>
                       <td className="px-4 py-4">{money(item.amount_vnd)}</td>
-                      <td className="px-4 py-4">{labelFor(statusOptions, item.status)}</td>
-                      <td className="px-4 py-4">{labelFor(paymentOptions, item.payment_status)}</td>
+                      <td className="px-4 py-4"><OrderBadge value={item.status} /></td>
+                      <td className="px-4 py-4"><OrderBadge value={item.payment_status} payment /></td>
                       <td className="px-4 py-4">{dateTime(item.created_at)}</td>
                       <td className="px-4 py-4">
                         <button

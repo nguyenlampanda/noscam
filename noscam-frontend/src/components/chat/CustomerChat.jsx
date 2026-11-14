@@ -1,4 +1,5 @@
 import './CustomerChat.css'
+import { ChatMascotPeek } from '../social/TinyPlatformPet'
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import chatService from '../../services/chatService'
@@ -192,6 +193,7 @@ export default function CustomerChat() {
 
   return (
     <div className="fixed bottom-3 right-3 z-[90] sm:bottom-5 sm:right-5">
+      <ChatMascotPeek open={open} />
       {open && (
         <section className="noscam-chat-panel mb-3 flex h-[min(540px,75dvh)] w-[min(370px,calc(100vw-24px))] flex-col overflow-hidden">
           <header className="noscam-chat-header flex items-center justify-between text-white">

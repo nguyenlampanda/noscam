@@ -136,6 +136,7 @@ export const adminService = {
     const query = new URLSearchParams()
     if (params.from) query.set('from', params.from)
     if (params.to) query.set('to', params.to)
+    if (params.topups_page) query.set('topups_page', String(params.topups_page))
 
     return adminRequest(() =>
       apiClient.get(

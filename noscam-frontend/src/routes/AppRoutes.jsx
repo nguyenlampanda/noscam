@@ -2,10 +2,7 @@ import {
   lazy,
   Suspense,
 } from 'react'
-import {
-  Route,
-  Routes,
-} from 'react-router-dom'
+import { Route, Routes, Navigate } from 'react-router-dom'
 
 import ProtectedAdminRoute from '../components/admin/ProtectedAdminRoute'
 import { PageLoading } from '../components/ui/NoScamUI'
@@ -79,6 +76,10 @@ const AdminHeaderPage = lazy(() =>
   import('../pages/Admin/AdminHeaderPage')
 )
 
+const AdminFinancePage = lazy(() =>
+  import('../pages/Admin/AdminFinancePage')
+)
+
 const AdminDashboardPage = lazy(() =>
   import(
     '../pages/Admin/AdminDashboardPage'
@@ -126,10 +127,6 @@ function RouteLoading() {
 
 const AdminSocialOrdersPage = lazy(() =>
   import('../pages/Admin/AdminSocialOrdersPage')
-)
-
-const AdminSocialTopupsPage = lazy(() =>
-  import('../pages/Admin/AdminSocialTopupsPage')
 )
 
 const AdminSocialCustomersPage = lazy(() =>
@@ -342,6 +339,15 @@ function AppRoutes() {
         />
 
         <Route
+          path="/admin/finance"
+          element={
+            <ProtectedAdminRoute>
+              <AdminFinancePage />
+            </ProtectedAdminRoute>
+          }
+        />
+
+        <Route
           path="/admin"
           element={
             <ProtectedAdminRoute>
@@ -423,15 +429,6 @@ function AppRoutes() {
         />
 
         <Route
-          path="/admin/social/topups"
-          element={
-            <ProtectedAdminRoute>
-              <AdminSocialTopupsPage />
-            </ProtectedAdminRoute>
-          }
-        />
-
-        <Route
           path="/admin/popups"
           element={
             <ProtectedAdminRoute>
@@ -477,11 +474,7 @@ function AppRoutes() {
 
         <Route
           path="/admin/digital/orders"
-          element={
-            <ProtectedAdminRoute>
-              <AdminDigitalOrdersPage />
-            </ProtectedAdminRoute>
-          }
+          element={<Navigate to="/admin/digital/services" replace />}
         />
 
         <Route

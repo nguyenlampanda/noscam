@@ -14,6 +14,7 @@ import {
   useReducedMotion,
 } from 'motion/react'
 import PlatformIcon from '../components/social/PlatformIcon'
+import TinyPlatformPet from '../components/social/TinyPlatformPet'
 import SocialGuideModal from '../components/social/SocialGuideModal'
 import customerService, {
   getCustomerToken,
@@ -977,51 +978,51 @@ export default function SocialServicesPage() {
 
   return (
     <>
-      <main className="bg-white min-h-screen px-4 py-8 sm:px-5 md:py-12">
+      <main className="bg-white min-h-screen px-3 py-4 sm:px-5 sm:py-8 md:py-12">
         <div className="mx-auto max-w-6xl">
 
-          {/* NOSCAM SOCIAL HOMEPAGE REDESIGN */}
+  {/* NOSCAM SOCIAL HOMEPAGE REDESIGN */}
           <motion.section
             {...rise(0)}
-            className="relative isolate overflow-hidden rounded-[26px] bg-gradient-to-br from-slate-950 via-[#10265c] to-blue-700 px-4 py-6 text-white shadow-2xl shadow-blue-950/15 sm:px-10 sm:py-10 md:py-12"
+            className="relative isolate overflow-hidden rounded-[20px] sm:rounded-[26px] bg-gradient-to-br from-slate-950 via-[#10265c] to-blue-700 px-3 py-4 text-white shadow-2xl shadow-blue-950/15 sm:px-10 sm:py-10 md:py-12"
           >
             <div className="pointer-events-none absolute -right-24 -top-32 h-80 w-80 rounded-full bg-blue-400/20 blur-3xl" />
             <div className="pointer-events-none absolute -bottom-32 left-1/3 h-72 w-72 rounded-full bg-cyan-400/10 blur-3xl" />
 
-            <div className="relative z-10 grid items-center gap-5 sm:gap-8 lg:grid-cols-[1.3fr_0.7fr]">
+            <div className="relative z-10 grid items-center gap-3 sm:gap-8 lg:grid-cols-[1.3fr_0.7fr]">
               <div>
-                <div className="inline-flex items-center gap-2 rounded-full border border-blue-300/25 bg-white/10 px-4 py-2 text-xs font-bold tracking-widest text-blue-100">
+                <div className="inline-flex items-center gap-2 rounded-full border border-blue-300/25 bg-white/10 px-3 py-1 text-[10px] sm:px-4 sm:py-2 sm:text-xs font-bold tracking-widest text-blue-100">
                   <span className="h-2 w-2 rounded-full bg-cyan-300" />
                   NOSCAM SOCIAL
                 </div>
 
-                <h1 className="mt-4 max-w-2xl text-[27px] font-black leading-[1.2] sm:mt-6 sm:text-5xl tracking-tight sm:text-5xl">
+                <h1 className="mt-2 max-w-2xl text-[22px] font-black leading-[1.2] sm:mt-6 sm:text-5xl tracking-tight sm:text-5xl">
                   Tăng tương tác
                   <span className="mt-1 block bg-gradient-to-r from-blue-200 to-cyan-300 bg-clip-text text-transparent">
                     mạng xã hội dễ dàng hơn
                   </span>
                 </h1>
 
-                <p className="mt-3 max-w-xl text-[13px] leading-6 text-blue-100/85 sm:mt-5 sm:text-base sm:leading-8">
+                <p className="mt-2 max-w-xl text-[12px] leading-5 text-blue-100/85 sm:mt-5 sm:text-base sm:leading-8">
                   Tăng người theo dõi, lượt thích và lượt xem
                   trên nhiều nền tảng mạng xã hội.
                   Chọn dịch vụ, nhập liên kết và đặt hàng
                   chỉ với vài bước đơn giản.
                 </p>
 
-                <div className="mt-5 flex flex-wrap gap-2 sm:mt-8 sm:gap-3">
+                <div className="mt-4 grid grid-cols-3 gap-2 sm:mt-8 sm:flex sm:flex-wrap sm:gap-3">
                   <a
                     href="#tao-don"
-                    className="inline-flex min-h-10 items-center justify-center rounded-xl sm:min-h-12 sm:rounded-2xl bg-white px-6 py-3 text-sm font-black text-blue-700 shadow-lg transition hover:-translate-y-1 hover:shadow-xl"
+                    className="inline-flex min-w-0 min-h-11 items-center justify-center rounded-xl sm:min-h-12 sm:rounded-2xl bg-white px-2 py-2.5 text-[11px] leading-tight whitespace-nowrap sm:px-6 sm:py-3 sm:text-sm sm:px-6 sm:py-3 sm:text-sm font-black text-blue-700 shadow-lg transition hover:-translate-y-1 hover:shadow-xl"
                   >
-                    Tạo đơn ngay ↓
+                    <span className="sm:hidden">Tạo đơn</span><span className="hidden sm:inline">Tạo đơn ngay ↓</span>
                   </a>
 
                   <Link
                     to="/my-orders"
-                    className="inline-flex min-h-10 items-center justify-center rounded-xl sm:min-h-12 sm:rounded-2xl border border-white/30 bg-white/10 px-6 py-3 text-sm font-bold text-white transition hover:bg-white/20"
+                    className="inline-flex min-w-0 min-h-11 items-center justify-center rounded-xl sm:min-h-12 sm:rounded-2xl border border-white/30 bg-white/10 px-2 py-2.5 text-[11px] leading-tight whitespace-nowrap sm:px-6 sm:py-3 sm:text-sm sm:px-6 sm:py-3 sm:text-sm font-bold text-white transition hover:bg-white/20"
                   >
-                    Xem đơn hàng
+                    <span className="sm:hidden">Lịch sử</span><span className="hidden sm:inline">Xem đơn hàng</span>
                   </Link>
 
                   <button
@@ -1033,18 +1034,18 @@ export default function SocialServicesPage() {
                       }
                       setGuideOpen(true)
                     }}
-                    className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-white/30 bg-white/10 px-6 py-3 text-sm font-bold text-white transition hover:bg-white/20 sm:min-h-12 sm:rounded-2xl"
+                    className="inline-flex min-w-0 min-h-11 items-center justify-center gap-2 rounded-xl border border-white/30 bg-white/10 px-2 py-2.5 text-[11px] leading-tight whitespace-nowrap sm:px-6 sm:py-3 sm:text-sm sm:px-6 sm:py-3 sm:text-sm font-bold text-white transition hover:bg-white/20 sm:min-h-12 sm:rounded-2xl"
                   >
                     
-                    Hướng dẫn sử dụng
+                    <span className="sm:hidden">Hướng dẫn</span><span className="hidden sm:inline">Hướng dẫn sử dụng</span>
                   </button>
                 </div>
               </div>
 
-              <div className="space-y-4">
+              <div className="space-y-2 sm:space-y-4">
                 <motion.div
                   {...hoverLift}
-                  className="rounded-2xl border border-white/20 bg-white/10 p-4 sm:rounded-3xl sm:p-6 shadow-xl backdrop-blur-md"
+                  className="rounded-2xl border border-white/20 bg-white/10 p-3 sm:rounded-3xl sm:p-6 shadow-xl backdrop-blur-md"
                 >
                   <div className="text-xs font-bold uppercase tracking-widest text-blue-200">
                     {isLoggedIn ? 'Số dư ví của bạn' : 'Bắt đầu sử dụng'}
@@ -1052,15 +1053,15 @@ export default function SocialServicesPage() {
 
                   {isLoggedIn ? (
                     <>
-                      <div className="mt-2 break-all text-2xl font-black sm:mt-3 sm:text-3xl">
+                      <div className="mt-1 break-all text-xl font-black sm:mt-3 sm:text-3xl">
                         {balance === null ? '...' : money(balance)}
                       </div>
-                      <p className="mt-2 text-sm text-blue-100/80">
+                      <p className="mt-2 hidden text-sm text-blue-100/80 sm:block">
                         Dùng số dư để thanh toán đơn hàng.
                       </p>
                       <Link
                         to="/wallet"
-                        className="mt-3 inline-flex rounded-xl bg-blue-500 px-4 py-2 sm:mt-5 sm:px-5 sm:py-3 text-sm font-bold text-white transition hover:bg-blue-400"
+                        className="mt-2 inline-flex rounded-lg bg-blue-500 px-3 py-1.5 text-xs sm:mt-5 sm:rounded-xl sm:px-5 sm:py-3 sm:text-sm sm:mt-5 sm:px-5 sm:py-3 text-sm font-bold text-white transition hover:bg-blue-400"
                       >
                         Nạp tiền vào ví →
                       </Link>
@@ -1072,7 +1073,7 @@ export default function SocialServicesPage() {
                       </p>
                       <Link
                         to="/login"
-                        className="mt-3 inline-flex rounded-xl bg-blue-500 px-4 py-2 sm:mt-5 sm:px-5 sm:py-3 text-sm font-bold text-white transition hover:bg-blue-400"
+                        className="mt-2 inline-flex rounded-lg bg-blue-500 px-3 py-1.5 text-xs sm:mt-5 sm:rounded-xl sm:px-5 sm:py-3 sm:text-sm sm:mt-5 sm:px-5 sm:py-3 text-sm font-bold text-white transition hover:bg-blue-400"
                       >
                         Đăng nhập →
                       </Link>
@@ -1080,17 +1081,17 @@ export default function SocialServicesPage() {
                   )}
                 </motion.div>
 
-                <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6 sm:gap-3">
+                <div className="grid grid-cols-6 gap-1 sm:grid-cols-4 lg:grid-cols-6 sm:gap-3">
                   {availablePlatforms.map((item) => (
                     <div
                       key={item.value}
-                      className="flex flex-col items-center gap-2 rounded-xl border border-white/15 bg-white/10 px-2 py-2 sm:rounded-2xl sm:py-4 backdrop-blur-sm"
+                      className="flex flex-col items-center gap-1 rounded-xl border border-white/15 bg-white/10 px-1 py-2 sm:rounded-2xl sm:px-2 sm:py-4 backdrop-blur-sm"
                     >
                       <PlatformIcon
                         platform={item.value}
-                        className="h-8 w-8"
+                        className="h-6 w-6 sm:h-8 sm:w-8"
                       />
-                      <span className="text-xs font-bold">
+                      <span className="text-[9px] sm:text-xs font-bold">
                         {item.label}
                       </span>
                     </div>
@@ -1100,33 +1101,7 @@ export default function SocialServicesPage() {
             </div>
           </motion.section>
 
-          <motion.div
-            {...rise(0.06)}
-            className="mt-4 grid grid-cols-3 gap-2 sm:mt-6 sm:gap-3"
-          >
-            {[
-              ['01', 'Chọn mạng xã hội', 'Chọn nền tảng có dịch vụ đang bán'],
-              ['02', 'Chọn dịch vụ', 'Chọn lượt theo dõi, thích hoặc xem'],
-              ['03', 'Xác nhận đặt hàng', 'Kiểm tra giá tiền trước khi thanh toán'],
-            ].map(([number, title, description]) => (
-              <div
-                key={number}
-                className="flex flex-col items-start gap-2 rounded-xl border border-slate-200 bg-white p-3 sm:flex-row sm:gap-4 sm:rounded-2xl sm:p-5 shadow-sm"
-              >
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-50 sm:h-11 sm:w-11 sm:rounded-xl text-sm font-black text-blue-600">
-                  {number}
-                </div>
-                <div>
-                  <div className="font-black text-slate-900">
-                    {title}
-                  </div>
-                  <p className="mt-1 text-xs leading-5 text-slate-500">
-                    {description}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </motion.div>
+
 
           {error && (
             <div className="mt-5 rounded-2xl border border-red-100 bg-red-50 p-4 font-semibold text-red-600">
@@ -1136,7 +1111,7 @@ export default function SocialServicesPage() {
 
           <motion.form
             noValidate
-            id="tao-don"
+                    id="tao-don"
             {...rise(0.09)}
             onSubmit={(event) => {
               if (guideOpen) {
@@ -1146,7 +1121,7 @@ export default function SocialServicesPage() {
               }
               prepareOrder(event)
             }}
-            className="relative isolate mt-5 rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm sm:p-6 md:p-8"
+            className="relative isolate mt-3 rounded-[20px] border border-slate-200 bg-white p-3 shadow-sm sm:mt-5 sm:rounded-[24px] sm:p-6 md:p-8"
           >
             {/* NOSCAM_ORDER_LOGIN_GATE_V1 */}
             <fieldset
@@ -1158,21 +1133,7 @@ export default function SocialServicesPage() {
               }
             >
 
-            <div className="mb-5 flex items-center justify-between gap-3 sm:mb-7">
-              <div>
-                <h2 className="text-xl font-black text-slate-950 sm:text-2xl">
-                  Bắt đầu tạo đơn hàng
-                </h2>
 
-                <p className="mt-1 text-sm text-slate-400">
-                  Làm theo các bước bên dưới để đặt dịch vụ bạn cần.
-                </p>
-              </div>
-
-              <div className="rounded-xl bg-blue-50 px-3 py-2 text-xs font-black text-blue-600">
-                TẠO ĐƠN
-              </div>
-            </div>
 
             {loading ? (
               <div className="rounded-2xl bg-slate-50 p-10 text-center text-slate-400">
@@ -1185,7 +1146,8 @@ export default function SocialServicesPage() {
                     1. Chọn nền tảng
                   </label>
 
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 sm:gap-3">
+                  <TinyPlatformPet selected={platform} />
+                  <div className="grid grid-cols-3 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 sm:gap-3">
                     {availablePlatforms.map(
                       (item) => {
                         const active =
@@ -1208,11 +1170,20 @@ export default function SocialServicesPage() {
                               whileHover: { y: -4, scale: 1.015, boxShadow: '0 12px 28px rgba(15,23,42,0.10)' },
                               whileTap: { scale: 0.98 },
                             })}
-                            onClick={() =>
-                              changePlatform(
-                                item.value,
-                              )
-                            }
+                            onClick={() => {
+                              changePlatform(item.value)
+                              window.setTimeout(() => {
+                                const target = document.getElementById('chon-loai-dich-vu')
+                                if (target) {
+                                  const top = target.getBoundingClientRect().top
+                                    + window.scrollY - 360
+                                  window.scrollTo({
+                                    top: Math.max(0, top),
+                                    behavior: 'smooth',
+                                  })
+                                }
+                              }, 180)
+                            }}
                             className={`relative flex min-w-0 flex-col items-center justify-center gap-2 rounded-xl border p-2 text-center transition sm:flex-row sm:justify-start sm:gap-3 sm:rounded-2xl sm:p-4 sm:text-left ${
                               active
                                 ? item.value === 'facebook'
@@ -1272,7 +1243,7 @@ export default function SocialServicesPage() {
                 </div>
 
                 <div className="relative z-30">
-                  <label className="mb-2 block text-sm font-black text-slate-700">
+                  <label id="chon-loai-dich-vu" className="mb-2 block text-sm font-black text-slate-700">
                     2. Loại dịch vụ
                   </label>
 

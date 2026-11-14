@@ -104,9 +104,25 @@ class AdminDigitalOrderController extends Controller
             });
         }
 
-        return response()->json(
-            $query->orderByDesc('id')->paginate(30)
-        );
+        // Thong ke tren toan bo don hang, khong phu thuoc phan trang.
+        $stats = DigitalOrder::query()
+            ->selectRaw('COUNT(*) AS total')
+            ->selectRaw("SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) AS pending")
+            ->selectRaw("SUM(CASE WHEN status IN ('processing', 'in_progress') THEN 1 ELSE 0 END) AS processing")
+            ->selectRaw("SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS completed")
+            ->first();
+
+        $result = $query->orderByDesc('id')->paginate(30);
+
+        return response()->json([
+            ...$result->toArray(),
+            'stats' => [
+                'total' => (int) ($stats->total ?? 0),
+                'pending' => (int) ($stats->pending ?? 0),
+                'processing' => (int) ($stats->processing ?? 0),
+                'completed' => (int) ($stats->completed ?? 0),
+            ],
+        ]);
     }
 
     public function show(
