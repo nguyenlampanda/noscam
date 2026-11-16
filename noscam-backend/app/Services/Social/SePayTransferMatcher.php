@@ -52,7 +52,7 @@ class SePayTransferMatcher
 
         if ($suffix !== ''
             && !preg_match(
-                '/^(?:(?:FT|GD|REF|TRACE)[A-Za-z0-9-]+(?:\s+|$))+$/i',
+                '/^(?:(?:(?:FT|GD|REF|TRACE)[A-Za-z0-9-]+|(?:CT\s+TU|CT\s+DEN|IBFT)\s*[:#-]?\s*[A-Za-z0-9-]+)(?:\s+|$))+$/i',
                 $suffix
             )) {
             return null;

@@ -69,6 +69,36 @@ class SePayTransferMatcherTest extends TestCase
         );
     }
 
+
+    public function test_bank_suffix_variants(): void
+    {
+        $matcher = new SePayTransferMatcher();
+
+        foreach ([
+            'SEVQR NOSCAM nguyenlam CT TU 123456',
+            'SEVQR NOSCAM nguyenlam IBFT 123456',
+            'SEVQR NOSCAM nguyenlam CT DEN:123456',
+            'CT TU 123456 SEVQR NOSCAM nguyenlam',
+        ] as $content) {
+            $this->assertSame('nguyenlam', $matcher->usernameFromContent($content));
+        }
+    }
+
+    public function test_rejects_ambiguous_bank_suffix(): void
+    {
+        $matcher = new SePayTransferMatcher();
+
+        foreach ([
+            'SEVQR NOSCAM user1 user2',
+            'SEVQR NOSCAM user1 CT TU',
+            'SEVQR NOSCAM user1 IBFT',
+            'SEVQR NOSCAM user1 CT TU 123456 user2',
+            'SEVQR NOSCAM user1 SEVQR NOSCAM user2',
+        ] as $content) {
+            $this->assertNull($matcher->usernameFromContent($content));
+        }
+    }
+
     public function test_rejects_multiple_sevqr_references(): void
     {
         $matcher = new SePayTransferMatcher();
