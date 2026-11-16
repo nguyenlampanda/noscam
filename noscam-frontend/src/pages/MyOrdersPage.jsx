@@ -587,6 +587,20 @@ async function handleCancelOrder(item) {
 
   return (
     <main className="bg-white min-h-screen px-4 pb-24 pt-7 sm:px-6 sm:pb-12 md:py-12">
+<style>{`
+  .noscam-customer-order-detail {
+    animation: noscam-customer-order-expand 240ms ease-out both;
+    transform-origin: top;
+  }
+  @keyframes noscam-customer-order-expand {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .noscam-customer-order-detail { animation: none; }
+  }
+`}</style>
+
       {commentDialogOrder && (
         <div
           className="fixed inset-0 z-[1000] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm"
@@ -925,9 +939,33 @@ async function handleCancelOrder(item) {
                           0.2,
                         ),
                     }}
-                    className="overflow-hidden rounded-[28px] border border-slate-200/80 bg-white/95 shadow-[0_12px_35px_-25px_rgba(15,23,42,0.35)] transition-all duration-300 hover:-translate-y-1 hover:border-blue-300 hover:shadow-[0_25px_55px_-28px_rgba(37,99,235,0.35)]"
+                    className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm has-[details[open]]:border-blue-400 has-[details[open]]:ring-2 has-[details[open]]:ring-blue-100 has-[details[open]]:shadow-lg has-[details[open]]:shadow-blue-100/60"
                   >
-                    <div className="p-5 md:p-6">
+                    <details className="group/order">
+                      <summary className="flex cursor-pointer list-none items-center gap-3 p-4 transition-colors hover:bg-blue-50/40 group-open/order:bg-blue-50 [&::-webkit-details-marker]:hidden">
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100">
+                          <PlatformIcon platform={item.service?.platform || 'other'} className="h-5 w-5" />
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm font-black text-slate-950">{item.code}</div>
+                          <div className="truncate text-xs text-slate-500">{item.service?.name || 'Dịch vụ'}</div>
+                          <div className="mt-1 text-[11px] text-slate-400">{number(item.quantity)} lượt · {progress}%</div>
+                        </div>
+                        <div className="shrink-0 text-right">
+                          <div className="text-sm font-black text-blue-600">{money(item.sell_amount)}</div>
+                          <div className="text-[11px] font-bold text-slate-500">{meta.label}</div>
+                          <div className="text-[11px] font-bold text-blue-600 group-open/order:hidden">Chi tiết ▾</div>
+                          <div className="hidden text-[11px] font-bold text-blue-600 group-open/order:block">Thu gọn ▴</div>
+                        </div>
+                      </summary>
+                      <div className="noscam-customer-order-detail border-l-4 border-l-blue-500 border-t border-blue-100 bg-blue-50/20 p-4 md:p-5">
+                        <div className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3">
+                          <div>
+                            <div className="text-[10px] font-black uppercase tracking-widest text-blue-500">Thông tin mở rộng</div>
+                            <div className="mt-1 text-sm font-black text-blue-900">CHI TIẾT ĐƠN {item.code}</div>
+                          </div>
+                          <span className="text-xs font-bold text-blue-600">Thông tin đơn hàng</span>
+                        </div>
                       <div className="flex flex-wrap items-start justify-between gap-4">
                         <div className="flex min-w-0 items-start gap-4">
                           <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-blue-100 bg-gradient-to-br from-blue-50 to-white shadow-sm transition-transform duration-300 group-hover:scale-110">
@@ -1105,6 +1143,7 @@ async function handleCancelOrder(item) {
                         </div>
                       )}
                     </div>
+                    </details>
                   </motion.article>
                 )
               },

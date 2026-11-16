@@ -508,6 +508,20 @@ export default function AdminSocialOrdersPage() {
   return (
     <div className="min-h-screen bg-slate-50">
       <AdminNav />
+<style>{`
+  .noscam-order-detail {
+    animation: noscam-order-expand 240ms ease-out both;
+    transform-origin: top;
+  }
+  @keyframes noscam-order-expand {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .noscam-order-detail { animation: none; }
+  }
+`}</style>
+
 
       <main className="mx-auto max-w-7xl px-5 py-8 lg:px-8">
         <div>
@@ -641,8 +655,39 @@ export default function AdminSocialOrdersPage() {
                 return (
                   <article
                     key={item.id}
-                    className="p-4 transition hover:bg-slate-50/70 sm:p-5"
+                    className="relative border-b border-slate-100 last:border-b-0 has-[details[open]]:z-10 has-[details[open]]:rounded-xl has-[details[open]]:ring-2 has-[details[open]]:ring-blue-400 has-[details[open]]:shadow-lg has-[details[open]]:shadow-blue-100"
                   >
+                    <details className="group/order">
+                      <summary className="grid cursor-pointer list-none grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 px-4 py-3 transition-colors hover:bg-blue-50/40 group-open/order:bg-blue-50 sm:grid-cols-[minmax(0,1fr)_85px_105px_105px_155px_105px] [&::-webkit-details-marker]:hidden">
+                        <div className="min-w-0">
+                          <div className="text-sm font-black text-slate-950">{item.code}</div>
+                          <div className="truncate text-xs text-slate-500">{item.service?.name || 'Dịch vụ'}</div>
+                          <div className="truncate text-[11px] text-slate-400">{item.user?.username || item.user?.name || 'Khách hàng'}</div>
+                        </div>
+                        <div className="hidden min-w-[70px] text-xs sm:block">
+                          <div className="text-slate-400">Số lượng</div>
+                          <div className="font-bold">{number(item.quantity)}</div>
+                        </div>
+                        <div className="hidden min-w-[90px] text-xs md:block">
+                          <div className="text-slate-400">Giá bán</div>
+                          <div className="font-bold">{money(item.sell_amount)}</div>
+                        </div>
+                        <div className="hidden min-w-[90px] text-xs lg:block">
+                          <div className="text-slate-400">Lợi nhuận</div>
+                          <div className="font-bold text-emerald-700">{money(item.profit_amount)}</div>
+                        </div>
+                        <StatusBadge status={item.status} order={item} />
+                        <span className="inline-flex items-center justify-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700 group-open/order:hidden">Chi tiết <span>⌄</span></span>
+                        <span className="hidden items-center justify-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700 group-open/order:inline-flex">Thu gọn <span>⌃</span></span>
+                      </summary>
+                      <div className="noscam-order-detail border-l-4 border-l-blue-500 border-t border-t-blue-100 bg-blue-50/20 p-4 sm:p-5">
+                        <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3">
+                          <div>
+                            <div className="text-[10px] font-black uppercase tracking-widest text-blue-500">Thông tin mở rộng</div>
+                            <div className="mt-1 text-sm font-black text-blue-900">CHI TIẾT ĐƠN {item.code}</div>
+                          </div>
+                          <span className="rounded-lg bg-white px-3 py-1.5 text-xs font-bold text-blue-700">#{item.id}</span>
+                        </div>
                     <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 pb-4">
                       <div className="min-w-0">
                         <div className="text-base font-black text-slate-950">
@@ -799,6 +844,8 @@ export default function AdminSocialOrdersPage() {
 </div>
 
                     </div>
+                      </div>
+                    </details>
                   </article>
                 )
               })
