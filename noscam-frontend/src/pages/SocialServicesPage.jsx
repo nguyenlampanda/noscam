@@ -349,6 +349,30 @@ export default function SocialServicesPage() {
   const isLoggedIn =
     Boolean(getCustomerToken())
 
+  const [depositUser, setDepositUser] = useState(null)
+
+  useEffect(() => {
+    let active = true
+
+    if (!isLoggedIn) {
+      setDepositUser(null)
+      return undefined
+    }
+
+    customerService.me()
+      .then((response) => {
+        if (!active) return
+        setDepositUser(response?.data?.user || response?.data || null)
+      })
+      .catch(() => {
+        if (active) setDepositUser(null)
+      })
+
+    return () => {
+      active = false
+    }
+  }, [isLoggedIn])
+
   useEffect(() => {
     let active = true
 
@@ -525,6 +549,8 @@ export default function SocialServicesPage() {
     numericQuantity,
   ])
 
+  const [depositQrOpen, setDepositQrOpen] = useState(false)
+
   const insufficient =
     isLoggedIn &&
     balance !== null &&
@@ -534,6 +560,19 @@ export default function SocialServicesPage() {
     insufficient
       ? total - balance
       : 0
+
+  const depositUsername = String(depositUser?.username || '').trim()
+  const depositContent = /^[A-Za-z0-9_.-]{1,50}$/.test(depositUsername)
+    ? `SEVQR NOSCAM ${depositUsername}`
+    : ''
+  const depositAmount = Math.max(10000, Math.ceil(missingAmount))
+  const depositQrUrl = depositContent && depositAmount <= 100000000
+    ? `https://img.vietqr.io/image/ICB-888838906789-compact2.png?${new URLSearchParams({
+        amount: String(depositAmount),
+        addInfo: depositContent,
+        accountName: 'NGUYEN LAM',
+      }).toString()}`
+    : ''
 
   const categoryMeta = {
     follow: {
@@ -1842,12 +1881,13 @@ export default function SocialServicesPage() {
                           .
                         </div>
 
-                        <Link
-                          to="/wallet"
+                        <button
+                          type="button"
+                          onClick={() => setDepositQrOpen(true)}
                           className="mt-3 inline-flex rounded-xl bg-red-600 px-4 py-2.5 text-sm font-black text-white"
                         >
                           Nạp tiền
-                        </Link>
+                        </button>
                       </div>
                     )}
 
@@ -1859,15 +1899,14 @@ export default function SocialServicesPage() {
                         Đăng nhập để đặt đơn
                       </button>
                     ) : insufficient ? (
-                      <Link
-                        to="/wallet"
+                      <button
+                        type="button"
+                        onClick={() => setDepositQrOpen(true)}
                         className="flex w-full items-center justify-center rounded-2xl bg-slate-950 px-5 py-4 font-black text-white"
                       >
                         Nạp thêm{' '}
-                        {money(
-                          missingAmount,
-                        )}
-                      </Link>
+                        {money(missingAmount)}
+                      </button>
                     ) : (
                       <button
                         type="submit"
@@ -2196,6 +2235,83 @@ export default function SocialServicesPage() {
             >
               {orderResult.type === 'success' ? 'Tiếp tục đặt hàng' : 'Đóng'}
             </button>
+          </div>
+        </div>
+      )}
+
+      {depositQrOpen && (
+        <div
+          className="fixed inset-0 z-[350] flex items-center justify-center bg-slate-950/65 p-3 sm:p-5"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Nạp tiền VietinBank"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setDepositQrOpen(false)
+          }}
+        >
+          <div className="max-h-[95vh] w-full max-w-md overflow-y-auto rounded-3xl bg-white p-5 shadow-2xl sm:p-7">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-xl font-black text-slate-950">
+                Nạp tiền VietinBank
+              </h2>
+              <button
+                type="button"
+                onClick={() => setDepositQrOpen(false)}
+                className="rounded-xl bg-slate-100 px-3 py-2 font-bold text-slate-600"
+                aria-label="Đóng"
+              >
+                ✕
+              </button>
+            </div>
+            {depositQrUrl ? (
+              <>
+                <img
+                  src={depositQrUrl}
+                  alt="QR VietinBank nạp tiền NoScam"
+                  className="mx-auto mt-4 w-full max-w-[300px] rounded-2xl border border-slate-100"
+                />
+                <div className="mt-3 text-center text-3xl font-black text-blue-600">
+                  {money(depositAmount)}
+                </div>
+                <div className="mt-4 rounded-2xl bg-slate-50 p-4 text-sm">
+                  <p><strong>Ngân hàng:</strong> VietinBank</p>
+                  <p className="mt-2"><strong>Chủ tài khoản:</strong> NGUYEN LAM</p>
+                  <p className="mt-2"><strong>Số tài khoản:</strong> 888838906789</p>
+                  <p className="mt-2 break-all">
+                    <strong>Nội dung:</strong> {depositContent}
+                  </p>
+                </div>
+                <div className="mt-4 grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => navigator.clipboard.writeText('888838906789')}
+                    className="rounded-xl bg-slate-100 px-3 py-3 text-sm font-bold"
+                  >
+                    Sao chép STK
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => navigator.clipboard.writeText(depositContent)}
+                    className="rounded-xl bg-blue-600 px-3 py-3 text-sm font-bold text-white"
+                  >
+                    Sao chép nội dung
+                  </button>
+                </div>
+                {missingAmount < 10000 && (
+                  <p className="mt-3 text-center text-xs text-amber-700">
+                    Số tiền nạp tối thiểu là 10.000đ.
+                  </p>
+                )}
+                <p className="mt-4 text-center text-xs leading-5 text-slate-500">
+                  Quét QR và giữ nguyên nội dung chuyển khoản.
+                  Số dư ví sẽ được cập nhật khi ngân hàng xác nhận.
+                </p>
+              </>
+            ) : (
+              <p className="mt-6 text-sm text-red-600">
+                Không thể tạo QR. Vui lòng kiểm tra tài khoản đăng nhập hoặc số tiền.
+              </p>
+            )}
           </div>
         </div>
       )}
