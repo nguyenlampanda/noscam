@@ -662,6 +662,7 @@ class VietnamFbProvider implements SocialProviderInterface
         $status = match ($rawStatus) {
             'THANH_CONG' => 'completed',
             'DANG_XU_LY' => 'in_progress',
+            'DA_HUY', 'HUY', 'CANCELLED', 'CANCELED' => 'cancelled',
             default => '',
         };
 
