@@ -331,6 +331,7 @@ class VietnamFbProvider implements SocialProviderInterface
             'LIKE_PAGE2' => ['like_page2', 'create', 'id'],
             'FANPAGE_REVIEW' => ['fanpage_review', 'create', 'id'],
             'STORY_VIEW' => ['story_view', 'create', 'link'],
+            'VIRTUAL_SHARE' => ['virtual_share', 'create', 'id'],
             'SHARELIVE' => ['sharelive', 'create', 'id'],
             'VIPLIKE' => ['viplike', 'create', 'id'],
             'VIPCMT' => ['vipcmt', 'create', 'id'],
