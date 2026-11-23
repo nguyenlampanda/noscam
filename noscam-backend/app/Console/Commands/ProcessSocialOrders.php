@@ -135,16 +135,18 @@ class ProcessSocialOrders extends Command
                     'provider',
                     function ($query) {
                         $query
-                            ->where(
-                                'status',
-                                'active'
-                            )
+                            ->where(function ($statusQuery) {
+                                $statusQuery
+                                    ->where('status', 'active')
+                                    ->orWhere('driver', 'bufflikenhanh_v2');
+                            })
                             ->whereIn(
                                 'driver',
                                 [
                         'subs24h',
                                     'hacklike17',
             'vietnamfb',
+                                    'bufflikenhanh_v2',
         ]
                             );
                     }

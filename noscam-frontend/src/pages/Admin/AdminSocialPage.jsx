@@ -196,7 +196,7 @@ function ProviderCard({
         provider.api_url || '',
 
       api_key:
-        provider.api_key || '',
+        '',
 
       priority:
         provider.priority ?? 100,

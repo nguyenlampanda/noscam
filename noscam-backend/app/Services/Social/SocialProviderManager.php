@@ -7,6 +7,7 @@ use App\Services\Social\Providers\HackLike17Provider;
 use App\Services\Social\Providers\Subs24hProvider;
 use App\Services\Social\Providers\VietnamFbProvider;
 use App\Services\Social\Providers\VietnamFbV2Provider;
+use App\Services\Social\Providers\BuffLikeNhanhV2Provider;
 use InvalidArgumentException;
 
 class SocialProviderManager
@@ -23,6 +24,12 @@ class SocialProviderManager
 
             'hacklike17' =>
                 new HackLike17Provider(
+                    $provider->api_url,
+                    $provider->api_key
+                ),
+
+            'bufflikenhanh_v2' =>
+                new BuffLikeNhanhV2Provider(
                     $provider->api_url,
                     $provider->api_key
                 ),

@@ -294,6 +294,7 @@ function ProviderBadge({
     vietnamfb: 'VietnamFB',
     nganhangsub: 'NganHangSub',
     hacklike17: 'HackLike17',
+    bufflikenhanh_v2: 'BuffLikeNhanh V2',
   }
 
   return (
@@ -466,7 +467,7 @@ function MapModal({ item, onClose, onDone }) {
         min_quantity: min,
         max_quantity: max,
         priority: Number(item.priority ?? 100),
-        is_active: true,
+        is_active: String(item.provider?.driver || '').toLowerCase() !== 'bufflikenhanh_v2',
       })
 
       setSaved({

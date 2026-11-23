@@ -431,37 +431,26 @@ class SocialOrderProviderService
 
                         $locked->save();
 
+                        /*
+                         * Keep terminal status and wallet refund atomic.
+                         * A failed refund must roll back the status.
+                         */
+                        if (in_array(
+                            $locked->status,
+                            ['failed', 'cancelled'],
+                            true
+                        )) {
+                            return $this->orders->refund($locked);
+                        }
+
+                        if ($locked->status === 'partial') {
+                            return $this->orders->refundPartial($locked);
+                        }
+
                         return $locked->fresh();
                     },
                     3
                 );
-
-            if (
-                in_array(
-                    $order->status,
-                    [
-                        'failed',
-                        'cancelled',
-                    ],
-                    true
-                )
-            ) {
-                $order =
-                    $this->orders->refund(
-                        $order
-                    );
-            }
-
-            if (
-                $order->status ===
-                'partial'
-            ) {
-                $order =
-                    $this->orders
-                        ->refundPartial(
-                            $order
-                        );
-            }
 
             return $order
                 ->fresh()

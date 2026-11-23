@@ -50,6 +50,18 @@ class AdminSocialProviderController extends Controller
         Request $request,
         SocialProvider $provider
     ): JsonResponse {
+        if (
+            $provider->driver === 'bufflikenhanh_v2'
+            && (
+                $request->input('status') === 'active'
+                || $request->boolean('auto_sync')
+            )
+        ) {
+            return response()->json([
+                'message' => 'BuffLikeNhanh V2 đang thử nghiệm, chưa được bật provider hoặc tự đồng bộ.',
+            ], 422);
+        }
+
         $data = $request->validate([
             'name' => [
                 'sometimes',
@@ -197,7 +209,7 @@ class AdminSocialProviderController extends Controller
                     $currency,
 
                 'status' =>
-                    $provider->driver === 'vietnamfb_v2'
+                    in_array($provider->driver, ['vietnamfb_v2', 'bufflikenhanh_v2'], true)
                         ? $provider->status
                         : 'active',
 
@@ -245,7 +257,7 @@ class AdminSocialProviderController extends Controller
 
             $provider->update([
                 'status' =>
-                    $provider->driver === 'vietnamfb_v2'
+                    in_array($provider->driver, ['vietnamfb_v2', 'bufflikenhanh_v2'], true)
                         ? $provider->status
                         : 'error',
 
@@ -433,6 +445,27 @@ class AdminSocialProviderController extends Controller
                             }
                         }
 
+                        if ($provider->driver === 'bufflikenhanh_v2') {
+                            if (
+                                !is_numeric($rate)
+                                || !is_finite((float) $rate)
+                                || (float) $rate <= 0
+                                || (float) $rate > 99999999999
+                                || !is_numeric($min)
+                                || !is_numeric($max)
+                                || !is_finite((float) $min)
+                                || !is_finite((float) $max)
+                                || (float) $min < 1
+                                || (float) $max < (float) $min
+                                || (float) $max > 4294967295
+                                || floor((float) $min) != (float) $min
+                                || floor((float) $max) != (float) $max
+                            ) {
+                                continue;
+                            }
+                        }
+
+
                         $providerActive =
                             array_key_exists(
                                 'provider_active',
@@ -467,9 +500,13 @@ class AdminSocialProviderController extends Controller
                                             $name,
 
                                         'cost_price_per_1000' =>
-                                            $provider->driver === 'vietnamfb_v2'
-                                                ? round((float) $rate * 26000, 5)
-                                                : $rate,
+                                            $provider->driver === 'bufflikenhanh_v2'
+                                                ? round((float) $rate , 5)
+                                                : (
+                                                    $provider->driver === 'vietnamfb_v2'
+                                                        ? round((float) $rate * 26000, 5)
+                                                        : $rate
+                                                ),
 
                                         'min_quantity' =>
                                             max(
@@ -499,8 +536,26 @@ class AdminSocialProviderController extends Controller
                                     ]
                                 );
 
+
+                        if (
+                            $provider->driver === 'bufflikenhanh_v2'
+                            && $record->wasRecentlyCreated
+                        ) {
+                            $record->update(['is_active' => false]);
+                        }
+
                         $syncedIds[] =
                             $record->id;
+                    }
+
+
+                    if (
+                        $provider->driver === 'bufflikenhanh_v2'
+                        && empty($syncedIds)
+                    ) {
+                        throw new \RuntimeException(
+                            'Không có dịch vụ BuffLikeNhanh hợp lệ để đồng bộ.'
+                        );
                     }
 
                     SocialProviderService::query()
@@ -673,7 +728,7 @@ class AdminSocialProviderController extends Controller
                 ),
 
             'api_key' =>
-                $provider->api_key,
+                null,
 
             'status' =>
                 $provider->status,

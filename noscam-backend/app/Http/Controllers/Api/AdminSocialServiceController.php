@@ -288,6 +288,17 @@ class AdminSocialServiceController extends Controller
             ],
         ]);
 
+        $providerService->loadMissing('provider');
+
+        if (
+            $providerService->provider?->driver === 'bufflikenhanh_v2'
+            && !empty($data['is_active'])
+        ) {
+            return response()->json([
+                'message' => 'BuffLikeNhanh V2 đang ở chế độ thử nghiệm, chưa cho phép kích hoạt.',
+            ], 422);
+        }
+
         $providerService->update(
             $data
         );
@@ -410,6 +421,44 @@ class AdminSocialServiceController extends Controller
         }
 
         /*
+         * BuffLikeNhanh V2:
+         * Validate provider limits when creating a new service.
+         * Never widen provider-supported quantity limits.
+         */
+        if (empty($data['social_service_id'])) {
+            $providerService->loadMissing('provider');
+
+            if (
+                $providerService->provider?->driver
+                === 'bufflikenhanh_v2'
+            ) {
+                $sourceMin = (int) $providerService->min_quantity;
+                $sourceMax = (int) $providerService->max_quantity;
+
+                $requestedMin = (int) (
+                    $data['min_quantity'] ?? $sourceMin
+                );
+
+                $requestedMax = (int) (
+                    $data['max_quantity'] ?? $sourceMax
+                );
+
+                if (
+                    $sourceMin < 1
+                    || $sourceMax < $sourceMin
+                    || $requestedMin < $sourceMin
+                    || $requestedMax > $sourceMax
+                    || $requestedMax < $requestedMin
+                ) {
+                    return response()->json([
+                        'message' =>
+                            'Min/Max không phù hợp giới hạn BuffLikeNhanh V2.',
+                    ], 422);
+                }
+            }
+        }
+
+        /*
          * New VietnamFB mappings without published limits must
          * receive explicit quantity limits from the administrator.
          */
@@ -492,6 +541,55 @@ class AdminSocialServiceController extends Controller
                     return response()->json([
                         'message' =>
                             'Giới hạn số lượng phải nằm trong Min/Max của VietnamFB V2.',
+                    ], 422);
+                }
+            }
+        }
+
+        /*
+         * BuffLikeNhanh V2:
+         * Validate existing selling price and provider limits.
+         * Never change the target service automatically.
+         */
+        if (!empty($data['social_service_id'])) {
+            $providerService->loadMissing('provider');
+
+            if (
+                $providerService->provider?->driver
+                === 'bufflikenhanh_v2'
+            ) {
+                $target = SocialService::findOrFail(
+                    $data['social_service_id']
+                );
+
+                $cost = $providerService->costPriceVnd();
+
+                if (
+                    !is_finite($cost)
+                    || $cost <= 0
+                    || $target->sell_price_per_1000 === null
+                    || (float) $target->sell_price_per_1000 <= $cost
+                ) {
+                    return response()->json([
+                        'message' =>
+                            'Giá bán phải cao hơn giá vốn BuffLikeNhanh V2.',
+                    ], 422);
+                }
+
+                $sourceMin = (int) $providerService->min_quantity;
+                $sourceMax = (int) $providerService->max_quantity;
+
+                if (
+                    $sourceMin < 1
+                    || $sourceMax < $sourceMin
+                    || (int) $target->min_quantity < $sourceMin
+                    || (int) $target->max_quantity > $sourceMax
+                    || (int) $target->max_quantity
+                        < (int) $target->min_quantity
+                ) {
+                    return response()->json([
+                        'message' =>
+                            'Min/Max không phù hợp giới hạn BuffLikeNhanh V2.',
                     ], 422);
                 }
             }
@@ -672,7 +770,7 @@ class AdminSocialServiceController extends Controller
                                 $data['sell_price_per_1000']
                                 ?? null,
                             'is_active' =>
-                                true,
+                                $providerService->provider?->driver !== 'bufflikenhanh_v2',
                             'sort_order' =>
                                 0,
                             'settings' => [
@@ -692,14 +790,13 @@ class AdminSocialServiceController extends Controller
                             ->priority,
 
                     'is_active' =>
-                        array_key_exists(
-                            'is_active',
-                            $data
-                        )
-                            ? (bool) $data[
-                                'is_active'
-                            ]
-                            : true,
+                        $providerService->provider?->driver === 'bufflikenhanh_v2'
+                            ? false
+                            : (
+                                array_key_exists('is_active', $data)
+                                    ? (bool) $data['is_active']
+                                    : true
+                            ),
                 ]);
 
                 return $service;
