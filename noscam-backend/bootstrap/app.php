@@ -116,6 +116,10 @@ return Application::configure(
                 at: '*'
             );
 
+            $middleware->redirectGuestsTo(
+                fn (Request $request) => '/login'
+            );
+
             $middleware->alias([
                 'moderator' =>
                     EnsureUserCanModerate::class,
