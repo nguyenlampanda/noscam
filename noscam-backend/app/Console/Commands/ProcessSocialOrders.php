@@ -28,10 +28,10 @@ class ProcessSocialOrders extends Command
         );
 
         /*
-         * SUBMIT
+- SUBMIT
          *
-         * Chỉ retry tối đa 3 lần.
-         * Chỉ provider đã xác nhận chuẩn SMM V2.
+- Chỉ retry tối đa 3 lần.
+- Chỉ provider đã xác nhận chuẩn SMM V2.
          */
         $pendingOrders =
             SocialOrder::query()
@@ -62,10 +62,11 @@ class ProcessSocialOrders extends Command
                             ->whereIn(
                                 'driver',
                                 [
-                        'subs24h',
+                                    'subs24h',
                                     'hacklike17',
-            'vietnamfb',
-        ]
+                                    'vietnamfb',
+                                    'vietnamfb_v2',
+                                ]
                             );
                     }
                 )
@@ -96,11 +97,11 @@ class ProcessSocialOrders extends Command
         }
 
         /*
-         * SYNC
+- SYNC
          *
-         * Chỉ sync đơn đang chạy.
-         * Không đụng completed/partial/
-         * cancelled/failed.
+- Chỉ sync đơn đang chạy.
+- Không đụng completed/partial/
+- cancelled/failed.
          */
         $syncOrders =
             SocialOrder::query()
@@ -143,11 +144,12 @@ class ProcessSocialOrders extends Command
                             ->whereIn(
                                 'driver',
                                 [
-                        'subs24h',
+                                    'subs24h',
                                     'hacklike17',
-            'vietnamfb',
+                                    'vietnamfb',
+                                    'vietnamfb_v2',
                                     'bufflikenhanh_v2',
-        ]
+                                ]
                             );
                     }
                 )
