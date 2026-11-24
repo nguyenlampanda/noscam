@@ -66,6 +66,7 @@ class ProcessSocialOrders extends Command
                                     'hacklike17',
                                     'vietnamfb',
                                     'vietnamfb_v2',
+                                    'bufflikenhanh_v2',
                                 ]
                             );
                     }

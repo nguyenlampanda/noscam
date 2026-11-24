@@ -1459,10 +1459,10 @@ export default function AdminSocialServicesPage() {
     useState('')
 
   const [mapped, setMapped] =
-    useState('')
+    useState('false')
 
   const [availability, setAvailability] =
-    useState('')
+    useState('available')
 
   const [page, setPage] =
     useState(1)
