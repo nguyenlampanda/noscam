@@ -418,6 +418,7 @@ export const adminService = {
   async getSocialProviderServices({
     providerId = '',
     platform = '',
+    interactionType = '',
     mapped = '',
     providerAvailability = '',
     active = '',
@@ -431,6 +432,10 @@ export const adminService = {
 
     if (platform) {
       params.set('platform', platform)
+    }
+
+    if (interactionType) {
+      params.set('interaction_type', interactionType)
     }
 
     if (providerAvailability) {

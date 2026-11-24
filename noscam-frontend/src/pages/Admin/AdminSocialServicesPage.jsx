@@ -1370,6 +1370,47 @@ const SOURCE_PLATFORMS = [
   ['other', 'Chưa xác định', 'bg-slate-100 text-slate-500'],
 ]
 
+const SOURCE_INTERACTION_TYPES = [
+  ['follow', 'Follow / Theo dõi'],
+  ['like', 'Like / Tim'],
+  ['comment', 'Comment / Bình luận'],
+  ['like_comment', 'Like bình luận'],
+  ['view', 'View / Lượt xem'],
+  ['share', 'Share / Chia sẻ'],
+  ['live', 'Livestream / Mắt live'],
+  ['like_live', 'Tim livestream'],
+  ['reaction', 'Reaction / Cảm xúc'],
+  ['save', 'Save / Yêu thích'],
+  ['member', 'Member / Thành viên'],
+  ['repost', 'Repost / Đăng lại'],
+  ['watch_time', 'Watch Time / Giờ xem'],
+  ['review', 'Review / Đánh giá'],
+  ['pk', 'PK Live'],
+  ['verification', 'Tích xanh'],
+  ['bot_start', 'Bot Start'],
+  ['other', 'Khác'],
+]
+
+function SourceInteractionBadges({ item }) {
+  const types = item.source_interaction_types || ['other']
+
+  return (
+    <>
+      {types.map((type) => {
+        const label = SOURCE_INTERACTION_TYPES.find(
+          ([key]) => key === type
+        )?.[1] || 'Khác'
+
+        return (
+          <span key={type} className="mb-2 inline-flex rounded-lg bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-800">
+            {label}
+          </span>
+        )
+      })}
+    </>
+  )
+}
+
 function SourcePlatformBadge({ item }) {
   const platform = SOURCE_PLATFORMS.find(
     ([key]) => key === item.source_platform
@@ -1412,6 +1453,7 @@ export default function AdminSocialServicesPage() {
     useState('')
 
   const [sourcePlatform, setSourcePlatform] = useState('')
+  const [sourceInteraction, setSourceInteraction] = useState('')
 
   const [providerId, setProviderId] =
     useState('')
@@ -1440,6 +1482,7 @@ export default function AdminSocialServicesPage() {
             .getSocialProviderServices({
               providerId,
               platform: sourcePlatform,
+              interactionType: sourceInteraction,
               mapped,
               providerAvailability: availability,
               search,
@@ -1524,6 +1567,7 @@ export default function AdminSocialServicesPage() {
       page,
       providerId,
       sourcePlatform,
+      sourceInteraction,
       search,
       availability,
     ],
@@ -1606,7 +1650,7 @@ export default function AdminSocialServicesPage() {
 
         <SocialAdminNav />
 
-        <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
           <input
             value={search}
             onChange={(e) => {
@@ -1655,6 +1699,20 @@ export default function AdminSocialServicesPage() {
           >
             <option value="">Tất cả nền tảng</option>
             {SOURCE_PLATFORMS.map(([key, label]) => (
+              <option key={key} value={key}>{label}</option>
+            ))}
+          </SocialFilterSelect>
+
+          <SocialFilterSelect
+            value={sourceInteraction}
+            onChange={(e) => {
+              setSourceInteraction(e.target.value)
+              setPage(1)
+            }}
+            className="h-12 w-full min-w-0 rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700"
+          >
+            <option value="">Tất cả loại tương tác</option>
+            {SOURCE_INTERACTION_TYPES.map(([key, label]) => (
               <option key={key} value={key}>{label}</option>
             ))}
           </SocialFilterSelect>
@@ -1775,7 +1833,10 @@ export default function AdminSocialServicesPage() {
                       </td>
 
                       <td className="px-2 py-4 align-middle break-words">
-                        <SourcePlatformBadge item={item} />
+                        <div className="flex flex-wrap items-center gap-x-1.5">
+                          <SourcePlatformBadge item={item} />
+                          <SourceInteractionBadges item={item} />
+                        </div>
                         <div className="max-w-sm font-bold text-slate-900">
                           {item.provider_service_name}
                         </div>

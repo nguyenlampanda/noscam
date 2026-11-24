@@ -179,6 +179,28 @@ class AdminSocialServiceController extends Controller
             $query->whereIntegerInRaw('id', $ids);
         }
 
+        if ($request->filled('interaction_type')) {
+            $interaction = (string) $request->input('interaction_type');
+
+            if (!in_array($interaction, ['follow', 'like', 'comment', 'like_comment', 'view', 'share', 'live', 'like_live', 'reaction', 'save', 'member', 'repost', 'watch_time', 'review', 'pk', 'verification', 'bot_start', 'other'], true)) {
+                return response()->json([
+                    'message' => 'Loại tương tác không hợp lệ.',
+                ], 422);
+            }
+
+            $ids = [];
+
+            (clone $query)->chunkById(500, function ($items) use (&$ids, $interaction) {
+                foreach ($items as $item) {
+                    if (in_array($interaction, $this->sourceInteractionTypes($item), true)) {
+                        $ids[] = (int) $item->id;
+                    }
+                }
+            });
+
+            $query->whereIntegerInRaw('id', $ids);
+        }
+
         $paginator = $query
             ->orderBy('social_provider_id')
             ->orderBy('provider_service_name')
@@ -1049,6 +1071,135 @@ class AdminSocialServiceController extends Controller
         return $detect($item->service?->platform ?? '');
     }
 
+    private function sourceInteractionTypes(SocialProviderService $item): array
+    {
+        $metadata = (array) ($item->provider_data ?? []);
+        $raw = (array) ($metadata['provider_data'] ?? []);
+
+        $detect = function ($value): array {
+            if (!is_string($value) || trim($value) === '') {
+                return [];
+            }
+
+            $text = strtolower(\Illuminate\Support\Str::ascii($value));
+            $text = str_replace('_', ' ', $text);
+            $text = preg_replace('/\s+/', ' ', trim($text));
+
+            $has = fn ($pattern) => preg_match('~'.$pattern.'~i', $text) === 1;
+            $types = [];
+
+            if ($has('thu nghiem|khong dung|dv test|dich vu dac biet')) {
+                return ['other'];
+            }
+
+            if ($has('tic[h]? xanh|verification|verified badge')) {
+                return ['verification'];
+            }
+
+            if ($has('bot start')) {
+                return ['bot_start'];
+            }
+
+            if ($has('\bpk\b|battle points|diem chien dau')) {
+                return ['pk'];
+            }
+
+            if ($has('\breview\b|danh gia')) {
+                return ['review'];
+            }
+
+            if ($has('4000\s*h|600\s*k\s*phut|60\s*k\s*(live|offline)|gio xem|watch time|watch hours')) {
+                return ['watch_time'];
+            }
+
+            if ($has('\b(like|tim)\s*(cho\s+)?(comments?|binh luan)\b|comment likes?')) {
+                $types[] = 'like_comment';
+                $text = preg_replace(
+                    '~\b(like|tim)\s*(cho\s+)?(comments?|binh luan)\b|comment likes?~i',
+                    '',
+                    $text
+                );
+            }
+
+            if ($has('\b(like|tim)\s*live(\s*stream)?\b')) {
+                $types[] = 'like_live';
+                $text = preg_replace(
+                    '~\b(like|tim)\s*live(\s*stream)?\b~i',
+                    '',
+                    $text
+                );
+            }
+
+            if ($has('\bfollow(ers?|ing)?\b|\bsub(s|scribers?|scribe)?\b|theo doi')) {
+                $types[] = 'follow';
+            }
+
+            if ($has('\blikes?\b|\bviplike\b|\blikepage\b|\btim\b|\bthich\b') &&
+                !$has('yeu thich')) {
+                $types[] = 'like';
+            }
+
+            if ($has('\bcomments?\b|binh luan')) {
+                $types[] = 'comment';
+            }
+
+            if ($has('\bshares?\b|chia se')) {
+                $types[] = 'share';
+            }
+
+            if ($has('\breactions?\b|\breact\b|cam xuc')) {
+                $types[] = 'reaction';
+            }
+
+            if ($has('\b(saves?|favorites?|favourites?)\b|yeu thich')) {
+                $types[] = 'save';
+            }
+
+            if ($has('\bmembers?\b|thanh vien')) {
+                $types[] = 'member';
+            }
+
+            if ($has('\b(reposts?|retweets?)\b|dang lai')) {
+                $types[] = 'repost';
+            }
+
+            $live = $has('\blive\s*stream\b|\blive\b|\bmat live\b|\bvip mat\b');
+
+            if ($live && (
+                $has('\bviews?\b|\bmat\b') ||
+                count($types) === 0
+            )) {
+                $types[] = 'live';
+            }
+
+            if (!$live && $has('\bviews?\b|\bplays?\b|\breels?\b|\bshorts?\b|luot xem')) {
+                $types[] = 'view';
+            }
+
+            return array_values(array_unique($types));
+        };
+
+        // Uu tien danh muc goc, khong dung SMM type Default.
+        foreach ([
+            $metadata['category'] ?? '',
+            $metadata['category_name'] ?? '',
+            $raw['category_name'] ?? '',
+            $raw['category'] ?? '',
+            $metadata['group'] ?? '',
+            $raw['name'] ?? '',
+            $item->provider_service_name,
+            $item->provider_service_id,
+        ] as $value) {
+            $types = $detect($value);
+
+            if ($types !== []) {
+                return $types;
+            }
+        }
+
+        return ['other'];
+    }
+
     private function serializeProviderService(
         SocialProviderService $item
     ): array {
@@ -1083,6 +1234,7 @@ class AdminSocialServiceController extends Controller
 
         return [
             'source_platform' => $this->sourcePlatform($item),
+            'source_interaction_types' => $this->sourceInteractionTypes($item),
 
             'id' =>
                 $item->id,
