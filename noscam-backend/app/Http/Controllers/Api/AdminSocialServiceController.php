@@ -157,7 +157,7 @@ class AdminSocialServiceController extends Controller
                 'youtube', 'telegram', 'twitter', 'discord',
                 'spotify', 'soundcloud', 'pinterest', 'linkedin',
                 'twitch', 'reddit', 'snapchat', 'whatsapp',
-                'zalo', 'other',
+                'zalo', 'shopee', 'google', 'capcut', 'seo', 'other',
             ];
 
             if (!in_array($platform, $allowed, true)) {
@@ -947,51 +947,106 @@ class AdminSocialServiceController extends Controller
     {
         $classifier = app(SocialServiceClassifier::class);
 
-        $mapped = strtolower((string) ($item->service?->platform ?? ''));
+        $metadata = (array) ($item->provider_data ?? []);
+        $raw = (array) ($metadata['provider_data'] ?? []);
 
-        $allowed = [
-            'facebook', 'instagram', 'tiktok', 'threads',
-            'youtube', 'telegram', 'twitter', 'discord',
-            'spotify', 'soundcloud', 'pinterest', 'linkedin',
-            'twitch', 'reddit', 'snapchat', 'whatsapp', 'zalo',
-        ];
-
-        if (in_array($mapped, $allowed, true)) {
-            return $mapped;
-        }
-
-        $metadata = $item->provider_data ?? [];
-        $metadata = is_array($metadata) ? $metadata : [];
-
-        $raw = $metadata['provider_data'] ?? [];
-        $raw = is_array($raw) ? $raw : [];
-
-        $candidates = [
-            $metadata['platform'] ?? '',
-            $raw['platform'] ?? '',
-            $metadata['category'] ?? '',
-            $raw['category'] ?? '',
-            $item->provider_service_name,
-            $item->provider_service_id,
-        ];
-
-        foreach ($candidates as $candidate) {
-            if (!is_string($candidate)) {
-                continue;
+        $detect = function ($value) use ($classifier): string {
+            if (!is_string($value)) {
+                return 'other';
             }
 
-            $candidate = str_replace('_', ' ', $candidate);
+            $text = strtolower(trim($value));
 
-            $platform = $classifier->platform(
-                strtolower($candidate)
+            $text = str_replace(
+                ['instargam', 'goolge', '_'],
+                ['instagram', 'google', ' '],
+                $text
             );
 
-            if (in_array($platform, $allowed, true)) {
+            if (str_contains($text, 'shopee')) return 'shopee';
+            if (str_contains($text, 'google')) return 'google';
+            if (str_contains($text, 'capcut')) return 'capcut';
+            if (preg_match('~traffic|seo~i', $text)) return 'seo';
+
+            return $classifier->platform($text);
+        };
+
+        // 1. Nền tảng được nhà cung cấp khai báo.
+        foreach ([
+            $metadata['platform'] ?? '',
+            $metadata['platform_name'] ?? '',
+            $raw['platform'] ?? '',
+            $raw['platform_name'] ?? '',
+        ] as $value) {
+            $platform = $detect($value);
+            if ($platform !== 'other') {
                 return $platform;
             }
         }
 
-        return 'other';
+        // 2. Nhóm API VietnamFB Legacy.
+        if ($item->provider?->driver === 'vietnamfb') {
+            $group = strtoupper((string) (
+                $metadata['group'] ?? ''
+            ));
+
+            $facebookGroups = [
+                'BUFF_COMMENT', 'BUFF_LIKE', 'BUFF_LIVE',
+                'BUFF_REEL', 'BUFF_SUB', 'BUFF_VIEW_NEW',
+                'FANPAGE_REVIEW', 'GROUP_MEMBER', 'LIKEPAGE_2',
+                'LIKE_COMMENT', 'SHARE_LIVE', 'STORY_VIEW',
+                'VIP_COMMENT', 'VIP_LIKE', 'VIP_MAT',
+                'VIRTUAL_SHARE',
+            ];
+
+            if (in_array($group, $facebookGroups, true)) {
+                return 'facebook';
+            }
+
+            $platform = $detect($group);
+            if ($platform !== 'other') {
+                return $platform;
+            }
+        }
+
+        // 3. Danh mục nguồn, ưu tiên phần tên nền tảng.
+        foreach ([
+            $metadata['category'] ?? '',
+            $metadata['category_name'] ?? '',
+            $raw['category'] ?? '',
+            $raw['category_name'] ?? '',
+        ] as $value) {
+            if (!is_string($value)) {
+                continue;
+            }
+
+            $prefix = explode('|', $value, 2)[0];
+
+            $platform = $detect($prefix);
+
+            if ($platform === 'other') {
+                $platform = $detect($value);
+            }
+
+            if ($platform !== 'other') {
+                return $platform;
+            }
+        }
+
+        // 4. Tên gốc và mã dịch vụ.
+        foreach ([
+            $raw['name'] ?? '',
+            $item->provider_service_name,
+            $item->provider_service_id,
+        ] as $value) {
+            $platform = $detect($value);
+            if ($platform !== 'other') {
+                return $platform;
+            }
+        }
+
+        // 5. Mapping chỉ dùng khi nguồn không đủ thông tin.
+        return $detect($item->service?->platform ?? '');
     }
 
     private function serializeProviderService(

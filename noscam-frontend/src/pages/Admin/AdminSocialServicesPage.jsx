@@ -1363,6 +1363,10 @@ const SOURCE_PLATFORMS = [
   ['snapchat', 'Snapchat', 'bg-yellow-100 text-yellow-800'],
   ['whatsapp', 'WhatsApp', 'bg-green-100 text-green-700'],
   ['zalo', 'Zalo', 'bg-blue-100 text-blue-700'],
+  ['shopee', 'Shopee', 'bg-orange-100 text-orange-700'],
+  ['google', 'Google / Maps', 'bg-green-100 text-green-700'],
+  ['capcut', 'CapCut Pro', 'bg-slate-900 text-white'],
+  ['seo', 'Traffic & SEO', 'bg-teal-100 text-teal-700'],
   ['other', 'Chưa xác định', 'bg-slate-100 text-slate-500'],
 ]
 
