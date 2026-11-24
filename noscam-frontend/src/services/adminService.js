@@ -417,6 +417,7 @@ export const adminService = {
 
   async getSocialProviderServices({
     providerId = '',
+    platform = '',
     mapped = '',
     providerAvailability = '',
     active = '',
@@ -427,6 +428,10 @@ export const adminService = {
     const params =
       new URLSearchParams()
 
+
+    if (platform) {
+      params.set('platform', platform)
+    }
 
     if (providerAvailability) {
       params.set(

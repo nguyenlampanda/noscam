@@ -149,6 +149,36 @@ class AdminSocialServiceController extends Controller
             });
         }
 
+        if ($request->filled('platform')) {
+            $platform = (string) $request->input('platform');
+
+            $allowed = [
+                'facebook', 'instagram', 'tiktok', 'threads',
+                'youtube', 'telegram', 'twitter', 'discord',
+                'spotify', 'soundcloud', 'pinterest', 'linkedin',
+                'twitch', 'reddit', 'snapchat', 'whatsapp',
+                'zalo', 'other',
+            ];
+
+            if (!in_array($platform, $allowed, true)) {
+                return response()->json([
+                    'message' => 'Nền tảng không hợp lệ.',
+                ], 422);
+            }
+
+            $ids = [];
+
+            (clone $query)->chunkById(500, function ($items) use (&$ids, $platform) {
+                foreach ($items as $item) {
+                    if ($this->sourcePlatform($item) === $platform) {
+                        $ids[] = (int) $item->id;
+                    }
+                }
+            });
+
+            $query->whereIntegerInRaw('id', $ids);
+        }
+
         $paginator = $query
             ->orderBy('social_provider_id')
             ->orderBy('provider_service_name')
@@ -913,6 +943,57 @@ class AdminSocialServiceController extends Controller
         return $code;
     }
 
+    private function sourcePlatform(SocialProviderService $item): string
+    {
+        $classifier = app(SocialServiceClassifier::class);
+
+        $mapped = strtolower((string) ($item->service?->platform ?? ''));
+
+        $allowed = [
+            'facebook', 'instagram', 'tiktok', 'threads',
+            'youtube', 'telegram', 'twitter', 'discord',
+            'spotify', 'soundcloud', 'pinterest', 'linkedin',
+            'twitch', 'reddit', 'snapchat', 'whatsapp', 'zalo',
+        ];
+
+        if (in_array($mapped, $allowed, true)) {
+            return $mapped;
+        }
+
+        $metadata = $item->provider_data ?? [];
+        $metadata = is_array($metadata) ? $metadata : [];
+
+        $raw = $metadata['provider_data'] ?? [];
+        $raw = is_array($raw) ? $raw : [];
+
+        $candidates = [
+            $metadata['platform'] ?? '',
+            $raw['platform'] ?? '',
+            $metadata['category'] ?? '',
+            $raw['category'] ?? '',
+            $item->provider_service_name,
+            $item->provider_service_id,
+        ];
+
+        foreach ($candidates as $candidate) {
+            if (!is_string($candidate)) {
+                continue;
+            }
+
+            $candidate = str_replace('_', ' ', $candidate);
+
+            $platform = $classifier->platform(
+                strtolower($candidate)
+            );
+
+            if (in_array($platform, $allowed, true)) {
+                return $platform;
+            }
+        }
+
+        return 'other';
+    }
+
     private function serializeProviderService(
         SocialProviderService $item
     ): array {
@@ -946,6 +1027,8 @@ class AdminSocialServiceController extends Controller
             * $unitFactor;
 
         return [
+            'source_platform' => $this->sourcePlatform($item),
+
             'id' =>
                 $item->id,
 

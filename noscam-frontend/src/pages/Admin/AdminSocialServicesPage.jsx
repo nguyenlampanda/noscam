@@ -1345,6 +1345,39 @@ function PriceModal({ item, onClose, onDone }) {
   )
 }
 
+const SOURCE_PLATFORMS = [
+  ['facebook', 'Facebook', 'bg-blue-100 text-blue-700'],
+  ['instagram', 'Instagram', 'bg-pink-100 text-pink-700'],
+  ['tiktok', 'TikTok', 'bg-slate-900 text-white'],
+  ['threads', 'Threads', 'bg-slate-800 text-white'],
+  ['youtube', 'YouTube', 'bg-red-100 text-red-700'],
+  ['telegram', 'Telegram', 'bg-sky-100 text-sky-700'],
+  ['twitter', 'X / Twitter', 'bg-slate-800 text-white'],
+  ['discord', 'Discord', 'bg-indigo-100 text-indigo-700'],
+  ['spotify', 'Spotify', 'bg-green-100 text-green-700'],
+  ['soundcloud', 'SoundCloud', 'bg-orange-100 text-orange-700'],
+  ['pinterest', 'Pinterest', 'bg-red-100 text-red-700'],
+  ['linkedin', 'LinkedIn', 'bg-blue-100 text-blue-800'],
+  ['twitch', 'Twitch', 'bg-purple-100 text-purple-700'],
+  ['reddit', 'Reddit', 'bg-orange-100 text-orange-700'],
+  ['snapchat', 'Snapchat', 'bg-yellow-100 text-yellow-800'],
+  ['whatsapp', 'WhatsApp', 'bg-green-100 text-green-700'],
+  ['zalo', 'Zalo', 'bg-blue-100 text-blue-700'],
+  ['other', 'Chưa xác định', 'bg-slate-100 text-slate-500'],
+]
+
+function SourcePlatformBadge({ item }) {
+  const platform = SOURCE_PLATFORMS.find(
+    ([key]) => key === item.source_platform
+  ) || SOURCE_PLATFORMS[SOURCE_PLATFORMS.length - 1]
+
+  return (
+    <span className={`mb-2 inline-flex rounded-lg px-2.5 py-1 text-xs font-bold ${platform[2]}`}>
+      {platform[1]}
+    </span>
+  )
+}
+
 export default function AdminSocialServicesPage() {
   const { confirm } = useNoScamUI()
   const [items, setItems] =
@@ -1374,6 +1407,8 @@ export default function AdminSocialServicesPage() {
   const [search, setSearch] =
     useState('')
 
+  const [sourcePlatform, setSourcePlatform] = useState('')
+
   const [providerId, setProviderId] =
     useState('')
 
@@ -1400,6 +1435,7 @@ export default function AdminSocialServicesPage() {
           adminService
             .getSocialProviderServices({
               providerId,
+              platform: sourcePlatform,
               mapped,
               providerAvailability: availability,
               search,
@@ -1483,6 +1519,7 @@ export default function AdminSocialServicesPage() {
       mapped,
       page,
       providerId,
+      sourcePlatform,
       search,
       availability,
     ],
@@ -1565,7 +1602,7 @@ export default function AdminSocialServicesPage() {
 
         <SocialAdminNav />
 
-        <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
           <input
             value={search}
             onChange={(e) => {
@@ -1602,6 +1639,20 @@ export default function AdminSocialServicesPage() {
                 </option>
               ),
             )}
+          </SocialFilterSelect>
+
+          <SocialFilterSelect
+            value={sourcePlatform}
+            onChange={(e) => {
+              setSourcePlatform(e.target.value)
+              setPage(1)
+            }}
+            className="h-12 w-full min-w-0 rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700"
+          >
+            <option value="">Tất cả nền tảng</option>
+            {SOURCE_PLATFORMS.map(([key, label]) => (
+              <option key={key} value={key}>{label}</option>
+            ))}
           </SocialFilterSelect>
 
           <SocialFilterSelect
@@ -1720,6 +1771,7 @@ export default function AdminSocialServicesPage() {
                       </td>
 
                       <td className="px-2 py-4 align-middle break-words">
+                        <SourcePlatformBadge item={item} />
                         <div className="max-w-sm font-bold text-slate-900">
                           {item.provider_service_name}
                         </div>
