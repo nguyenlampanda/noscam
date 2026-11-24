@@ -300,16 +300,19 @@ class AdminSocialServiceController extends Controller
             $cost = $providerService->costPriceVnd();
 
             if (
-                !$target
-                || $providerService->provider_availability !== 'available'
+                $providerService->provider_availability !== 'available'
                 || !is_finite($cost)
                 || $cost <= 0
-                || (float) $target->sell_price_per_1000 <= $cost
                 || (int) $providerService->min_quantity < 1
                 || (int) $providerService->max_quantity < (int) $providerService->min_quantity
-                || (int) $target->min_quantity < (int) $providerService->min_quantity
-                || (int) $target->max_quantity > (int) $providerService->max_quantity
-                || (int) $target->max_quantity < (int) $target->min_quantity
+                || (
+                    $target && (
+                        (float) $target->sell_price_per_1000 <= $cost
+                        || (int) $target->min_quantity < (int) $providerService->min_quantity
+                        || (int) $target->max_quantity > (int) $providerService->max_quantity
+                        || (int) $target->max_quantity < (int) $target->min_quantity
+                    )
+                )
             ) {
                 return response()->json([
                     'message' => 'Chưa thể bật nguồn: kiểm tra mapping, trạng thái API, giá bán và Min/Max.',

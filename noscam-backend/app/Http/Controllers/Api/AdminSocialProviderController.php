@@ -536,14 +536,6 @@ class AdminSocialProviderController extends Controller
                                     ]
                                 );
 
-
-                        if (
-                            $provider->driver === 'bufflikenhanh_v2'
-                            && $record->wasRecentlyCreated
-                        ) {
-                            $record->update(['is_active' => false]);
-                        }
-
                         $syncedIds[] =
                             $record->id;
                     }

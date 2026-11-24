@@ -218,16 +218,16 @@ class BuffLikeNhanhV2AdminMappingTest extends TestCase
         $this->assertFalse((bool) $source->fresh()->is_active);
     }
 
-    public function test_rejects_manual_activation(): void
+    public function test_allows_unmapped_source_activation(): void
     {
         [$source] = $this->makeData();
 
         $this->patchJson(
             "/api/admin/social/provider-services/{$source->id}",
             ['is_active' => true]
-        )->assertStatus(422);
+        )->assertOk();
 
-        $this->assertFalse(
+        $this->assertTrue(
             (bool) $source->fresh()->is_active
         );
     }
