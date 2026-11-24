@@ -467,7 +467,7 @@ function MapModal({ item, onClose, onDone }) {
         min_quantity: min,
         max_quantity: max,
         priority: Number(item.priority ?? 100),
-        is_active: String(item.provider?.driver || '').toLowerCase() !== 'bufflikenhanh_v2',
+        is_active: true,
       })
 
       setSaved({

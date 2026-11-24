@@ -698,6 +698,23 @@ class AdminSocialServiceController extends Controller
             }
         }
 
+        if ($providerService->provider?->driver === 'bufflikenhanh_v2') {
+            $cost = $providerService->costPriceVnd();
+
+            if (
+                !is_finite($cost)
+                || $cost <= 0
+                || (
+                    ($data['is_active'] ?? true)
+                    && $providerService->provider_availability !== 'available'
+                )
+            ) {
+                return response()->json([
+                    'message' => 'Nguồn BuffLikeNhanh chưa khả dụng hoặc giá vốn không hợp lệ.',
+                ], 422);
+            }
+        }
+
         $service = DB::transaction(
             function () use (
                 $data,
@@ -809,7 +826,10 @@ class AdminSocialServiceController extends Controller
 
                     'is_active' =>
                         $providerService->provider?->driver === 'bufflikenhanh_v2'
-                            ? false
+                            ? (
+                                $providerService->provider_availability === 'available'
+                                && (bool) ($data['is_active'] ?? true)
+                            )
                             : (
                                 array_key_exists('is_active', $data)
                                     ? (bool) $data['is_active']

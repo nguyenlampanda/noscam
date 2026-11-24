@@ -41,6 +41,7 @@ class BuffLikeNhanhV2AdminMappingTest extends TestCase
             'provider_service_id' => '64500',
             'provider_service_name' => 'Instagram Follow',
             'cost_price_per_1000' => 49000,
+            'provider_availability' => 'available',
             'min_quantity' => 50,
             'max_quantity' => 100000,
             'is_active' => false,
@@ -98,7 +99,7 @@ class BuffLikeNhanhV2AdminMappingTest extends TestCase
         );
     }
 
-    public function test_maps_valid_service_but_keeps_source_inactive(): void
+    public function test_maps_valid_service_and_activates_source(): void
     {
         [$source, $target] = $this->makeData();
 
@@ -110,12 +111,12 @@ class BuffLikeNhanhV2AdminMappingTest extends TestCase
             $source->fresh()->social_service_id
         );
 
-        $this->assertFalse(
+        $this->assertTrue(
             (bool) $source->fresh()->is_active
         );
     }
 
-    public function test_creates_new_service_inactive(): void
+    public function test_creates_new_service_with_active_source(): void
     {
         [$source] = $this->makeData();
 
@@ -139,9 +140,23 @@ class BuffLikeNhanhV2AdminMappingTest extends TestCase
             (bool) $service->is_active
         );
 
-        $this->assertFalse(
+        $this->assertTrue(
             (bool) $source->fresh()->is_active
         );
+    }
+
+    public function test_rejects_mapping_unavailable_source(): void
+    {
+        [$source, $target] = $this->makeData();
+
+        $source->update([
+            'provider_availability' => 'unavailable',
+        ]);
+
+        $this->mapExisting($source, $target)->assertStatus(422);
+
+        $this->assertNull($source->fresh()->social_service_id);
+        $this->assertFalse((bool) $source->fresh()->is_active);
     }
 
     public function test_allows_valid_mapped_source_activation(): void
