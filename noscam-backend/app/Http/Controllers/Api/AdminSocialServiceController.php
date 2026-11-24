@@ -294,9 +294,27 @@ class AdminSocialServiceController extends Controller
             $providerService->provider?->driver === 'bufflikenhanh_v2'
             && !empty($data['is_active'])
         ) {
-            return response()->json([
-                'message' => 'BuffLikeNhanh V2 đang ở chế độ thử nghiệm, chưa cho phép kích hoạt.',
-            ], 422);
+            $providerService->loadMissing('service');
+
+            $target = $providerService->service;
+            $cost = $providerService->costPriceVnd();
+
+            if (
+                !$target
+                || $providerService->provider_availability !== 'available'
+                || !is_finite($cost)
+                || $cost <= 0
+                || (float) $target->sell_price_per_1000 <= $cost
+                || (int) $providerService->min_quantity < 1
+                || (int) $providerService->max_quantity < (int) $providerService->min_quantity
+                || (int) $target->min_quantity < (int) $providerService->min_quantity
+                || (int) $target->max_quantity > (int) $providerService->max_quantity
+                || (int) $target->max_quantity < (int) $target->min_quantity
+            ) {
+                return response()->json([
+                    'message' => 'Chưa thể bật nguồn: kiểm tra mapping, trạng thái API, giá bán và Min/Max.',
+                ], 422);
+            }
         }
 
         $providerService->update(

@@ -144,6 +144,65 @@ class BuffLikeNhanhV2AdminMappingTest extends TestCase
         );
     }
 
+    public function test_allows_valid_mapped_source_activation(): void
+    {
+        [$source, $target] = $this->makeData();
+
+        $source->update([
+            'social_service_id' => $target->id,
+            'provider_availability' => 'available',
+        ]);
+
+        $this->patchJson(
+            "/api/admin/social/provider-services/{$source->id}",
+            ['is_active' => true]
+        )->assertOk();
+
+        $this->assertTrue((bool) $source->fresh()->is_active);
+        $this->assertSame('inactive', $source->provider->fresh()->status);
+
+        $this->patchJson(
+            "/api/admin/social/provider-services/{$source->id}",
+            ['is_active' => false]
+        )->assertOk();
+
+        $this->assertFalse((bool) $source->fresh()->is_active);
+    }
+
+    public function test_rejects_unavailable_source_activation(): void
+    {
+        [$source, $target] = $this->makeData();
+
+        $source->update([
+            'social_service_id' => $target->id,
+            'provider_availability' => 'unavailable',
+        ]);
+
+        $this->patchJson(
+            "/api/admin/social/provider-services/{$source->id}",
+            ['is_active' => true]
+        )->assertStatus(422);
+
+        $this->assertFalse((bool) $source->fresh()->is_active);
+    }
+
+    public function test_rejects_below_cost_source_activation(): void
+    {
+        [$source, $target] = $this->makeData(sellPrice: 40000);
+
+        $source->update([
+            'social_service_id' => $target->id,
+            'provider_availability' => 'available',
+        ]);
+
+        $this->patchJson(
+            "/api/admin/social/provider-services/{$source->id}",
+            ['is_active' => true]
+        )->assertStatus(422);
+
+        $this->assertFalse((bool) $source->fresh()->is_active);
+    }
+
     public function test_rejects_manual_activation(): void
     {
         [$source] = $this->makeData();

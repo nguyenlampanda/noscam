@@ -363,7 +363,7 @@ function MapModal({ item, onClose, onDone }) {
     String(item.provider?.driver || '').toLowerCase() === 'vietnamfb_v2'
   const [error, setError] = useState('')
 
-  // Gia von API duoc hieu la VND / 1 luot.
+  // Gia von da quy doi sang VND / 1000 luot.
   const cost1000 = Number(
     item.cost_price_vnd ?? item.cost_price_per_1000 ?? 0
   )
@@ -673,7 +673,7 @@ function MapModal({ item, onClose, onDone }) {
           <div className="mb-4 text-center">
             <div className="text-4xl text-emerald-600">✓</div>
             <h2 className="mt-2 text-xl font-black text-emerald-700">
-              Đưa lên bán thành công!
+              Đã lưu mapping dịch vụ thành công!
             </h2>
             <p className="mt-1 text-sm text-slate-500">
               Dịch vụ đã được lưu vào NoScam.vn
@@ -1046,7 +1046,7 @@ function MapModal({ item, onClose, onDone }) {
 
 function PriceModal({ item, onClose, onDone }) {
   const service = item.service || {}
-  // Gia von API duoc hieu la VND / 1 luot.
+  // Gia von da quy doi sang VND / 1000 luot.
   const cost1000 = Number(
     item.cost_price_vnd ?? item.cost_price_per_1000 ?? 0
   )
