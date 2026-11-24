@@ -201,7 +201,29 @@ class AdminSocialServiceController extends Controller
             $query->whereIntegerInRaw('id', $ids);
         }
 
+        // NOSCAM: Sap xep gia von VND truoc khi phan trang.
         $paginator = $query
+            ->orderByRaw("
+                ROUND(
+                    COALESCE(social_provider_services.cost_price_per_1000, 0)
+                    * COALESCE(NULLIF((
+                        SELECT exchange_rate_to_vnd
+                        FROM social_providers
+                        WHERE social_providers.id = social_provider_services.social_provider_id
+                    ), 0), 1)
+                    * COALESCE(NULLIF((
+                        SELECT price_multiplier
+                        FROM social_providers
+                        WHERE social_providers.id = social_provider_services.social_provider_id
+                    ), 0), 1)
+                    * CASE WHEN LOWER((
+                        SELECT driver
+                        FROM social_providers
+                        WHERE social_providers.id = social_provider_services.social_provider_id
+                    )) = 'vietnamfb' THEN 1000 ELSE 1 END,
+                    4
+                ) ASC
+            ")
             ->orderBy('social_provider_id')
             ->orderBy('provider_service_name')
             ->orderBy('id')
