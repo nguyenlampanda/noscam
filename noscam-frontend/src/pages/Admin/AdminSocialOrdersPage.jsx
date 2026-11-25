@@ -470,9 +470,7 @@ export default function AdminSocialOrdersPage() {
     const reasonInput = document.getElementById('noscam-refund-reason')
     const refundReason = reasonInput?.value?.trim() || ''
 
-    const canRefundNow =
-      !cancelOrder.provider_order_id &&
-      Number(cancelOrder.attempts || 0) === 0
+    const canRefundNow = !cancelOrder.provider_order_id
 
     if (canRefundNow && !refundReason) {
       setCancelError('Vui lòng nhập lý do hoàn tiền.')
@@ -938,15 +936,15 @@ export default function AdminSocialOrdersPage() {
               </button>
 
               <h2 className="mt-5 text-2xl font-black text-slate-950">
-                {(cancelOrder.provider_order_id || Number(cancelOrder.attempts || 0) >= 1)
+                {cancelOrder.provider_order_id
                   ? 'Kiểm tra trạng thái trước khi hủy?'
                   : 'Hủy đơn & hoàn tiền?'}
               </h2>
 
               <p className="mt-2 text-sm leading-6 text-slate-500">
-                {(cancelOrder.provider_order_id || Number(cancelOrder.attempts || 0) >= 1)
+                {cancelOrder.provider_order_id
                   ? 'Đơn đã thử gửi API. Không được hoàn tiền trước khi xác minh kết quả với Provider.'
-                  : 'Đơn chưa được gửi đến nhà cung cấp. Khi hủy, toàn bộ số tiền của đơn sẽ được hoàn lại vào ví khách hàng.'}
+                  : 'Hoàn số tiền còn lại vào ví khách hàng. Nếu đơn đã thử gửi API, việc hoàn tiền nội bộ không đồng nghĩa nhà cung cấp đã hủy đơn.'}
               </p>
 
               <div className="mt-5 overflow-hidden rounded-2xl border border-slate-200">
@@ -990,7 +988,7 @@ export default function AdminSocialOrdersPage() {
                   </span>
                 </div>
 
-                {!cancelOrder.provider_order_id && Number(cancelOrder.attempts || 0) === 0 && (
+                {!cancelOrder.provider_order_id && (
                   <div className="flex items-center justify-between gap-4 bg-emerald-50 px-4 py-4">
                     <div>
                       <div className="text-sm font-black text-emerald-700">
@@ -1021,7 +1019,7 @@ export default function AdminSocialOrdersPage() {
                 )}
               </div>
 
-              {(cancelOrder.provider_order_id || Number(cancelOrder.attempts || 0) >= 1) && (
+              {cancelOrder.provider_order_id && (
                 <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4">
                   <div className="text-sm font-black text-amber-800">
                     Chưa hoàn tiền ngay
@@ -1033,8 +1031,7 @@ export default function AdminSocialOrdersPage() {
                 </div>
               )}
 
-              {!cancelOrder.provider_order_id &&
-                Number(cancelOrder.attempts || 0) === 0 && (
+              {!cancelOrder.provider_order_id && (
                   <div className="mt-4">
                     <label
                       htmlFor="noscam-refund-reason"
@@ -1080,7 +1077,7 @@ export default function AdminSocialOrdersPage() {
                     cancelOrder.id
                   }
                   onClick={() => {
-                    if (cancelOrder.provider_order_id || Number(cancelOrder.attempts || 0) >= 1) {
+                    if (cancelOrder.provider_order_id) {
                       setCancelOrder(null)
                       setAuditOrder(cancelOrder)
                       return
@@ -1092,7 +1089,7 @@ export default function AdminSocialOrdersPage() {
                   {busyId ===
                   cancelOrder.id
                     ? 'Đang xử lý...'
-                    : (cancelOrder.provider_order_id || Number(cancelOrder.attempts || 0) >= 1)
+                    : cancelOrder.provider_order_id
                       ? 'Mở đối soát'
                       : `Hủy & hoàn ${money(
                           Math.max(
