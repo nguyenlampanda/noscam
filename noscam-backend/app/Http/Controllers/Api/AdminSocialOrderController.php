@@ -109,11 +109,51 @@ class AdminSocialOrderController extends Controller
         ]);
 
         try {
-            $order = $providerService->cancel(
-                $order,
-                $request->user()?->id,
-                trim((string) ($data['reason'] ?? ''))
-            );
+            if (!$order->provider_order_id) {
+                $reason = trim((string) ($data['reason'] ?? ''));
+
+                if ($reason === '') {
+                    throw new \RuntimeException('Vui lòng nhập lý do hoàn tiền.');
+                }
+
+                $lock = Cache::lock('social-order-operation-'.$order->id, 120);
+
+                if (!$lock->get()) {
+                    throw new \RuntimeException('Đơn đang được xử lý.');
+                }
+
+                try {
+                    $order = DB::transaction(function () use ($order, $request, $reason) {
+                        $locked = SocialOrder::query()->lockForUpdate()->findOrFail($order->id);
+
+                        if (
+                            $locked->status !== 'pending' ||
+                            $locked->provider_order_id ||
+                            $locked->submitted_at ||
+                            $locked->admin_no_refund
+                        ) {
+                            throw new \RuntimeException('Trạng thái đơn đã thay đổi hoặc không thể hoàn tiền trực tiếp.');
+                        }
+
+                        $locked->status = 'cancelled';
+                        $locked->save();
+
+                        return app(\App\Services\Social\SocialOrderService::class)->refund(
+                            $locked,
+                            $request->user()->id,
+                            'Admin hoàn tiền nội bộ: '.$reason
+                        );
+                    }, 3);
+                } finally {
+                    $lock->release();
+                }
+            } else {
+                $order = $providerService->cancel(
+                    $order,
+                    $request->user()?->id,
+                    trim((string) ($data['reason'] ?? ''))
+                );
+            }
         } catch (\RuntimeException $e) {
             return response()->json([
                 'message' => $e->getMessage(),

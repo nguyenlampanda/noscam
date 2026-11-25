@@ -148,6 +148,35 @@ class VietnamFbProviderTest extends TestCase
         );
     }
 
+    public function test_invalid_url_response_is_definitive_rejection(): void
+    {
+        Http::fake([
+            '*' => Http::response([
+                'success' => 0,
+                'message' => 'Url không hợp lệ',
+            ], 200),
+        ]);
+
+        $provider = new VietnamFbProvider(
+            'https://example.com/api',
+            'test-key',
+            'test-user'
+        );
+
+        $this->expectException(
+            \App\Services\Social\ProviderOrderRejectedException::class
+        );
+
+        $this->expectExceptionMessage('Url không hợp lệ');
+
+        $provider->createOrder(
+            'PANEL:123',
+            'https://example.com/test',
+            100,
+            ['service_id' => 123]
+        );
+    }
+
     public function test_panel_min_max_quantity_mapping(): void
     {
         \Illuminate\Support\Facades\Http::fake([

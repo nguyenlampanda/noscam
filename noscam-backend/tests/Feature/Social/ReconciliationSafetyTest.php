@@ -122,6 +122,53 @@ class ReconciliationSafetyTest extends TestCase
         );
     }
 
+    public function test_admin_direct_refund_after_attempt(): void
+    {
+        [$order, $audit] = $this->makeReconciliationOrder();
+
+        $admin = \App\Models\User::factory()->create([
+            'role' => 'admin',
+        ]);
+
+        \Laravel\Sanctum\Sanctum::actingAs($admin, ['*']);
+        \Illuminate\Support\Facades\Http::fake();
+
+        $controller = app(
+            \App\Http\Controllers\Api\AdminSocialOrderController::class
+        );
+
+        $request = \Illuminate\Http\Request::create(
+            '/', 'POST', ['reason' => 'Test internal refund']
+        );
+
+        $request->setUserResolver(fn () => $admin);
+
+        $provider = app(
+            \App\Services\Social\SocialOrderProviderService::class
+        );
+
+        $response = $controller->cancel($request, $order, $provider);
+
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertSame('cancelled', $order->fresh()->status);
+        $this->assertEquals(100000, $order->fresh()->refunded_amount);
+
+        $response = $controller->cancel(
+            $request, $order->fresh(), $provider
+        );
+
+        $this->assertSame(409, $response->getStatusCode());
+
+        $this->assertEquals(
+            100000,
+            (float) \Illuminate\Support\Facades\DB::table('wallets')
+                ->where('user_id', $order->user_id)
+                ->value('balance')
+        );
+
+        \Illuminate\Support\Facades\Http::assertNothingSent();
+    }
+
     public function test_testing_environment_uses_sqlite(): void
     {
         $this->assertSame(

@@ -210,7 +210,7 @@ class SocialOrderProviderService
                         $this->orders->refund($locked);
                     }, 3);
 
-                    Log::notice('social_order_auto_refund_before_http', [
+                    Log::notice('social_order_auto_refund_definitive_rejection', [
                         'social_order_id' => $order->id,
                         'code' => $order->code,
                         'reason' => $e->getMessage(),

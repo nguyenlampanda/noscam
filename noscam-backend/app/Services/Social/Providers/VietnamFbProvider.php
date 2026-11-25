@@ -79,6 +79,34 @@ class VietnamFbProvider implements SocialProviderInterface
                 $data
             );
 
+        // NOSCAM_INVALID_URL_REFUND_V1
+        if (in_array($site, ['create', 'add_new'], true) && $response->successful()) {
+            $json = $response->json();
+
+            if (
+                is_array($json) &&
+                in_array($json['success'] ?? null, [0, '0', false], true) &&
+                is_string($json['message'] ?? null) &&
+                empty($json['data']) &&
+                empty($json['order_id']) &&
+                empty($json['id'])
+            ) {
+                $message = mb_strtolower(trim($json['message']));
+
+                if (in_array(rtrim($message, '.'), [
+                    'url không hợp lệ',
+                    'link không hợp lệ',
+                    'liên kết không hợp lệ',
+                    'invalid url',
+                    'invalid link',
+                ], true)) {
+                    throw new \App\Services\Social\ProviderOrderRejectedException(
+                        'Url không hợp lệ'
+                    );
+                }
+            }
+        }
+
         return $this->parseResponse($response);
     }
 

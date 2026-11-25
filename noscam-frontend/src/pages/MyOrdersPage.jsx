@@ -149,6 +149,39 @@ function getStatus(order) {
   )
 }
 
+// NOSCAM_CUSTOMER_ORDER_ERROR_V1
+function customerOrderError(order) {
+  const raw = String(order?.provider_error || '')
+    .normalize('NFC')
+    .trim()
+    .toLowerCase()
+
+  if (!raw) return null
+
+  if (['url không hợp lệ', 'link không hợp lệ',
+       'invalid url', 'invalid link',
+       'liên kết không hợp lệ'].some(value =>
+         raw === value || raw === value + '.'
+       )) {
+    return {
+      title: 'Liên kết không hợp lệ',
+      message: 'Vui lòng kiểm tra lại liên kết đã nhập.'
+    }
+  }
+
+  if (['cancelled', 'canceled', 'failed'].includes(order.status)) {
+    return {
+      title: 'Đơn hàng không thực hiện được',
+      message: 'Vui lòng liên hệ hỗ trợ nếu cần thêm thông tin.'
+    }
+  }
+
+  return {
+    title: 'Đơn hàng cần kiểm tra',
+    message: 'Hệ thống đang kiểm tra kết quả xử lý đơn hàng.'
+  }
+}
+
 function progressOf(order) {
   if (
     order.status ===
@@ -917,6 +950,8 @@ async function handleCancelOrder(item) {
 
                 const progress =
                   progressOf(item)
+                const orderError = customerOrderError(item)
+
 
                 return (
                   <motion.article
@@ -1112,6 +1147,17 @@ async function handleCancelOrder(item) {
                           >
                             Xem nội dung bình luận
                           </button>
+                        </div>
+                      )}
+
+                      {orderError && (
+                        <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+                          <div className="text-sm font-black text-red-700">
+                            {orderError.title}
+                          </div>
+                          <p className="mt-1 text-xs font-medium leading-5 text-red-600">
+                            {orderError.message}
+                          </p>
                         </div>
                       )}
 
