@@ -136,7 +136,7 @@ class BuffLikeNhanhV2AdminMappingTest extends TestCase
             $response->json('data.id')
         );
 
-        $this->assertFalse(
+        $this->assertTrue(
             (bool) $service->is_active
         );
 
@@ -271,6 +271,29 @@ class BuffLikeNhanhV2AdminMappingTest extends TestCase
 
         $this->assertNull(
             $source->fresh()->social_service_id
+        );
+    }
+
+
+    public function test_mapped_service_public_visibility(): void
+    {
+        \Illuminate\Support\Facades\Http::preventStrayRequests();
+
+        [$source, $target] = $this->makeData();
+
+        $this->mapExisting($source, $target)->assertOk();
+
+        $this->getJson('/api/social/services')
+            ->assertOk()
+            ->assertJsonMissing(['id' => $target->id]);
+
+        $this->assertSame(
+            'inactive',
+            $source->provider->fresh()->status
+        );
+
+        $this->assertTrue(
+            (bool) $source->fresh()->is_active
         );
     }
 

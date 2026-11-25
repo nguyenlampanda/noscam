@@ -882,7 +882,7 @@ class AdminSocialServiceController extends Controller
                                 $data['sell_price_per_1000']
                                 ?? null,
                             'is_active' =>
-                                $providerService->provider?->driver !== 'bufflikenhanh_v2',
+                                (bool) ($data['is_active'] ?? true),
                             'sort_order' =>
                                 0,
                             'settings' => [
