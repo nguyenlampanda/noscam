@@ -110,4 +110,46 @@ class SePayTransferMatcherTest extends TestCase
         );
     }
 
+
+    public function test_extended_bank_transfer_formats(): void
+    {
+        $matcher = new SePayTransferMatcher();
+
+        foreach ([
+            'myvu1407',
+            'joyseee',
+            'vinguyen',
+            'vanphu',
+            'dang',
+            'dangphong',
+            'tobioo',
+            'user.name',
+            'user-name',
+        ] as $username) {
+            $content = 'CT DEN:948T26B15MPDMXEM '
+                .'MBVCB.17208068133.440899.SEVQR NOSCAM '
+                .$username
+                .'.CT tu 123456789 NGUYEN VAN A '
+                .'toi 987654321 NGUYEN VAN B tai VIETINBANK';
+
+            $this->assertSame(
+                $username,
+                $matcher->usernameFromContent($content)
+            );
+        }
+
+        $this->assertSame(
+            'thu',
+            $matcher->usernameFromContent(
+                '948D6112403L4Y8S SEVQR NOSCAM thu-241126-20:51:18 6328ASCB02XG5DSD'
+            )
+        );
+
+        $this->assertNull(
+            $matcher->usernameFromContent(
+                'SEVQR NOSCAM user1.CT tu user2'
+            )
+        );
+    }
+
 }

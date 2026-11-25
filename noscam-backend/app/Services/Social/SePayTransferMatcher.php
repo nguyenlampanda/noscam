@@ -16,6 +16,21 @@ class SePayTransferMatcher
     {
         $content = trim($content);
 
+        // Normalize strictly recognized bank-generated suffixes.
+        // Preserve usernames containing dots and hyphens.
+        $patterns = [
+            '/^CT DEN:[A-Z0-9]+\s+MBVCB\.\d+\.\d+\.(SEVQR\s+NOSCAM\s*[A-Za-z0-9_.-]{1,50})\.CT\s+TU\s+\d+\s+[A-Z ]+\s+TOI\s+\d+\s+[A-Z ]+\s+TAI\s+VIETINBANK$/i',
+            '/^[A-Z0-9]+\s+(SEVQR\s+NOSCAM\s*[A-Za-z0-9_.-]{1,50})-\d{6}-(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d\s+[A-Z0-9]{10,40}$/i',
+        ];
+
+        foreach ($patterns as $pattern) {
+            if (preg_match($pattern, $content, $bankMatch)) {
+                $content = $bankMatch[1];
+                break;
+            }
+        }
+
+
         // Giữ tương thích với nội dung nạp tiền cũ.
         if (preg_match(
             '/^NOSCAM\s+([A-Za-z0-9_.-]{1,50})$/i',

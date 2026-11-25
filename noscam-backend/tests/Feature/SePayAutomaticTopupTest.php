@@ -131,4 +131,97 @@ class SePayAutomaticTopupTest extends TestCase
             'code' => 'TP-20261109120000-ABCDEF', 'status' => 'pending',
         ]);
     }
+
+    public function test_historical_unmatched_webhook_is_never_recredited(): void
+    {
+        config(['sepay.auto_credit_enabled' => true]);
+
+        $content = 'CT DEN:948T26B15MPDMXEM '
+            .'MBVCB.17208068133.440899.SEVQR NOSCAM autotester'
+            .'.CT tu 123456789 NGUYEN VAN A '
+            .'toi 987654321 NGUYEN VAN B tai VIETINBANK';
+
+        DB::table('bank_webhook_transactions')->insert([
+            'provider' => 'sepay',
+            'provider_transaction_id' => '929001',
+            'bank_account' => '888838906789',
+            'transfer_type' => 'in',
+            'amount' => 50000,
+            'transfer_content' => $content,
+            'status' => 'unmatched',
+            'wallet_topup_id' => null,
+            'payload' => '{}',
+            'error_message' => 'Historical unmatched transfer',
+            'created_at' => now()->subDays(5),
+            'updated_at' => now()->subDays(5),
+        ]);
+
+        $this->send(929001, 50000, [
+            'content' => $content,
+        ])->assertStatus(200);
+
+        $this->assertDatabaseCount('wallet_topups', 0);
+        $this->assertDatabaseCount('wallet_transactions', 0);
+
+        $this->assertDatabaseHas('bank_webhook_transactions', [
+            'provider_transaction_id' => '929001',
+            'status' => 'unmatched',
+            'wallet_topup_id' => null,
+        ]);
+    }
+
+    public function test_new_vcb_transfer_credits_exactly_once(): void
+    {
+        config(['sepay.auto_credit_enabled' => true]);
+
+        $payload = [
+            'content' => 'CT DEN:948T26B15MPDMXEM '
+                .'MBVCB.17208068133.440899.SEVQR NOSCAM autotester'
+                .'.CT tu 123456789 NGUYEN VAN A '
+                .'toi 987654321 NGUYEN VAN B tai VIETINBANK',
+        ];
+
+        $this->send(929002, 45000, $payload)->assertStatus(201);
+        $this->send(929002, 45000, $payload)->assertStatus(200);
+
+        $this->assertDatabaseCount('wallet_topups', 1);
+        $this->assertDatabaseCount('wallet_transactions', 1);
+
+        $this->assertDatabaseHas('wallet_transactions', [
+            'type' => 'deposit',
+            'amount' => 45000,
+        ]);
+
+        $this->assertDatabaseHas('bank_webhook_transactions', [
+            'provider_transaction_id' => '929002',
+            'status' => 'processed',
+        ]);
+    }
+
+    public function test_new_timestamp_suffix_transfer_credits_once(): void
+    {
+        config(['sepay.auto_credit_enabled' => true]);
+
+        $payload = [
+            'content' => '948D6112403L4Y8S SEVQR NOSCAM '
+                .'autotester-241126-20:51:18 6328ASCB02XG5DSD',
+        ];
+
+        $this->send(929003, 150000, $payload)->assertStatus(201);
+        $this->send(929003, 150000, $payload)->assertStatus(200);
+
+        $this->assertDatabaseCount('wallet_topups', 1);
+        $this->assertDatabaseCount('wallet_transactions', 1);
+
+        $this->assertDatabaseHas('wallet_transactions', [
+            'type' => 'deposit',
+            'amount' => 150000,
+        ]);
+
+        $this->assertDatabaseHas('bank_webhook_transactions', [
+            'provider_transaction_id' => '929003',
+            'status' => 'processed',
+        ]);
+    }
+
 }
