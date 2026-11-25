@@ -44,6 +44,7 @@ export default function AdminFloatingChat() {
       const data = response?.data ?? response
       setMessages(itemsFrom(data?.messages ?? []))
       await chatService.admin.markRead(id)
+      window.dispatchEvent(new Event('noscam-chat-unread-refresh'))
       await refreshUnread()
       await refreshConversations()
       setError('')
@@ -62,10 +63,12 @@ export default function AdminFloatingChat() {
     pollUnread()
     const timer = window.setInterval(pollUnread, 30000)
     document.addEventListener('visibilitychange', pollUnread)
+    window.addEventListener('noscam-chat-unread-refresh', pollUnread)
 
     return () => {
       window.clearInterval(timer)
       document.removeEventListener('visibilitychange', pollUnread)
+      window.removeEventListener('noscam-chat-unread-refresh', pollUnread)
     }
   }, [refreshUnread])
 

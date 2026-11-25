@@ -146,6 +146,22 @@ export const adminService = {
     )
   },
 
+  async getNotificationCounts() {
+    return adminRequest(() =>
+      apiClient.get('/admin/notifications', authOptions())
+    )
+  },
+
+  async markNotificationsRead(section, orderId = null) {
+    return adminRequest(() =>
+      apiClient.post(
+        '/admin/notifications/read',
+        { section, ...(orderId != null ? { order_id: orderId } : {}) },
+        authOptions(),
+      )
+    )
+  },
+
   async getDashboard(params = {}) {
     const query = new URLSearchParams()
     if (params.from) query.set('from', params.from)

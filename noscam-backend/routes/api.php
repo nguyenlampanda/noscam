@@ -608,6 +608,16 @@ Route::prefix('admin')
         );
 
         Route::get(
+            '/notifications',
+            [\App\Http\Controllers\Api\AdminNotificationController::class, 'index']
+        );
+
+        Route::post(
+            '/notifications/read',
+            [\App\Http\Controllers\Api\AdminNotificationController::class, 'markRead']
+        );
+
+        Route::get(
             '/dashboard',
             [
                 AdminDashboardController::class,

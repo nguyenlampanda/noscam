@@ -50,7 +50,7 @@ function Badge({ count }) {
 
   return (
     <span
-      aria-label={`${count} mục cần xử lý`}
+      aria-label={`${count} thông báo chưa đọc`}
       className="inline-flex min-h-[17px] min-w-[17px] shrink-0 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-black leading-none text-white shadow-sm"
     >
       {count > 99 ? '99+' : count}
@@ -71,6 +71,15 @@ function NavIcon({ name, count }) {
   )
 }
 
+const notificationSections = {
+  '/admin/social/orders': 'orders',
+  '/admin/finance': 'finance',
+  '/admin/exchange': 'exchange',
+  '/admin/reports': 'reports',
+  '/admin/community': 'community',
+  '/admin/digital/orders': 'digital_orders',
+}
+
 const countValue = value =>
   Math.max(0, Math.floor(Number(value) || 0))
 
@@ -87,12 +96,13 @@ export default function AdminNav({ seasonalTheme = 'default' }) {
   const location = useLocation()
   const headerRef = useRef(null)
   const [openMenu, setOpenMenu] = useState(null)
-  const [operations, setOperations] = useState({})
+  const [notifications, setNotifications] = useState({})
   const [unread, setUnread] = useState(0)
 
   useEffect(() => {
     let active = true
     let running = false
+    let refreshPending = false
 
     async function refreshCounts() {
       if (!active || running || document.visibilityState !== 'visible') return
@@ -101,16 +111,10 @@ export default function AdminNav({ seasonalTheme = 'default' }) {
 
       try {
         await Promise.allSettled([
-          adminService.getDashboard().then(response => {
+          adminService.getNotificationCounts().then(response => {
             const data = response?.data ?? response
-            if (active && data?.operations) {
-              setOperations(previous => {
-                const next = { ...previous }
-                for (const [key, value] of Object.entries(data.operations)) {
-                  if (value != null) next[key] = value
-                }
-                return next
-              })
+            if (active && data) {
+              setNotifications(data)
             }
           }),
           chatService.admin.unreadCount().then(response => {
@@ -122,10 +126,49 @@ export default function AdminNav({ seasonalTheme = 'default' }) {
         ])
       } finally {
         running = false
+        if (active && refreshPending) {
+          refreshPending = false
+          void refreshCounts()
+        }
       }
     }
 
-    refreshCounts()
+    async function initializeCounts() {
+      const section = Object.entries(notificationSections).find(
+        ([path]) =>
+          location.pathname === path ||
+          location.pathname.startsWith(path + '/')
+      )?.[1]
+
+      if (section && section !== 'orders') {
+        try {
+          await adminService.markNotificationsRead(section)
+          if (active) {
+            setNotifications(previous => ({
+              ...previous,
+              [section]: 0,
+            }))
+          }
+        } catch (error) {
+          console.warn('Không thể đánh dấu thông báo đã đọc', error)
+        }
+      }
+
+      if (active) await refreshCounts()
+    }
+
+    function handleChatRead() {
+      if (running) {
+        refreshPending = true
+      } else {
+        void refreshCounts()
+      }
+    }
+
+    window.addEventListener('noscam-chat-unread-refresh', handleChatRead)
+    window.addEventListener('noscam-admin-notifications-refresh', handleChatRead)
+
+    initializeCounts()
 
     const timer = window.setInterval(refreshCounts, 15000)
     document.addEventListener('visibilitychange', refreshCounts)
@@ -134,28 +177,21 @@ export default function AdminNav({ seasonalTheme = 'default' }) {
     return () => {
       active = false
       window.clearInterval(timer)
+      window.removeEventListener('noscam-chat-unread-refresh', handleChatRead)
+      window.removeEventListener('noscam-admin-notifications-refresh', handleChatRead)
       document.removeEventListener('visibilitychange', refreshCounts)
       window.removeEventListener('focus', refreshCounts)
     }
   }, [location.key])
 
-  const ordersCount =
-    countValue(operations.social_pending) +
-    countValue(operations.social_failed)
-
-  const financeCount = countValue(operations.topups_pending)
+  const ordersCount = countValue(notifications.orders)
+  const financeCount = countValue(notifications.finance)
 
   const otherCounts = {
-    '/admin/exchange':
-      countValue(operations.exchange_disputes_open) +
-      countValue(operations.exchange_campaigns_paused),
-    '/admin/reports':
-      countValue(operations.reports_pending),
-    '/admin/community':
-      countValue(operations.community_posts_pending) +
-      countValue(operations.community_comments_pending),
-    '/admin/digital/orders':
-      countValue(operations.digital_orders_pending),
+    '/admin/exchange': countValue(notifications.exchange),
+    '/admin/reports': countValue(notifications.reports),
+    '/admin/community': countValue(notifications.community),
+    '/admin/digital/orders': countValue(notifications.digital_orders),
   }
 
   const otherCount = Object.values(otherCounts)
@@ -190,6 +226,48 @@ export default function AdminNav({ seasonalTheme = 'default' }) {
     }
   }, [])
 
+  async function handleHeaderNavigation(event, destination) {
+    const isOrdersPage =
+      location.pathname === '/admin/social/orders' ||
+      location.pathname.startsWith('/admin/social/orders/')
+
+    const staysInOrders =
+      destination === '/admin/social/orders' ||
+      destination.startsWith('/admin/social/orders/')
+
+    if (!isOrdersPage || staysInOrders) return
+
+    if (
+      event.defaultPrevented ||
+      event.button !== 0 ||
+      event.metaKey ||
+      event.ctrlKey ||
+      event.shiftKey ||
+      event.altKey
+    ) return
+
+    event.preventDefault()
+
+    try {
+      await adminService.markNotificationsRead('orders')
+
+      setNotifications(previous => ({
+        ...previous,
+        orders: 0,
+      }))
+
+      window.dispatchEvent(
+        new Event('noscam-admin-notifications-refresh')
+      )
+
+      setOpenMenu(null)
+      navigate(destination)
+    } catch (error) {
+      console.warn('Không thể đánh dấu đơn hàng đã đọc', error)
+      navigate(destination)
+    }
+  }
+
   async function handleLogout() {
     try {
       await adminService.logout()
@@ -211,7 +289,8 @@ export default function AdminNav({ seasonalTheme = 'default' }) {
       <div className="relative mx-auto max-w-7xl px-3 sm:px-5 lg:px-8">
 
         <div className="flex h-16 items-center justify-between gap-2">
-          <NavLink to="/admin" className="flex min-w-0 items-center gap-2.5">
+          <NavLink to="/admin"
+            onClick={event => handleHeaderNavigation(event, "/admin")} className="flex min-w-0 items-center gap-2.5">
             <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-blue-600 font-black text-white">
               N
             </div>
@@ -265,6 +344,7 @@ export default function AdminNav({ seasonalTheme = 'default' }) {
         >
           <NavLink
             to="/admin"
+            onClick={event => handleHeaderNavigation(event, "/admin")}
             end
             className={({ isActive }) => navClass(isActive)}
           >
@@ -274,6 +354,7 @@ export default function AdminNav({ seasonalTheme = 'default' }) {
 
           <NavLink
             to="/admin/social/orders"
+            onClick={event => handleHeaderNavigation(event, "/admin/social/orders")}
             className={({ isActive }) => navClass(isActive)}
           >
             <NavIcon name="orders" count={ordersCount} />
@@ -282,6 +363,7 @@ export default function AdminNav({ seasonalTheme = 'default' }) {
 
           <NavLink
             to="/admin/users"
+            onClick={event => handleHeaderNavigation(event, "/admin/users")}
             className={({ isActive }) =>
               navClass(isActive || location.pathname === '/admin/social/customers')
             }
@@ -292,6 +374,7 @@ export default function AdminNav({ seasonalTheme = 'default' }) {
 
           <NavLink
             to="/admin/finance"
+            onClick={event => handleHeaderNavigation(event, "/admin/finance")}
             className={({ isActive }) => navClass(isActive)}
           >
             <NavIcon name="wallet" count={financeCount} />
@@ -300,6 +383,7 @@ export default function AdminNav({ seasonalTheme = 'default' }) {
 
           <NavLink
             to="/admin/chat"
+            onClick={event => handleHeaderNavigation(event, "/admin/chat")}
             className={({ isActive }) => navClass(isActive)}
           >
             <NavIcon name="chat" count={unread} />
@@ -333,7 +417,10 @@ export default function AdminNav({ seasonalTheme = 'default' }) {
                 <NavLink
                   key={item.to}
                   to={item.to}
-                  onClick={() => setOpenMenu(null)}
+                  onClick={event => {
+                    setOpenMenu(null)
+                    handleHeaderNavigation(event, item.to)
+                  }}
                   className={({ isActive }) =>
                     `flex items-center justify-between gap-2 rounded-xl px-3 py-3 text-xs font-bold transition ${
                       isActive

@@ -3,6 +3,7 @@ import NoScamSelect from '../../components/ui/NoScamSelect'
 import {
   useCallback,
   useEffect,
+  useRef,
   useState,
 } from 'react'
 import { createPortal } from 'react-dom'
@@ -303,6 +304,75 @@ function canCancel(item) {
 }
 
 export default function AdminSocialOrdersPage() {
+  const [unreadOrderIds, setUnreadOrderIds] = useState([])
+  const openedOrderIds = useRef(new Set())
+  const notificationSequence = useRef(0)
+
+  useEffect(() => {
+    let active = true
+
+    async function refreshOrderNotifications() {
+      const sequence = ++notificationSequence.current
+
+      try {
+        const response = await adminService.getNotificationCounts()
+        const payload = response?.data ?? response
+        const keys = payload?.unread_orders ?? []
+
+        if (!active || sequence !== notificationSequence.current ||
+            !Array.isArray(keys)) return
+
+        const ids = keys
+          .filter(key => String(key).startsWith('social_orders:'))
+          .map(key => String(key).split(':')[1])
+
+        setUnreadOrderIds(
+          ids.filter(id => !openedOrderIds.current.has(id))
+        )
+      } catch (error) {
+        console.warn('Không thể tải thông báo đơn hàng', error)
+      }
+    }
+
+    refreshOrderNotifications()
+
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        refreshOrderNotifications()
+      }
+    }, 5000)
+
+    return () => {
+      active = false
+      window.clearInterval(timer)
+    }
+  }, [])
+
+  async function markOrderViewed(id) {
+    const key = String(id)
+
+    if (openedOrderIds.current.has(key)) return
+
+    openedOrderIds.current.add(key)
+
+    try {
+      await adminService.markNotificationsRead('orders', id)
+
+      notificationSequence.current += 1
+
+      setUnreadOrderIds(previous =>
+        previous.filter(value => value !== key)
+      )
+
+      window.dispatchEvent(
+        new Event('noscam-admin-notifications-refresh')
+      )
+    } catch (error) {
+      openedOrderIds.current.delete(key)
+      console.warn('Không thể đánh dấu đơn đã đọc', error)
+    }
+  }
+
   const [items, setItems] =
     useState([])
 
@@ -655,10 +725,26 @@ export default function AdminSocialOrdersPage() {
                     key={item.id}
                     className="relative border-b border-slate-100 last:border-b-0 has-[details[open]]:z-10 has-[details[open]]:rounded-xl has-[details[open]]:ring-2 has-[details[open]]:ring-blue-400 has-[details[open]]:shadow-lg has-[details[open]]:shadow-blue-100"
                   >
-                    <details className="group/order">
+                    <details
+                      className="group/order"
+                      onToggle={(event) => {
+                        if (event.currentTarget.open) {
+                          markOrderViewed(item.id)
+                        }
+                      }}
+                    >
                       <summary className="grid cursor-pointer list-none grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 px-4 py-3 transition-colors hover:bg-blue-50/40 group-open/order:bg-blue-50 sm:grid-cols-[minmax(0,1fr)_85px_105px_105px_155px_105px] [&::-webkit-details-marker]:hidden">
                         <div className="min-w-0">
-                          <div className="text-sm font-black text-slate-950">{item.code}</div>
+                          <div className="flex items-center gap-2 text-sm font-black text-slate-950">
+                            {item.code}
+                            {unreadOrderIds.includes(String(item.id)) && (
+                              <span
+                                className="inline-block h-2 w-2 shrink-0 rounded-full bg-red-500"
+                                title="Đơn hàng mới"
+                                aria-label="Đơn hàng mới"
+                              />
+                            )}
+                          </div>
                           <div className="truncate text-xs text-slate-500">{item.service?.name || 'Dịch vụ'}</div>
                           <div className="truncate text-[11px] text-slate-400">{item.user?.username || item.user?.name || 'Khách hàng'}</div>
                         </div>

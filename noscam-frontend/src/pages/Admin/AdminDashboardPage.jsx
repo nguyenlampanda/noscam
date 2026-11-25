@@ -44,6 +44,7 @@ export default function AdminDashboardPage() {
   useEffect(() => {
     let active = true
     let running = false
+    let refreshPending = false
 
     async function refreshUnread() {
       if (running || document.visibilityState !== 'visible') return
@@ -56,8 +57,22 @@ export default function AdminDashboardPage() {
         // Keep last successful count.
       } finally {
         running = false
+        if (active && refreshPending) {
+          refreshPending = false
+          void refreshUnread()
+        }
       }
     }
+
+    function handleChatRead() {
+      if (running) {
+        refreshPending = true
+      } else {
+        void refreshUnread()
+      }
+    }
+
+    window.addEventListener('noscam-chat-unread-refresh', handleChatRead)
 
     refreshUnread()
     const timer = window.setInterval(refreshUnread, 15000)
@@ -67,6 +82,7 @@ export default function AdminDashboardPage() {
       active = false
       window.clearInterval(timer)
       document.removeEventListener('visibilitychange', refreshUnread)
+      window.removeEventListener('noscam-chat-unread-refresh', handleChatRead)
     }
   }, [])
 
