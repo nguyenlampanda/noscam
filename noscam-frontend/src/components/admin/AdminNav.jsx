@@ -42,7 +42,6 @@ const otherItems = [
   { to: '/admin/digital/services', label: 'Quản lý dịch vụ số' },
   { to: '/admin/mediators', label: 'Trung gian' },
   { to: '/admin/popups', label: 'Thông báo' },
-  { to: '/admin/seasonal-theme', label: 'Giao diện lễ hội' },
   { to: '/admin/header', label: 'Quản lý Header' },
 ]
 
