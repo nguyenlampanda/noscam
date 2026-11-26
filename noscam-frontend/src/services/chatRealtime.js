@@ -22,7 +22,7 @@ export function createChatEcho(token) {
     wsPort: port,
     wssPort: port,
     forceTLS: secure,
-    enabledTransports: secure ? ['wss'] : ['ws'],
+    enabledTransports: ['ws', 'wss'],
     disableStats: true,
 
     authorizer: (channel) => ({
