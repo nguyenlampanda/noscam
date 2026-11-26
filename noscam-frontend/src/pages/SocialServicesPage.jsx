@@ -574,6 +574,102 @@ export default function SocialServicesPage() {
       }).toString()}`
     : ''
 
+
+  // NOSCAM_QR_DEPOSIT_AUTO_REFRESH_V1
+  const [depositNotice, setDepositNotice] = useState('')
+  const depositTotalRef = useRef(total)
+
+  useEffect(() => {
+    depositTotalRef.current = total
+  }, [total])
+
+  useEffect(() => {
+    if (!depositQrOpen || !isLoggedIn) return
+
+    let active = true
+    let timer
+    let baseline = null
+    const token = getCustomerToken()
+
+    setDepositNotice('Đang chờ xác nhận chuyển khoản...')
+
+    async function checkDeposit() {
+      try {
+        const response = await customerService.wallet()
+
+        if (!active || getCustomerToken() !== token) return
+
+        const currentBalance = readWalletBalance(response)
+        const rawDeposited = response?.data?.total_deposited
+
+        if (
+          currentBalance === null ||
+          rawDeposited == null ||
+          String(rawDeposited).trim() === '' ||
+          !Number.isFinite(Number(rawDeposited))
+        ) {
+          throw new Error('Wallet data unavailable')
+        }
+
+        const deposited = Number(rawDeposited)
+
+        if (baseline === null) {
+          baseline = deposited
+        }
+
+        setBalance(currentBalance)
+
+        if (currentBalance >= depositTotalRef.current) {
+          active = false
+          setDepositQrOpen(false)
+
+          window.dispatchEvent(
+            new Event('noscam-customer-updated')
+          )
+
+          window.dispatchEvent(
+            new Event('noscam-wallet-deposit-check')
+          )
+
+          return
+        }
+
+        if (deposited > baseline) {
+          baseline = deposited
+
+          window.dispatchEvent(
+            new Event('noscam-customer-updated')
+          )
+
+          window.dispatchEvent(
+            new Event('noscam-wallet-deposit-check')
+          )
+
+          setDepositNotice(
+            'Đã nhận tiền. Bạn vẫn cần nạp thêm để đủ số dư đặt hàng.'
+          )
+        }
+      } catch {
+        if (active) {
+          setDepositNotice(
+            'Đang kết nối lại. Vui lòng không chuyển khoản lần nữa.'
+          )
+        }
+      } finally {
+        if (active && getCustomerToken() === token) {
+          timer = window.setTimeout(checkDeposit, 3000)
+        }
+      }
+    }
+
+    checkDeposit()
+
+    return () => {
+      active = false
+      window.clearTimeout(timer)
+    }
+  }, [depositQrOpen, isLoggedIn])
+
   const categoryMeta = {
     follow: {
       label: 'Follow / Followers',
@@ -2249,7 +2345,7 @@ export default function SocialServicesPage() {
             if (event.target === event.currentTarget) setDepositQrOpen(false)
           }}
         >
-          <div className="max-h-[95vh] w-full max-w-md overflow-y-auto rounded-3xl bg-white p-5 shadow-2xl sm:p-7">
+          <div className="max-h-[90dvh] w-full max-w-md overscroll-contain overflow-y-auto rounded-3xl bg-white p-4 shadow-2xl sm:p-7">
             <div className="flex items-center justify-between gap-3">
               <h2 className="text-xl font-black text-slate-950">
                 Nạp tiền VietinBank
@@ -2302,10 +2398,28 @@ export default function SocialServicesPage() {
                     Số tiền nạp tối thiểu là 10.000đ.
                   </p>
                 )}
-                <p className="mt-4 text-center text-xs leading-5 text-slate-500">
-                  Quét QR và giữ nguyên nội dung chuyển khoản.
-                  Số dư ví sẽ được cập nhật khi ngân hàng xác nhận.
-                </p>
+                <div className="mt-4 rounded-2xl border border-blue-200 bg-blue-50 p-4">
+                  <div
+                    role="status"
+                    aria-live="polite"
+                    className="flex items-center gap-2 text-xs font-bold text-blue-700"
+                  >
+                    <span className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-blue-200 border-t-blue-600" />
+                    {depositNotice || 'Đang chờ xác nhận chuyển khoản...'}
+                  </div>
+
+                  <div className="mt-3 text-sm font-black text-blue-950">
+                    Lưu ý sau khi chuyển khoản
+                  </div>
+
+                  <ul className="mt-2 space-y-1.5 text-xs leading-5 text-blue-900">
+                    <li>• Giữ nguyên nội dung chuyển khoản.</li>
+                    <li>• Chuyển khoản xong, vui lòng đợi hệ thống xác nhận.</li>
+                    <li>• Không cần tải lại trang hoặc chuyển khoản lần nữa.</li>
+                    <li>• Cửa sổ sẽ tự động đóng khi số dư đã đủ.</li>
+                    <li>• Bạn có thể tiếp tục đặt hàng ngay sau đó.</li>
+                  </ul>
+                </div>
               </>
             ) : (
               <p className="mt-6 text-sm text-red-600">

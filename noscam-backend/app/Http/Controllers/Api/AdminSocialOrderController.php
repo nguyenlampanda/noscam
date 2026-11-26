@@ -20,7 +20,7 @@ class AdminSocialOrderController extends Controller
             ->with([
                 'user:id,name,email',
                 'service:id,code,name,platform,category',
-                'provider:id,name,slug,status',
+                'provider:id,name,slug,status,balance,currency,exchange_rate_to_vnd,last_checked_at',
                 'providerService:id,social_provider_id,provider_service_id,provider_service_name,cost_price_per_1000,priority,is_active',
             ]);
 
@@ -73,7 +73,7 @@ class AdminSocialOrderController extends Controller
             ->with([
                 'user:id,name,email',
                 'service:id,name,platform',
-                'provider:id,name,slug',
+                'provider:id,name,slug,status,balance,currency,exchange_rate_to_vnd,last_checked_at',
             ])
             ->where('status', 'pending')
             ->whereNull('provider_order_id')
@@ -90,7 +90,7 @@ class AdminSocialOrderController extends Controller
         $order->load([
             'user:id,name,email',
             'service',
-            'provider:id,name,slug,status',
+            'provider:id,name,slug,status,balance,currency,exchange_rate_to_vnd,last_checked_at',
             'providerService',
         ]);
 

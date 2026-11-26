@@ -124,6 +124,10 @@ export default function WalletDepositSuccessPopup() {
         showing.current = true
         setStorageKey(key)
         setDeposit(latest)
+
+        window.dispatchEvent(
+          new Event('noscam-customer-updated')
+        )
       }
     } catch (error) {
       // Không làm gián đoạn website khi mạng hoặc API tạm thời lỗi.
@@ -232,7 +236,7 @@ export default function WalletDepositSuccessPopup() {
           onClick={acknowledge}
           className="mt-6 w-full rounded-2xl bg-blue-600 px-5 py-3.5 font-bold text-white transition hover:bg-blue-700"
         >
-          Đã hiểu
+          Đóng
         </button>
       </section>
     </div>,

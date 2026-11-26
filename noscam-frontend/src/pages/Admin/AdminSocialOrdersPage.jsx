@@ -303,6 +303,48 @@ function canCancel(item) {
   ].includes(item.status)
 }
 
+
+function ProviderBalanceBadge({ provider }) {
+  const raw = provider?.balance
+  const currency = String(provider?.currency || '').trim().toUpperCase()
+  const rate = currency === 'VND'
+    ? 1
+    : Number(provider?.exchange_rate_to_vnd)
+
+  const valid =
+    raw != null &&
+    String(raw).trim() !== '' &&
+    Boolean(provider?.last_checked_at) &&
+    Boolean(currency) &&
+    Number.isFinite(Number(raw)) &&
+    Number.isFinite(rate) &&
+    rate > 0
+
+  const converted = valid ? Number(raw) * rate : null
+  const balance = Number.isFinite(converted) ? converted : null
+
+  const color = balance === null
+    ? 'bg-slate-100 text-slate-500'
+    : balance < 10000
+      ? 'bg-red-100 text-red-700'
+      : balance < 50000
+        ? 'bg-amber-100 text-amber-700'
+        : 'bg-emerald-100 text-emerald-700'
+
+  return (
+    <span
+      className={`inline-flex items-center whitespace-nowrap rounded-md px-2 py-1 text-xs font-black ${color}`}
+      title={balance !== null
+        ? `Số dư gốc: ${raw} ${currency} | Tỷ giá: ${rate} | Kiểm tra: ${orderDateTime(provider.last_checked_at)}`
+        : 'Chưa cập nhật số dư hoặc thiếu tỷ giá'}
+    >
+      Số dư: {balance === null
+        ? 'Chưa cập nhật'
+        : `${Math.round(balance).toLocaleString('vi-VN')}đ`}
+    </span>
+  )
+}
+
 export default function AdminSocialOrdersPage() {
   const [unreadOrderIds, setUnreadOrderIds] = useState([])
   const openedOrderIds = useRef(new Set())
@@ -747,6 +789,13 @@ export default function AdminSocialOrdersPage() {
                           </div>
                           <div className="truncate text-xs text-slate-500">{item.service?.name || 'Dịch vụ'}</div>
                           <div className="truncate text-[11px] text-slate-400">{item.user?.username || item.user?.name || 'Khách hàng'}</div>
+                          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px]">
+                            <span className="font-bold text-blue-700">
+                              API: {item.provider?.name || 'Chưa xác định'}
+                            </span>
+                            <ProviderBalanceBadge provider={item.provider} />
+                          </div>
+
                         </div>
                         <div className="hidden min-w-[70px] text-xs sm:block">
                           <div className="text-slate-400">Số lượng</div>
