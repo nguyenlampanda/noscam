@@ -1,3 +1,4 @@
+import ChatImageLightbox, { ChatImagePicker } from '../chat/ChatImageLightbox'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import chatService from '../../services/chatService'
@@ -15,6 +16,7 @@ export default function AdminFloatingChat() {
   const [selected, setSelected] = useState(null)
   const [messages, setMessages] = useState([])
   const [body, setBody] = useState('')
+  const [image, setImage] = useState(null)
   const [error, setError] = useState('')
   const [sending, setSending] = useState(false)
   const bottomRef = useRef(null)
@@ -34,7 +36,7 @@ export default function AdminFloatingChat() {
       const response = await chatService.admin.conversations()
       setConversations(itemsFrom(response))
     } catch (err) {
-      setError(err?.message || 'Không tải được danh sách Chat.')
+      setError('Không tải được danh sách Chat.')
     }
   }, [])
 
@@ -49,7 +51,7 @@ export default function AdminFloatingChat() {
       await refreshConversations()
       setError('')
     } catch (err) {
-      setError(err?.message || 'Không tải được tin nhắn.')
+      setError('Không tải được tin nhắn.')
     }
   }, [refreshUnread, refreshConversations])
 
@@ -90,15 +92,16 @@ export default function AdminFloatingChat() {
 
   async function sendMessage(event) {
     event.preventDefault()
-    if (!selected || !body.trim() || sending) return
+    if (!selected || (!body.trim() && !image) || sending) return
 
     setSending(true)
     try {
-      await chatService.admin.send(selected.id, body.trim())
+      await chatService.admin.send(selected.id, body.trim(), image)
       setBody('')
+      setImage(null)
       await loadMessages(selected.id)
     } catch (err) {
-      setError(err?.message || 'Không gửi được tin nhắn.')
+      setError('Không gửi được tin nhắn.')
     } finally {
       setSending(false)
     }
@@ -142,7 +145,7 @@ export default function AdminFloatingChat() {
                   key={conversation.id}
                   type="button"
                   onClick={() => {
-                    setSelected(conversation)
+                    if (sending) return; setImage(null); setBody(''); setSelected(conversation)
                     setMessages([])
                     loadMessages(conversation.id)
                   }}
@@ -174,7 +177,7 @@ export default function AdminFloatingChat() {
                 <button
                   type="button"
                   onClick={() => {
-                    setSelected(null)
+                    if (sending) return; setImage(null); setBody(''); setSelected(null)
                     setMessages([])
                     refreshConversations()
                   }}
@@ -205,7 +208,12 @@ export default function AdminFloatingChat() {
                             : 'rounded-br-md bg-blue-600 text-white'
                         }`}
                       >
-                        {message.body}
+                        {message.has_image && (
+                            <ChatImageLightbox
+                              messageId={message.id} admin
+                            />
+                          )}
+                          {message.body && <div>{message.body}</div>}
                       </div>
                     </div>
                   )
@@ -214,7 +222,13 @@ export default function AdminFloatingChat() {
               </div>
 
               <form onSubmit={sendMessage} className="flex gap-2 border-t border-slate-200 p-3">
-                <input
+                <ChatImagePicker
+                    image={image}
+                    onChange={setImage}
+                    onError={setError}
+                    disabled={sending}
+                  />
+                  <input
                   value={body}
                   onChange={(event) => setBody(event.target.value)}
                   placeholder="Nhập tin nhắn..."
@@ -223,7 +237,7 @@ export default function AdminFloatingChat() {
                 />
                 <button
                   type="submit"
-                  disabled={sending || !body.trim()}
+                  disabled={sending || (!body.trim() && !image)}
                   className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
                 >
                   Gửi

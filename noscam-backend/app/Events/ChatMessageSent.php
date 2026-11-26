@@ -26,6 +26,7 @@ class ChatMessageSent implements ShouldBroadcastNow
             'conversation_id' => $chatMessage->conversation_id,
             'sender_id' => $chatMessage->sender_id,
             'body' => $chatMessage->body,
+            'has_image' => $chatMessage->has_image,
             'created_at' => $chatMessage->created_at?->toISOString(),
         ];
     }

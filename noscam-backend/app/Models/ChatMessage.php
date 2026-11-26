@@ -8,6 +8,15 @@ class ChatMessage extends Model
 {
     protected $guarded = ['*'];
 
+    protected $hidden = ['image_path'];
+
+    protected $appends = ['has_image'];
+
+    public function getHasImageAttribute(): bool
+    {
+        return !empty($this->image_path);
+    }
+
     protected function casts(): array
     {
         return ['read_at' => 'datetime'];

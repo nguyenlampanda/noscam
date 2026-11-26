@@ -1,5 +1,5 @@
+import ChatImageLightbox, { ChatImagePicker } from './ChatImageLightbox'
 import './CustomerChat.css'
-import { ChatMascotPeek } from '../social/TinyPlatformPet'
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import chatService from '../../services/chatService'
@@ -13,6 +13,7 @@ export default function CustomerChat() {
   const [conversationId, setConversationId] = useState(null)
   const [currentUserId, setCurrentUserId] = useState(null)
   const [body, setBody] = useState('')
+  const [image, setImage] = useState(null)
   const [loading, setLoading] = useState(false)
   const [sending, setSending] = useState(false)
   const [error, setError] = useState('')
@@ -75,7 +76,7 @@ export default function CustomerChat() {
       setMessages(Array.isArray(items) ? items : [])
       setError('')
     } catch (err) {
-      setError(err?.message || 'Không tải được tin nhắn.')
+      setError('Không tải được tin nhắn.')
     }
   }
 
@@ -120,7 +121,7 @@ export default function CustomerChat() {
         }
       } catch (err) {
         if (active) {
-          setError(err?.message || 'Không tải được tin nhắn.')
+          setError('Không tải được tin nhắn.')
         }
       } finally {
         if (active) setLoading(false)
@@ -183,17 +184,18 @@ export default function CustomerChat() {
   async function sendMessage(event) {
     event.preventDefault()
     const text = body.trim()
-    if (!text || sending) return
+    if ((!text && !image) || sending) return
 
     setSending(true)
     setError('')
 
     try {
-      await chatService.customer.send(text)
+      await chatService.customer.send(text, image)
       setBody('')
+      setImage(null)
       await loadMessages()
     } catch (err) {
-      setError(err?.message || 'Không gửi được tin nhắn.')
+      setError('Không gửi được tin nhắn.')
     } finally {
       setSending(false)
     }
@@ -201,7 +203,6 @@ export default function CustomerChat() {
 
   return (
     <div className="fixed bottom-3 right-3 z-[90] sm:bottom-5 sm:right-5">
-      <ChatMascotPeek open={open} />
       {open && (
         <section className="noscam-chat-panel mb-3 flex h-[min(540px,75dvh)] w-[min(370px,calc(100vw-24px))] flex-col overflow-hidden">
           <header className="noscam-chat-header flex items-center justify-between text-white">
@@ -259,7 +260,12 @@ export default function CustomerChat() {
                             : 'border border-slate-200 bg-white text-slate-800'
                         }`}
                       >
-                        {message.body}
+                        {message.has_image && (
+                            <ChatImageLightbox
+                              messageId={message.id}
+                            />
+                          )}
+                          {message.body && <div>{message.body}</div>}
                       </div>
                     </div>
                   )
@@ -274,7 +280,13 @@ export default function CustomerChat() {
               )}
 
               <form onSubmit={sendMessage} className="noscam-chat-form flex gap-2">
-                <input
+                <ChatImagePicker
+                    image={image}
+                    onChange={setImage}
+                    onError={setError}
+                    disabled={sending}
+                  />
+                  <input
                   value={body}
                   onChange={(event) => setBody(event.target.value)}
                   maxLength={5000}
@@ -284,7 +296,7 @@ export default function CustomerChat() {
                 />
                 <button
                   type="submit"
-                  disabled={sending || !body.trim()}
+                  disabled={sending || (!body.trim() && !image)}
                   className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
                 >
                   Gửi

@@ -14,7 +14,6 @@ import {
   useReducedMotion,
 } from 'motion/react'
 import PlatformIcon from '../components/social/PlatformIcon'
-import TinyPlatformPet from '../components/social/TinyPlatformPet'
 import SocialGuideModal from '../components/social/SocialGuideModal'
 import customerService, {
   getCustomerToken,
@@ -1128,128 +1127,108 @@ export default function SocialServicesPage() {
 
   return (
     <>
-      <main className="bg-white min-h-screen px-3 py-4 sm:px-5 sm:py-8 md:py-12">
+      <main className="bg-white min-h-screen px-3 py-3 sm:px-5 sm:py-4">
         <div className="mx-auto max-w-6xl">
 
-  {/* NOSCAM SOCIAL HOMEPAGE REDESIGN */}
-          <motion.section
-            {...rise(0)}
-            className="relative isolate overflow-hidden rounded-[20px] sm:rounded-[26px] bg-gradient-to-br from-slate-950 via-[#10265c] to-blue-700 px-3 py-4 text-white shadow-2xl shadow-blue-950/15 sm:px-10 sm:py-10 md:py-12"
-          >
-            <div className="pointer-events-none absolute -right-24 -top-32 h-80 w-80 rounded-full bg-blue-400/20 blur-3xl" />
-            <div className="pointer-events-none absolute -bottom-32 left-1/3 h-72 w-72 rounded-full bg-cyan-400/10 blur-3xl" />
+  {/* NOSCAM SOCIAL COMPACT HEADER V1 */}
+          <section className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h1 className="text-lg font-black tracking-tight text-slate-900 sm:text-xl">
+                Tăng tương tác
+              </h1>
 
-            <div className="relative z-10 grid items-center gap-3 sm:gap-8 lg:grid-cols-[1.3fr_0.7fr]">
-              <div>
-                <div className="inline-flex items-center gap-2 rounded-full border border-blue-300/25 bg-white/10 px-3 py-1 text-[10px] sm:px-4 sm:py-2 sm:text-xs font-bold tracking-widest text-blue-100">
-                  <span className="h-2 w-2 rounded-full bg-cyan-300" />
-                  NOSCAM SOCIAL
-                </div>
-
-                <h1 className="mt-2 max-w-2xl text-[22px] font-black leading-[1.2] sm:mt-6 sm:text-5xl tracking-tight sm:text-5xl">
-                  Tăng tương tác
-                  <span className="mt-1 block bg-gradient-to-r from-blue-200 to-cyan-300 bg-clip-text text-transparent">
-                    mạng xã hội dễ dàng hơn
-                  </span>
-                </h1>
-
-                <p className="mt-2 max-w-xl text-[12px] leading-5 text-blue-100/85 sm:mt-5 sm:text-base sm:leading-8">
-                  Tăng người theo dõi, lượt thích và lượt xem
-                  trên nhiều nền tảng mạng xã hội.
-                  Chọn dịch vụ, nhập liên kết và đặt hàng
-                  chỉ với vài bước đơn giản.
-                </p>
-
-                <div className="mt-4 grid grid-cols-3 gap-2 sm:mt-8 sm:flex sm:flex-wrap sm:gap-3">
-                  <a
-                    href="#tao-don"
-                    className="inline-flex min-w-0 min-h-11 items-center justify-center rounded-xl sm:min-h-12 sm:rounded-2xl bg-white px-2 py-2.5 text-[11px] leading-tight whitespace-nowrap sm:px-6 sm:py-3 sm:text-sm sm:px-6 sm:py-3 sm:text-sm font-black text-blue-700 shadow-lg transition hover:-translate-y-1 hover:shadow-xl"
-                  >
-                    <span className="sm:hidden">Tạo đơn</span><span className="hidden sm:inline">Tạo đơn ngay ↓</span>
-                  </a>
-
-                  <Link
-                    to="/my-orders"
-                    className="inline-flex min-w-0 min-h-11 items-center justify-center rounded-xl sm:min-h-12 sm:rounded-2xl border border-white/30 bg-white/10 px-2 py-2.5 text-[11px] leading-tight whitespace-nowrap sm:px-6 sm:py-3 sm:text-sm sm:px-6 sm:py-3 sm:text-sm font-bold text-white transition hover:bg-white/20"
-                  >
-                    <span className="sm:hidden">Lịch sử</span><span className="hidden sm:inline">Xem đơn hàng</span>
-                  </Link>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!isLoggedIn) {
-                        navigate('/login')
-                        return
-                      }
-                      setGuideOpen(true)
-                    }}
-                    className="inline-flex min-w-0 min-h-11 items-center justify-center gap-2 rounded-xl border border-white/30 bg-white/10 px-2 py-2.5 text-[11px] leading-tight whitespace-nowrap sm:px-6 sm:py-3 sm:text-sm sm:px-6 sm:py-3 sm:text-sm font-bold text-white transition hover:bg-white/20 sm:min-h-12 sm:rounded-2xl"
-                  >
-                    
-                    <span className="sm:hidden">Hướng dẫn</span><span className="hidden sm:inline">Hướng dẫn sử dụng</span>
-                  </button>
-                </div>
-              </div>
-
-              <div className="space-y-2 sm:space-y-4">
-                <motion.div
-                  {...hoverLift}
-                  className="rounded-2xl border border-white/20 bg-white/10 p-3 sm:rounded-3xl sm:p-6 shadow-xl backdrop-blur-md"
+              <button
+                type="button"
+                onClick={() => {
+                  if (!isLoggedIn) {
+                    navigate('/login')
+                    return
+                  }
+                  setGuideOpen(true)
+                }}
+                className="inline-flex min-h-10 items-center gap-1.5 rounded-lg px-2 text-xs font-semibold text-slate-500 transition hover:bg-slate-50 hover:text-blue-600 sm:text-sm"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  className="h-4 w-4"
+                  aria-hidden="true"
                 >
-                  <div className="text-xs font-bold uppercase tracking-widest text-blue-200">
-                    {isLoggedIn ? 'Số dư ví của bạn' : 'Bắt đầu sử dụng'}
+                  <circle cx="12" cy="12" r="9" />
+                  <path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 2-3 4M12 17h.01" />
+                </svg>
+                Hướng dẫn
+              </button>
+            </div>
+
+            <div className="mt-2 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex min-w-0 items-center justify-between gap-3 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2 sm:px-4">
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-blue-600">
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      className="h-5 w-5"
+                      aria-hidden="true"
+                    >
+                      <rect x="3" y="5" width="18" height="15" rx="3" />
+                      <path d="M3 9h18M16 14h2" />
+                    </svg>
                   </div>
 
-                  {isLoggedIn ? (
-                    <>
-                      <div className="mt-1 break-all text-xl font-black sm:mt-3 sm:text-3xl">
-                        {balance === null ? '...' : money(balance)}
-                      </div>
-                      <p className="mt-2 hidden text-sm text-blue-100/80 sm:block">
-                        Dùng số dư để thanh toán đơn hàng.
-                      </p>
-                      <Link
-                        to="/wallet"
-                        className="mt-2 inline-flex rounded-lg bg-blue-500 px-3 py-1.5 text-xs sm:mt-5 sm:rounded-xl sm:px-5 sm:py-3 sm:text-sm sm:mt-5 sm:px-5 sm:py-3 text-sm font-bold text-white transition hover:bg-blue-400"
-                      >
-                        Nạp tiền vào ví →
-                      </Link>
-                    </>
-                  ) : (
-                    <>
-                      <p className="mt-3 text-lg font-bold">
-                        Đăng nhập để quản lý đơn hàng
-                      </p>
-                      <Link
-                        to="/login"
-                        className="mt-2 inline-flex rounded-lg bg-blue-500 px-3 py-1.5 text-xs sm:mt-5 sm:rounded-xl sm:px-5 sm:py-3 sm:text-sm sm:mt-5 sm:px-5 sm:py-3 text-sm font-bold text-white transition hover:bg-blue-400"
-                      >
-                        Đăng nhập →
-                      </Link>
-                    </>
-                  )}
-                </motion.div>
-
-                <div className="grid grid-cols-6 gap-1 sm:grid-cols-4 lg:grid-cols-6 sm:gap-3">
-                  {availablePlatforms.map((item) => (
-                    <div
-                      key={item.value}
-                      className="flex flex-col items-center gap-1 rounded-xl border border-white/15 bg-white/10 px-1 py-2 sm:rounded-2xl sm:px-2 sm:py-4 backdrop-blur-sm"
-                    >
-                      <PlatformIcon
-                        platform={item.value}
-                        className="h-6 w-6 sm:h-8 sm:w-8"
-                      />
-                      <span className="text-[9px] sm:text-xs font-bold">
-                        {item.label}
-                      </span>
+                  <div className="min-w-0">
+                    <div className="text-[11px] font-medium text-slate-500">
+                      {isLoggedIn ? 'Số dư ví' : 'Tài khoản'}
                     </div>
-                  ))}
+                    <div className="break-all text-base font-black tabular-nums text-blue-700 sm:text-lg">
+                      {isLoggedIn
+                        ? balance === null ? '...' : money(balance)
+                        : 'Chưa đăng nhập'}
+                    </div>
+                  </div>
                 </div>
+
+                <Link
+                  to={isLoggedIn ? '/wallet' : '/login'}
+                  className="inline-flex min-h-9 shrink-0 items-center justify-center rounded-lg bg-blue-600 px-3 text-xs font-bold text-white transition hover:bg-blue-700 sm:text-sm"
+                >
+                  {isLoggedIn ? '+ Nạp tiền' : 'Đăng nhập'}
+                </Link>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 lg:flex">
+                <a
+                  href="#tao-don"
+                  className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-blue-600 px-3 text-xs font-bold text-white transition hover:bg-blue-700 sm:px-5 sm:text-sm"
+                >
+                  <span aria-hidden="true">＋</span>
+                  Tạo đơn hàng
+                </a>
+
+                <Link
+                  to="/my-orders"
+                  className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600 sm:px-5 sm:text-sm"
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    className="h-4 w-4"
+                    aria-hidden="true"
+                  >
+                    <rect x="5" y="3" width="14" height="18" rx="2" />
+                    <path d="M9 8h6M9 12h6M9 16h4" />
+                  </svg>
+                  Xem đơn hàng
+                </Link>
               </div>
             </div>
-          </motion.section>
+          </section>
 
 
 
@@ -1271,7 +1250,7 @@ export default function SocialServicesPage() {
               }
               prepareOrder(event)
             }}
-            className="relative isolate mt-3 rounded-[20px] border border-slate-200 bg-white p-3 shadow-sm sm:mt-5 sm:rounded-[24px] sm:p-6 md:p-8"
+            className="relative isolate mt-3 scroll-mt-24 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-5"
           >
             {/* NOSCAM_ORDER_LOGIN_GATE_V1 */}
             <fieldset
@@ -1296,7 +1275,6 @@ export default function SocialServicesPage() {
                     1. Chọn nền tảng
                   </label>
 
-                  <TinyPlatformPet selected={platform} />
                   <div className="grid grid-cols-3 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 sm:gap-3">
                     {availablePlatforms.map(
                       (item) => {

@@ -1,3 +1,4 @@
+import ChatImageLightbox, { ChatImagePicker } from '../../components/chat/ChatImageLightbox'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import AdminNav from '../../components/admin/AdminNav'
 import chatService from '../../services/chatService'
@@ -19,6 +20,7 @@ export default function AdminChatPage() {
   const [messages, setMessages] = useState([])
   const [currentUserId, setCurrentUserId] = useState(null)
   const [body, setBody] = useState('')
+  const [image, setImage] = useState(null)
   const [loading, setLoading] = useState(true)
   const [loadingMessages, setLoadingMessages] = useState(false)
   const [sending, setSending] = useState(false)
@@ -31,7 +33,7 @@ export default function AdminChatPage() {
       setConversations(extractItems(response, 'conversations'))
       setError('')
     } catch (err) {
-      setError(err?.message || 'Không tải được danh sách trò chuyện.')
+      setError('Không tải được danh sách trò chuyện.')
     } finally {
       setLoading(false)
     }
@@ -54,7 +56,7 @@ export default function AdminChatPage() {
         // Không đánh dấu đã đọc nếu API thất bại.
       }
     } catch (err) {
-      setError(err?.message || 'Không tải được tin nhắn.')
+      setError('Không tải được tin nhắn.')
     } finally {
       setLoadingMessages(false)
     }
@@ -156,18 +158,19 @@ export default function AdminChatPage() {
   async function sendMessage(event) {
     event.preventDefault()
     const text = body.trim()
-    if (!selected || !text || sending) return
+    if (!selected || (!text && !image) || sending) return
 
     setSending(true)
     setError('')
 
     try {
-      await chatService.admin.send(selected.id, text)
+      await chatService.admin.send(selected.id, text, image)
       setBody('')
+      setImage(null)
       await loadMessages(selected.id)
       await loadConversations()
     } catch (err) {
-      setError(err?.message || 'Không gửi được tin nhắn.')
+      setError('Không gửi được tin nhắn.')
     } finally {
       setSending(false)
     }
@@ -221,7 +224,7 @@ export default function AdminChatPage() {
                 <button
                   key={conversation.id}
                   type="button"
-                  onClick={() => setSelected(conversation)}
+                  onClick={() => { if (sending) return; setImage(null); setBody(''); setSelected(conversation) }}
                   className={`block w-full border-b border-slate-100 px-5 py-4 text-left hover:bg-blue-50 ${
                     selected?.id === conversation.id ? 'bg-blue-50' : ''
                   }`}
@@ -255,7 +258,7 @@ export default function AdminChatPage() {
                 <header className="border-b border-slate-100 px-5 py-4">
                   <button
                     type="button"
-                    onClick={() => setSelected(null)}
+                    onClick={() => { if (sending) return; setImage(null); setBody(''); setSelected(null) }}
                     className="mb-3 rounded-lg bg-blue-50 px-3 py-2 text-sm font-bold text-blue-700 md:hidden"
                   >
                     ← Quay lại danh sách
@@ -290,7 +293,12 @@ export default function AdminChatPage() {
                               : 'border border-slate-200 bg-white text-slate-800'
                           }`}
                         >
-                          {message.body}
+                          {message.has_image && (
+                            <ChatImageLightbox
+                              messageId={message.id} admin
+                            />
+                          )}
+                          {message.body && <div>{message.body}</div>}
                         </div>
                       </div>
                     )
@@ -302,6 +310,12 @@ export default function AdminChatPage() {
                   onSubmit={sendMessage}
                   className="flex gap-3 border-t border-slate-200 p-4"
                 >
+                  <ChatImagePicker
+                    image={image}
+                    onChange={setImage}
+                    onError={setError}
+                    disabled={sending}
+                  />
                   <input
                     value={body}
                     onChange={(event) => setBody(event.target.value)}
@@ -312,7 +326,7 @@ export default function AdminChatPage() {
                   />
                   <button
                     type="submit"
-                    disabled={sending || !body.trim()}
+                    disabled={sending || (!body.trim() && !image)}
                     className="rounded-xl bg-blue-600 px-5 py-3 font-bold text-white disabled:opacity-50"
                   >
                     Gửi

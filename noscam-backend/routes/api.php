@@ -1046,6 +1046,11 @@ Route::prefix('admin')
         [\App\Http\Controllers\Api\ChatController::class, 'customerMessages']
     );
 
+    \Illuminate\Support\Facades\Route::get(
+        '/chat/messages/{message}/image',
+        [\App\Http\Controllers\Api\ChatController::class, 'customerImage']
+    );
+
     \Illuminate\Support\Facades\Route::post(
         '/chat/messages',
         [\App\Http\Controllers\Api\ChatController::class, 'customerSend']
@@ -1077,6 +1082,11 @@ Route::prefix('admin')
         \Illuminate\Support\Facades\Route::get(
             '/conversations/{conversation}/messages',
             [\App\Http\Controllers\Api\ChatController::class, 'adminMessages']
+        );
+
+        \Illuminate\Support\Facades\Route::get(
+            '/messages/{message}/image',
+            [\App\Http\Controllers\Api\ChatController::class, 'adminImage']
         );
 
         \Illuminate\Support\Facades\Route::post(

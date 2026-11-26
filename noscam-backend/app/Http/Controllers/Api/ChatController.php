@@ -11,6 +11,8 @@ use App\Models\ChatConversation;
 use App\Models\ChatMessage;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 
 class ChatController extends Controller
 {
@@ -100,10 +102,22 @@ class ChatController extends Controller
         }
 
         $data = $request->validate([
-            'body' => ['required', 'string', 'max:5000'],
+            'body' => ['nullable', 'required_without:image', 'string', 'max:5000'],
+            'image' => [
+                'nullable',
+                'required_without:body',
+                'file',
+                'image',
+                'mimes:jpg,jpeg,png,webp',
+                'max:10240',
+                'dimensions:max_width=8000,max_height=8000',
+            ],
         ]);
 
-        $message = DB::transaction(function () use ($request, $data) {
+        $imagePath = $this->storeChatImage($request);
+
+        try {
+            $message = DB::transaction(function () use ($request, $data, $imagePath) {
             $conversation = ChatConversation::firstOrCreate([
                 'customer_id' => $request->user()->id,
             ]);
@@ -111,16 +125,24 @@ class ChatController extends Controller
             $message = new ChatMessage();
             $message->conversation_id = $conversation->id;
             $message->sender_id = $request->user()->id;
-            $message->body = $data['body'];
+            $message->body = $data['body'] ?? '';
+            $message->image_path = $imagePath;
             $message->save();
 
             $conversation->last_message_at = now();
             $conversation->save();
 
             return $message;
-        });
+            });
+        } catch (\Throwable $exception) {
+            if ($imagePath) {
+                Storage::disk('local')->delete($imagePath);
+            }
 
-        ChatMessageSent::dispatch($message);
+            throw $exception;
+        }
+
+        $this->broadcastChatMessage($message);
 
         return response()->json(['message' => $message], 201);
     }
@@ -189,23 +211,43 @@ class ChatController extends Controller
         }
 
         $data = $request->validate([
-            'body' => ['required', 'string', 'max:5000'],
+            'body' => ['nullable', 'required_without:image', 'string', 'max:5000'],
+            'image' => [
+                'nullable',
+                'required_without:body',
+                'file',
+                'image',
+                'mimes:jpg,jpeg,png,webp',
+                'max:10240',
+                'dimensions:max_width=8000,max_height=8000',
+            ],
         ]);
 
-        $message = DB::transaction(function () use ($request, $conversation, $data) {
+        $imagePath = $this->storeChatImage($request);
+
+        try {
+            $message = DB::transaction(function () use ($request, $conversation, $data, $imagePath) {
             $message = new ChatMessage();
             $message->conversation_id = $conversation->id;
             $message->sender_id = $request->user()->id;
-            $message->body = $data['body'];
+            $message->body = $data['body'] ?? '';
+            $message->image_path = $imagePath;
             $message->save();
 
             $conversation->last_message_at = now();
             $conversation->save();
 
             return $message;
-        });
+            });
+        } catch (\Throwable $exception) {
+            if ($imagePath) {
+                Storage::disk('local')->delete($imagePath);
+            }
 
-        ChatMessageSent::dispatch($message);
+            throw $exception;
+        }
+
+        $this->broadcastChatMessage($message);
 
         return response()->json(['message' => $message], 201);
     }
@@ -225,4 +267,90 @@ class ChatController extends Controller
 
         return response()->json(['success' => true]);
     }
+
+    // NOSCAM_CHAT_REALTIME_FALLBACK_V1
+    private function broadcastChatMessage(ChatMessage $message): void
+    {
+        try {
+            ChatMessageSent::dispatch($message);
+        } catch (\Throwable $exception) {
+            \Illuminate\Support\Facades\Log::warning(
+                'Chat realtime delivery failed',
+                [
+                    'message_id' => $message->id,
+                    'exception_type' => get_class($exception),
+                ]
+            );
+        }
+    }
+
+    // NOSCAM_CHAT_IMAGES_V1
+    private function storeChatImage(Request $request): ?string
+    {
+        if (!$request->hasFile('image')) {
+            return null;
+        }
+
+        $path = $request->file('image')->store(
+            'chat-images',
+            'local'
+        );
+
+        if (!$path) {
+            throw ValidationException::withMessages([
+                'image' => 'Khong the luu hinh anh.',
+            ]);
+        }
+
+        return $path;
+    }
+
+    public function customerImage(Request $request, ChatMessage $message)
+    {
+        abort_unless($this->isCustomer($request), 403);
+
+        abort_unless(
+            $message->conversation()
+                ->where('customer_id', $request->user()->id)
+                ->exists(),
+            404
+        );
+
+        return $this->serveChatImage($message);
+    }
+
+    public function adminImage(Request $request, ChatMessage $message)
+    {
+        abort_unless($this->isAdmin($request), 403);
+
+        return $this->serveChatImage($message);
+    }
+
+    private function serveChatImage(ChatMessage $message)
+    {
+        $path = $message->image_path;
+
+        abort_unless(
+            $path && str_starts_with($path, 'chat-images/'),
+            404
+        );
+
+        $disk = Storage::disk('local');
+
+        abort_unless($disk->exists($path), 404);
+
+        $mime = $disk->mimeType($path);
+
+        abort_unless(
+            in_array($mime, ['image/jpeg', 'image/png', 'image/webp'], true),
+            404
+        );
+
+        return $disk->response($path, null, [
+            'Content-Type' => $mime,
+            'Cache-Control' => 'private, no-store',
+            'X-Content-Type-Options' => 'nosniff',
+        ], 'inline');
+    }
+
 }
