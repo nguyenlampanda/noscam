@@ -73,8 +73,11 @@ class SocialServiceController extends Controller
 
         $services = $query
             ->orderBy('platform')
+            ->orderByRaw('CASE WHEN sell_price_per_1000 IS NULL THEN 1 ELSE 0 END ASC')
+            ->orderBy('sell_price_per_1000', 'asc')
             ->orderBy('sort_order')
             ->orderBy('name')
+            ->orderBy('id')
             ->get([
                 'id',
                 'code',
