@@ -112,8 +112,10 @@ return Application::configure(
                 SecurityHeaders::class
             );
 
+            // Nginx validates Cloudflare client IPs before FastCGI.
+            // Do not trust client-supplied forwarded headers.
             $middleware->trustProxies(
-                at: '*'
+                at: []
             );
 
             $middleware->redirectGuestsTo(
