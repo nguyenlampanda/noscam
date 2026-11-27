@@ -4,6 +4,7 @@ export default function ScrollableList({ children }) {
   const scrollRef = useRef(null)
   const contentRef = useRef(null)
 
+  const [hasOverflow, setHasOverflow] = useState(false)
   const [canScrollUp, setCanScrollUp] = useState(false)
   const [canScrollDown, setCanScrollDown] = useState(false)
 
@@ -19,6 +20,8 @@ export default function ScrollableList({ children }) {
 
       const itemCount = contentRef.current?.children.length || 0
       const hasOverflow = itemCount > 2 && maxScroll > 8
+
+      setHasOverflow(hasOverflow)
 
       if (!hasOverflow) {
         setCanScrollUp(false)
@@ -52,8 +55,10 @@ export default function ScrollableList({ children }) {
 
   return (
     <div className="min-w-0">
-      {canScrollUp && (
-        <div className="mb-2 select-none rounded-lg bg-blue-50/80 px-3 py-2 text-center text-xs font-bold text-blue-600">
+      {hasOverflow && (
+        <div aria-hidden={!canScrollUp}
+          style={{ visibility: canScrollUp ? "visible" : "hidden" }}
+          className="mb-2 select-none rounded-lg bg-blue-50/80 px-3 py-2 text-center text-xs font-bold text-blue-600">
           ↑ Cuộn lên xem lại
         </div>
       )}
@@ -75,8 +80,10 @@ export default function ScrollableList({ children }) {
         </div>
       </div>
 
-      {canScrollDown && (
-        <div className="mt-2 select-none rounded-lg bg-blue-50/80 px-3 py-2 text-center text-xs font-bold text-blue-600">
+      {hasOverflow && (
+        <div aria-hidden={!canScrollDown}
+          style={{ visibility: canScrollDown ? "visible" : "hidden" }}
+          className="mt-2 select-none rounded-lg bg-blue-50/80 px-3 py-2 text-center text-xs font-bold text-blue-600">
           ↓ Cuộn xuống xem thêm
         </div>
       )}
