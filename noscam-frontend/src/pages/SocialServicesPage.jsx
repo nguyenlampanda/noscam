@@ -14,6 +14,7 @@ import {
   useReducedMotion,
 } from 'motion/react'
 import PlatformIcon from '../components/social/PlatformIcon'
+import ScrollableList from '../components/ui/ScrollableList'
 import SocialGuideModal from '../components/social/SocialGuideModal'
 import customerService, {
   getCustomerToken,
@@ -1601,7 +1602,10 @@ export default function SocialServicesPage() {
                       <p className="px-1 pb-1 text-xs font-medium text-slate-500">
                         Chọn một dịch vụ để tiếp tục đặt hàng.
                       </p>
-{categoryServices.map(
+                      <ScrollableList
+                        key={JSON.stringify(categoryServices.map(item => item.id))}
+                      >
+                        {categoryServices.map(
                               (item) => {
                                 const active =
                                   String(
@@ -1718,6 +1722,7 @@ export default function SocialServicesPage() {
                                 )
                               },
                             )}
+                      </ScrollableList>
                     </div>
                   )}
                 </div>
