@@ -58,4 +58,77 @@ class ProviderBalanceSnapshotTest extends TestCase
 
         Http::assertNothingSent();
     }
+
+    public function test_new_orders_capture_latest_wallet_snapshot(): void
+    {
+        Http::preventStrayRequests();
+
+        $provider = \App\Models\SocialProvider::create([
+            'name' => 'Snapshot Test',
+            'slug' => 'snapshot-test',
+            'driver' => 'bufflikenhanh_v2',
+            'api_url' => 'https://example.invalid/api',
+            'api_key' => 'fake-test-key',
+            'status' => 'active',
+            'currency' => 'VND',
+            'exchange_rate_to_vnd' => 1,
+        ]);
+
+        $api = \Mockery::mock(
+            \App\Services\Social\SocialProviderInterface::class
+        );
+
+        $api->shouldReceive('balance')
+            ->times(3)
+            ->andReturn(
+                ['balance' => 19500, 'currency' => 'VND'],
+                ['balance' => 13980, 'currency' => 'VND'],
+                ['balance' => 9220, 'currency' => 'VND']
+            );
+
+        $manager = \Mockery::mock(
+            \App\Services\Social\SocialProviderManager::class
+        );
+
+        $manager->shouldReceive('make')
+            ->times(3)
+            ->andReturn($api);
+
+        $sync = new \App\Services\Social\ProviderWalletBalanceService(
+            $manager
+        );
+
+        $sync->sync();
+
+        $this->assertEquals(
+            19500,
+            $provider->fresh()->wallet_balance_vnd
+        );
+
+        $firstSnapshot = $provider->fresh()->wallet_balance_vnd;
+        $firstCheckedAt = $provider->fresh()->wallet_checked_at;
+
+        $sync->sync();
+
+        $this->assertEquals(
+            13980,
+            $provider->fresh()->wallet_balance_vnd
+        );
+
+        $secondSnapshot = $provider->fresh()->wallet_balance_vnd;
+
+        $sync->sync();
+
+        $this->assertEquals(
+            9220,
+            $provider->fresh()->wallet_balance_vnd
+        );
+
+        $this->assertEquals(19500, $firstSnapshot);
+        $this->assertEquals(13980, $secondSnapshot);
+        $this->assertNotNull($firstCheckedAt);
+
+        Http::assertNothingSent();
+    }
+
 }

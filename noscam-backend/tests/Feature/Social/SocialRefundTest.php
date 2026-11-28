@@ -45,6 +45,36 @@ class SocialRefundTest extends TestCase
         ]);
     }
 
+    public function test_two_saved_snapshots_remain_independent(): void
+    {
+        \Illuminate\Support\Facades\Http::preventStrayRequests();
+
+        $first = $this->createTestOrder();
+
+        $first->update([
+            'provider_balance_snapshot_vnd' => 19500,
+            'provider_balance_snapshot_at' => now(),
+        ]);
+
+        $second = $first->replicate();
+        $second->code = 'TEST-SNAPSHOT-002';
+        $second->provider_balance_snapshot_vnd = 13980;
+        $second->provider_balance_snapshot_at = now();
+        $second->save();
+
+        $this->assertEquals(
+            19500,
+            (float) $first->fresh()->provider_balance_snapshot_vnd
+        );
+
+        $this->assertEquals(
+            13980,
+            (float) $second->fresh()->provider_balance_snapshot_vnd
+        );
+
+        \Illuminate\Support\Facades\Http::assertNothingSent();
+    }
+
     public function test_saved_snapshot_survives_refund(): void
     {
         \Illuminate\Support\Facades\Http::preventStrayRequests();
