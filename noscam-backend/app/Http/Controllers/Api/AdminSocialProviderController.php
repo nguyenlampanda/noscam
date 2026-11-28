@@ -281,73 +281,44 @@ class AdminSocialProviderController extends Controller
 
     public function refreshBalance(
         SocialProvider $provider,
-        SocialProviderManager $manager
+        \App\Services\Social\ProviderWalletBalanceService $service
     ): JsonResponse {
-        if (empty($provider->api_key)) {
+        if ($provider->status !== 'active') {
             return response()->json([
-                'message' => 'Nhà cung cấp chưa có API key.',
+                'message' => 'Nhà cung cấp không hoạt động.',
             ], 422);
         }
 
-        try {
-            $result = $manager
-                ->make($provider)
-                ->balance();
+        $results = $service->sync((int) $provider->id);
 
-            $balance = $this->extractBalance($result);
-
-            if (
-                $balance === null
-                || !is_finite((float) $balance)
-                || $balance < 0
-            ) {
-                return response()->json([
-                    'message' => 'API không trả về số dư hợp lệ.',
-                ], 422);
-            }
-
-            $currency = strtoupper(
-                (string) (
-                    data_get($result, 'currency')
-                    ?? data_get($result, 'data.currency')
-                    ?? $provider->currency
-                    ?? 'VND'
-                )
-            );
-
-            $provider->update([
-                'balance' => $balance,
-                'currency' => $currency,
-                'last_checked_at' => now(),
-            ]);
-
+        if (empty($results)) {
             return response()->json([
-                'message' => 'Đã cập nhật số dư API.',
-                'data' => [
-                    'balance' => $balance,
-                    'currency' => $currency,
-                    'balance_vnd' => $balance
-                        * (float) (
-                            $this->balanceExchangeRate($provider)
-                        ),
-                    'last_checked_at' =>
-                        $provider->last_checked_at,
-                ],
-            ]);
-        } catch (Throwable $e) {
-            Log::warning(
-                'Social provider balance refresh failed',
-                [
-                    'provider_id' => $provider->id,
-                    'driver' => $provider->driver,
-                    'error' => $e->getMessage(),
-                ]
-            );
+                'message' => 'Ví đang được đồng bộ. Vui lòng thử lại.',
+            ], 409);
+        }
 
+        $result = reset($results);
+
+        if (!$result['success']) {
             return response()->json([
                 'message' => 'Không thể cập nhật số dư API.',
             ], 422);
         }
+
+        $provider->refresh();
+
+        return response()->json([
+            'message' => 'Đã cập nhật số dư API.',
+            'data' => [
+                'balance' => $provider->wallet_balance_vnd,
+                'currency' => 'VND',
+                'balance_vnd' => $provider->wallet_balance_vnd,
+                'wallet_balance_vnd' => $provider->wallet_balance_vnd,
+                'wallet_group' => $provider->wallet_group,
+                'wallet_checked_at' => $provider->wallet_checked_at,
+                'last_checked_at' => $provider->wallet_checked_at,
+            ],
+        ]);
     }
 
     public function sync(
@@ -740,8 +711,19 @@ class AdminSocialProviderController extends Controller
                     ->price_multiplier,
 
             'balance_vnd' =>
-                $balance
-                * $exchangeRate,
+                $provider->wallet_balance_vnd,
+
+            'wallet_balance_vnd' =>
+                $provider->wallet_balance_vnd,
+
+            'wallet_checked_at' =>
+                $provider->wallet_checked_at,
+
+            'wallet_group' =>
+                $provider->wallet_group,
+
+            'wallet_error' =>
+                $provider->wallet_error,
 
             'priority' =>
                 $provider->priority,

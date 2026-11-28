@@ -35,6 +35,8 @@ class SocialProvider extends Model
         return [
             'api_key' => 'encrypted',
             'balance' => 'decimal:4',
+            'wallet_balance_vnd' => 'decimal:4',
+            'wallet_checked_at' => 'datetime',
             'exchange_rate_to_vnd' => 'decimal:4',
             'price_multiplier' => 'decimal:6',
             'auto_sync' => 'boolean',

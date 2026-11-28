@@ -35,3 +35,15 @@ Schedule::command('social:process-orders --limit=50')
 Schedule::command('exchange:process-expired --limit=50')
     ->everyMinute()
     ->withoutOverlapping(5);
+
+
+/*
+|--------------------------------------------------------------------------
+| NoScam Provider Wallet Balances
+|--------------------------------------------------------------------------
+*/
+
+Schedule::command('social:sync-wallet-balances')
+    ->everyMinute()
+    ->withoutOverlapping(5)
+    ->runInBackground();

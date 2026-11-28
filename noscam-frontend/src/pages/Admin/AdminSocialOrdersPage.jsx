@@ -305,23 +305,18 @@ function canCancel(item) {
 
 
 function ProviderBalanceBadge({ provider }) {
-  const raw = provider?.balance
-  const currency = String(provider?.currency || '').trim().toUpperCase()
-  const rate = currency === 'VND'
-    ? 1
-    : Number(provider?.exchange_rate_to_vnd)
+  const raw = provider?.wallet_balance_vnd
+  const checkedAt = provider?.wallet_checked_at
+  const hasError = Boolean(provider?.wallet_error)
 
   const valid =
     raw != null &&
     String(raw).trim() !== '' &&
-    Boolean(provider?.last_checked_at) &&
-    Boolean(currency) &&
+    Boolean(checkedAt) &&
     Number.isFinite(Number(raw)) &&
-    Number.isFinite(rate) &&
-    rate > 0
+    Number(raw) >= 0
 
-  const converted = valid ? Number(raw) * rate : null
-  const balance = Number.isFinite(converted) ? converted : null
+  const balance = valid ? Number(raw) : null
 
   const color = balance === null
     ? 'bg-slate-100 text-slate-500'
@@ -334,13 +329,20 @@ function ProviderBalanceBadge({ provider }) {
   return (
     <span
       className={`inline-flex items-center whitespace-nowrap rounded-md px-2 py-1 text-xs font-black ${color}`}
-      title={balance !== null
-        ? `Số dư gốc: ${raw} ${currency} | Tỷ giá: ${rate} | Kiểm tra: ${orderDateTime(provider.last_checked_at)}`
-        : 'Chưa cập nhật số dư hoặc thiếu tỷ giá'}
+      title={[
+        provider?.wallet_group === 'vietnamfb'
+          ? 'Ví chung VietnamFB và VietnamFB V2'
+          : 'Số dư ví API',
+        checkedAt
+          ? `Cập nhật: ${orderDateTime(checkedAt)}`
+          : 'Chưa đồng bộ',
+        hasError ? 'Đồng bộ thất bại, giữ số dư gần nhất' : '',
+      ].filter(Boolean).join(' | ')}
     >
       Số dư: {balance === null
         ? 'Chưa cập nhật'
         : `${Math.round(balance).toLocaleString('vi-VN')}đ`}
+      {hasError ? ' ⚠' : ''}
     </span>
   )
 }

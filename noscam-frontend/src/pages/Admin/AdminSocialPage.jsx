@@ -58,20 +58,18 @@ function providerBalanceOriginal(
   )} ${currency}`
 }
 
-function providerBalanceVnd(
-  provider,
-) {
-  const value =
-    provider.balance_vnd ??
-    (
-      Number(provider.balance || 0) *
-      Number(
-        provider.exchange_rate_to_vnd ||
-          1,
-      )
-    )
+function providerBalanceVnd(provider) {
+  const value = provider.wallet_balance_vnd
 
-  return `${money(value)}đ`
+  if (
+    value == null ||
+    !provider.wallet_checked_at ||
+    !Number.isFinite(Number(value))
+  ) {
+    return 'Chưa cập nhật'
+  }
+
+  return `${money(Number(value))}đ`
 }
 
 function StatCard({
@@ -391,9 +389,9 @@ function ProviderCard({
               )}
             </div>
             <div className="mt-2 text-xs font-medium text-slate-500">
-              {provider.last_checked_at
+              {provider.wallet_checked_at
                 ? `Lần kiểm tra: ${new Date(
-                    provider.last_checked_at,
+                    provider.wallet_checked_at,
                   ).toLocaleString('vi-VN')}`
                 : 'Chưa có thời gian kiểm tra'}
             </div>
@@ -910,65 +908,32 @@ export default function AdminSocialPage() {
 
       try {
         const response = await adminService.getSocialProviders()
+
         const payload =
           response?.data?.data ??
           response?.data ??
           response ??
           []
 
-        if (!Array.isArray(payload)) return
+        if (stopped || !Array.isArray(payload)) return
 
-        const targets = payload.filter(
-          (provider) => provider.has_api_key,
-        )
+        setProviders(payload)
 
-        for (const provider of targets) {
-          if (stopped) break
-
-          setBalanceStatuses((previous) => ({
-            ...previous,
-            [provider.id]: 'loading',
-          }))
-
-          try {
-            await adminService.refreshSocialProviderBalance(provider.id)
-
-            if (!stopped) {
-              setBalanceStatuses((previous) => ({
-                ...previous,
-                [provider.id]: 'success',
-              }))
-            }
-          } catch (error) {
-            if (!stopped) {
-              setBalanceStatuses((previous) => ({
-                ...previous,
-                [provider.id]: 'error',
-              }))
-            }
-            console.warn(
-              'Không cập nhật được số dư provider:',
+        setBalanceStatuses(
+          Object.fromEntries(
+            payload.map(provider => [
               provider.id,
-              error?.message,
-            )
-          }
-        }
-
-        if (!stopped) {
-          const updated = await adminService.getSocialProviders()
-          const updatedPayload =
-            updated?.data?.data ??
-            updated?.data ??
-            updated ??
-            []
-
-          if (Array.isArray(updatedPayload)) {
-            setProviders(updatedPayload)
-          }
-        }
+              provider.wallet_error
+                ? 'error'
+                : provider.wallet_checked_at
+                  ? 'success'
+                  : null,
+            ])
+          )
+        )
       } catch (error) {
         console.warn(
-          'Không thể làm mới số dư API:',
+          'Không tải được số dư API:',
           error?.message,
         )
       } finally {
@@ -980,7 +945,7 @@ export default function AdminSocialPage() {
       if (!stopped) refreshBalances()
     })
 
-    const interval = setInterval(refreshBalances, 60000)
+    const interval = setInterval(refreshBalances, 15000)
 
     return () => {
       stopped = true
