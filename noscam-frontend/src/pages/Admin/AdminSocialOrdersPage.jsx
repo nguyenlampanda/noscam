@@ -304,10 +304,9 @@ function canCancel(item) {
 }
 
 
-function ProviderBalanceBadge({ provider }) {
-  const raw = provider?.wallet_balance_vnd
-  const checkedAt = provider?.wallet_checked_at
-  const hasError = Boolean(provider?.wallet_error)
+function ProviderBalanceBadge({ order }) {
+  const raw = order?.provider_balance_snapshot_vnd
+  const checkedAt = order?.provider_balance_snapshot_at
 
   const valid =
     raw != null &&
@@ -330,19 +329,17 @@ function ProviderBalanceBadge({ provider }) {
     <span
       className={`inline-flex items-center whitespace-nowrap rounded-md px-2 py-1 text-xs font-black ${color}`}
       title={[
-        provider?.wallet_group === 'vietnamfb'
-          ? 'Ví chung VietnamFB và VietnamFB V2'
-          : 'Số dư ví API',
+        order?.provider?.wallet_group === 'vietnamfb'
+          ? 'Số dư lịch sử ví chung VietnamFB'
+          : 'Số dư API tại thời điểm ghi nhận đơn',
         checkedAt
-          ? `Cập nhật: ${orderDateTime(checkedAt)}`
-          : 'Chưa đồng bộ',
-        hasError ? 'Đồng bộ thất bại, giữ số dư gần nhất' : '',
+          ? `Ghi nhận: ${orderDateTime(checkedAt)}`
+          : 'Không có dữ liệu lịch sử',
       ].filter(Boolean).join(' | ')}
     >
       Số dư: {balance === null
-        ? 'Chưa cập nhật'
+        ? 'Chưa ghi nhận'
         : `${Math.round(balance).toLocaleString('vi-VN')}đ`}
-      {hasError ? ' ⚠' : ''}
     </span>
   )
 }
@@ -795,7 +792,7 @@ export default function AdminSocialOrdersPage() {
                             <span className="font-bold text-blue-700">
                               API: {item.provider?.name || 'Chưa xác định'}
                             </span>
-                            <ProviderBalanceBadge provider={item.provider} />
+                            <ProviderBalanceBadge order={item} />
                           </div>
 
                         </div>

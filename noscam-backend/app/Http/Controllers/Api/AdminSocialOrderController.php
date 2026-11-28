@@ -61,9 +61,16 @@ class AdminSocialOrderController extends Controller
             });
         }
 
-        return response()->json(
-            $query->latest()->paginate(50)
+        $orders = $query->latest()->paginate(50);
+
+        $orders->getCollection()->each(
+            fn (SocialOrder $order) => $order->makeVisible([
+                'provider_balance_snapshot_vnd',
+                'provider_balance_snapshot_at',
+            ])
         );
+
+        return response()->json($orders);
     }
 
 
@@ -81,6 +88,13 @@ class AdminSocialOrderController extends Controller
             ->orderBy('id')
             ->paginate(50);
 
+        $orders->getCollection()->each(
+            fn (SocialOrder $order) => $order->makeVisible([
+                'provider_balance_snapshot_vnd',
+                'provider_balance_snapshot_at',
+            ])
+        );
+
         return response()->json($orders);
     }
 
@@ -95,7 +109,10 @@ class AdminSocialOrderController extends Controller
         ]);
 
         return response()->json([
-            'data' => $order,
+            'data' => $order->makeVisible([
+                'provider_balance_snapshot_vnd',
+                'provider_balance_snapshot_at',
+            ]),
         ]);
     }
 

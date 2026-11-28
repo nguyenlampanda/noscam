@@ -45,6 +45,41 @@ class SocialRefundTest extends TestCase
         ]);
     }
 
+    public function test_saved_snapshot_survives_refund(): void
+    {
+        \Illuminate\Support\Facades\Http::preventStrayRequests();
+
+        $order = $this->createTestOrder();
+
+        $order->update([
+            'provider_balance_snapshot_vnd' => 19499.9,
+            'provider_balance_snapshot_at' => now(),
+        ]);
+
+        $snapshotAt = $order->fresh()->provider_balance_snapshot_at;
+
+        app(SocialOrderService::class)->refund($order->fresh());
+
+        $saved = $order->fresh();
+
+        $this->assertEquals(
+            19499.9,
+            (float) $saved->provider_balance_snapshot_vnd
+        );
+
+        $this->assertEquals(
+            $snapshotAt,
+            $saved->provider_balance_snapshot_at
+        );
+
+        $this->assertEquals(
+            100000,
+            (float) $saved->refunded_amount
+        );
+
+        \Illuminate\Support\Facades\Http::assertNothingSent();
+    }
+
     public function test_refund_credits_wallet_once(): void
     {
         $order = $this->createTestOrder();

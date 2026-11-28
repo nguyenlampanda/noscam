@@ -469,7 +469,32 @@ class SocialOrderService
                     return $existing;
                 }
 
+                // Capture the latest recorded wallet balance once.
+                // Never overwrite historical snapshots during later syncs.
+                $walletSnapshot = DB::table('social_providers')
+                    ->where('id', $providerService->social_provider_id)
+                    ->first([
+                        'wallet_balance_vnd',
+                        'wallet_checked_at',
+                    ]);
+
+                $snapshotBalance = $walletSnapshot?->wallet_balance_vnd;
+                $snapshotAt = $walletSnapshot?->wallet_checked_at;
+
+                if (
+                    !is_numeric($snapshotBalance)
+                    || !is_finite((float) $snapshotBalance)
+                    || (float) $snapshotBalance < 0
+                    || !$snapshotAt
+                ) {
+                    $snapshotBalance = null;
+                    $snapshotAt = null;
+                }
+
                 $order = SocialOrder::create([
+                    'provider_balance_snapshot_vnd' => $snapshotBalance,
+                    'provider_balance_snapshot_at' => $snapshotAt,
+
                     'code' =>
                         $this->orderCode(),
 
