@@ -243,6 +243,8 @@ function progressOf(order) {
 export default function MyOrdersPage() {
   // NOSCAM_ORDER_PLATFORM_COMMENT_V1
   const [platformFilter, setPlatformFilter] = useState('all')
+  const [filtersOpen, setFiltersOpen] = useState(false)
+
   const [commentDialogOrder, setCommentDialogOrder] = useState(null)
 
 const [cancelBusyId, setCancelBusyId] = useState(null)
@@ -619,7 +621,7 @@ async function handleCancelOrder(item) {
   }
 
   return (
-    <main className="bg-white min-h-screen px-4 pb-24 pt-7 sm:px-6 sm:pb-12 md:py-12">
+    <main className="bg-white min-h-screen px-3 pb-24 pt-4 sm:px-6 sm:pb-12 md:pt-6">
 <style>{`
   .noscam-customer-order-detail {
     animation: noscam-customer-order-expand 240ms ease-out both;
@@ -716,30 +718,37 @@ async function handleCancelOrder(item) {
             opacity: 1,
             y: 0,
           }}
-          className="flex flex-wrap items-end justify-between gap-5 rounded-[32px] border border-blue-100/80 bg-white/90 p-6 shadow-[0_20px_65px_-35px_rgba(37,99,235,0.35)] backdrop-blur-xl sm:p-9"
+          className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-3 sm:px-5 sm:py-4"
         >
           <div>
-            <div className="text-sm font-black uppercase tracking-[0.18em] text-blue-600">
+            <div className="hidden">
               Tài khoản
             </div>
 
-            <h1 className="mt-2 text-3xl font-black text-slate-950">
+            <h1 className="text-xl font-black text-slate-950 sm:text-2xl">
               Đơn của tôi
             </h1>
 
-            <p className="mt-2 text-sm text-slate-400">
-              Theo dõi trạng thái, tiến độ và lịch sử đơn tăng tương tác.
-            </p>
+
           </div>
 
           <Link
             to="/social-services"
-            className="rounded-2xl bg-blue-600 px-5 py-3 font-black text-white shadow-sm transition hover:bg-blue-700"
+            className="shrink-0 whitespace-nowrap rounded-xl bg-blue-600 px-3 py-2.5 text-xs font-bold text-white transition hover:bg-blue-700 sm:px-4 sm:text-sm"
           >
             + Tạo đơn mới
           </Link>
         </motion.div>
 
+        <div className="mt-3 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 sm:px-4">
+          <svg className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+            <circle cx="12" cy="12" r="9" />
+            <path d="M12 7v5l3 2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          <p className="text-xs leading-5 text-amber-800 sm:text-sm">
+            <strong>Lưu ý:</strong> Sau khi đặt đơn, vui lòng chờ <strong>12–24 giờ</strong> để hệ thống xử lý. Nếu sau 24 giờ đơn vẫn chưa bắt đầu chạy, hãy liên hệ Admin để được hỗ trợ.
+          </p>
+        </div>
 
 {error && (
           <div className="mt-6 rounded-2xl border border-red-100 bg-red-50 p-4 font-semibold text-red-600">
@@ -760,7 +769,7 @@ async function handleCancelOrder(item) {
           </div>
         )}
 
-        <div className="mt-7 grid grid-cols-4 gap-1.5 sm:gap-3">
+        <div className="mt-3 grid grid-cols-4 gap-1.5 sm:gap-2">
           {tabs.map((item) => {
             const active = status === item.value
 
@@ -793,10 +802,10 @@ async function handleCancelOrder(item) {
                 onClick={() => setStatus(item.value)}
                 aria-pressed={active}
                 className={`flex min-w-0 flex-col items-center justify-center
-                  rounded-xl border px-0.5 py-3 text-center
+                  rounded-xl border px-1 py-2 text-center
                   shadow-sm transition-all duration-300
                   hover:-translate-y-1 hover:shadow-md
-                  sm:min-h-[108px] sm:rounded-2xl sm:px-3 sm:py-4
+                  sm:min-h-[64px] sm:rounded-xl sm:px-3 sm:py-2
                   ${active ? palette.selected : palette.normal}`}
               >
                 <span
@@ -807,7 +816,7 @@ async function handleCancelOrder(item) {
                   {item.label}
                 </span>
 
-                <span className="mt-2 text-xl font-black leading-none sm:text-2xl">
+                <span className="mt-1 text-lg font-black leading-none sm:text-xl">
                   {item.count}
                 </span>
               </motion.button>
@@ -816,9 +825,65 @@ async function handleCancelOrder(item) {
         </div>
 
 
-        <div className="mt-5 flex flex-wrap items-center gap-3">
+        <div className="group/filter mt-3">
+          <div className="flex items-center gap-2">
+            <div className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-2 py-1 transition focus-within:border-blue-400">
+          <div className="flex items-center gap-3">
+            <span className="pl-2 text-slate-400">
+              ⌕
+            </span>
+
+            <input
+              value={search}
+              onChange={(e) =>
+                setSearch(
+                  e.target.value,
+                )
+              }
+              placeholder="Tìm mã đơn, dịch vụ..."
+              className="min-w-0 flex-1 bg-transparent py-2 text-xs font-medium outline-none sm:text-sm"
+            />
+
+            {search && (
+              <button
+                type="button"
+                onClick={() =>
+                  setSearch('')
+                }
+                className="rounded-xl bg-slate-100 px-3 py-2 text-xs font-black text-slate-500"
+              >
+                Xóa
+              </button>
+            )}
+          </div>
+        </div>
+            <button
+              type="button"
+              aria-controls="noscam-order-filters"
+              aria-expanded={filtersOpen}
+              onClick={() => setFiltersOpen(value => !value)}
+              className={`flex min-h-10 shrink-0 items-center gap-1.5 rounded-xl border px-3 text-xs font-bold transition sm:text-sm ${
+                filtersOpen || platformFilter !== 'all'
+                  ? 'border-blue-300 bg-blue-50 text-blue-700'
+                  : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+                <path d="M4 6h16M7 12h10M10 18h4" />
+              </svg>
+              Bộ lọc
+              {platformFilter !== 'all' && (
+                <span className="h-1.5 w-1.5 rounded-full bg-blue-600" />
+              )}
+              <span className={`transition-transform ${filtersOpen ? 'rotate-180' : ''}`}>▾</span>
+            </button>
+          </div>
+
+          {filtersOpen && (
+            <div id="noscam-order-filters">
+              <div className="mt-2 flex flex-col gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
           <label
-            htmlFor="noscam-order-platform"
+
             className="text-sm font-bold text-slate-600"
           >
             Nền tảng
@@ -851,19 +916,19 @@ async function handleCancelOrder(item) {
                   type="button"
                   aria-pressed={active}
                   onClick={() => setPlatformFilter(item.value)}
-                  className={`flex min-w-[76px] flex-col items-center gap-1.5 rounded-xl border px-3 py-2.5 transition ${
+                  className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-2 transition ${
                     active
                       ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm'
                       : 'border-slate-200 bg-white text-slate-600 hover:border-blue-300 hover:bg-slate-50'
                   }`}
                 >
                   {item.value === 'all' ? (
-                    <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-600 text-lg font-black text-white">
+                    <span className="flex h-5 w-5 items-center justify-center rounded-md bg-blue-600 text-xs font-black text-white">
                       ✓
                     </span>
                   ) : (
-                    <span className="flex h-9 w-9 items-center justify-center">
-                      <PlatformIcon platform={item.value} size={32} />
+                    <span className="flex h-5 w-5 items-center justify-center">
+                      <PlatformIcon platform={item.value} size={18} />
                     </span>
                   )}
                   <span className="text-xs font-bold">
@@ -874,39 +939,24 @@ async function handleCancelOrder(item) {
             })}
           </div>
         </div>
-
-        <div className="mt-6 rounded-[24px] border border-slate-200/80 bg-white/95 p-4 shadow-[0_12px_35px_-25px_rgba(15,23,42,0.4)] transition-all duration-300 hover:border-blue-200 hover:shadow-lg focus-within:border-blue-400 focus-within:ring-4 focus-within:ring-blue-50">
-          <div className="flex items-center gap-3">
-            <span className="pl-2 text-slate-400">
-              ⌕
-            </span>
-
-            <input
-              value={search}
-              onChange={(e) =>
-                setSearch(
-                  e.target.value,
-                )
-              }
-              placeholder="Tìm mã đơn, tên dịch vụ hoặc liên kết..."
-              className="min-w-0 flex-1 bg-transparent py-2 text-sm font-semibold outline-none"
-            />
-
-            {search && (
-              <button
-                type="button"
-                onClick={() =>
-                  setSearch('')
-                }
-                className="rounded-xl bg-slate-100 px-3 py-2 text-xs font-black text-slate-500"
-              >
-                Xóa
-              </button>
-            )}
-          </div>
+              <div className="mt-2 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPlatformFilter('all')
+                    setStatus('all')
+                    setSearch('')
+                  }}
+                  className="rounded-lg px-3 py-2 text-xs font-bold text-blue-600 hover:bg-blue-50"
+                >
+                  Đặt lại bộ lọc
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
-        <div className="mt-5 space-y-4">
+        <div className="mt-3 space-y-2">
           {loading ? (
             <div className="rounded-3xl border border-slate-200 bg-white p-14 text-center text-slate-400">
               Đang tải đơn hàng...
@@ -977,7 +1027,7 @@ async function handleCancelOrder(item) {
                     className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm has-[details[open]]:border-blue-400 has-[details[open]]:ring-2 has-[details[open]]:ring-blue-100 has-[details[open]]:shadow-lg has-[details[open]]:shadow-blue-100/60"
                   >
                     <details className="group/order">
-                      <summary className="flex cursor-pointer list-none items-center gap-3 p-4 transition-colors hover:bg-blue-50/40 group-open/order:bg-blue-50 [&::-webkit-details-marker]:hidden">
+                      <summary className="flex cursor-pointer list-none items-center gap-2.5 p-3 transition-colors hover:bg-blue-50/40 group-open/order:bg-blue-50 [&::-webkit-details-marker]:hidden">
                         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100">
                           <PlatformIcon platform={item.service?.platform || 'other'} className="h-5 w-5" />
                         </span>
@@ -1076,7 +1126,7 @@ async function handleCancelOrder(item) {
                             )}
                           </div>
 
-                          
+
                           <div className="flex items-center justify-between gap-2 md:flex-col md:items-end md:justify-center md:gap-0">
                             <span className="text-[10px] font-bold uppercase text-slate-400">
                               Ban đầu
